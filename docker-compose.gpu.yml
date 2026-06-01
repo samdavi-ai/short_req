@@ -1,0 +1,16 @@
+version: '3.8'
+
+services:
+  video_processor:
+    environment:
+      - USE_GPU=true
+      - USE_TENSORRT=true
+      - CUDA_VISIBLE_DEVICES=0
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    restart: always

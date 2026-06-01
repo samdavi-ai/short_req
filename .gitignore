@@ -1,0 +1,101 @@
+# ─── Python ─────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+.eggs/
+*.whl
+
+# ─── Virtual Environments ────────────────────────────────────────────
+venv/
+env/
+.venv/
+.env.local
+backend/venv/
+backend/.venv/
+
+# ─── Environment / Secrets ───────────────────────────────────────────
+# Keep .env.example but NEVER commit real .env
+.env
+.env.*
+!.env.example
+
+# ─── Database ────────────────────────────────────────────────────────
+*.db
+*.sqlite
+*.sqlite3
+
+# ─── Alembic ─────────────────────────────────────────────────────────
+# Keep migrations but ignore auto-generated temp files
+backend/alembic/versions/*.pyc
+
+# ─── Node / Frontend ─────────────────────────────────────────────────
+node_modules/
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+*.tsbuildinfo
+
+# ─── ML Models & Large Binary Files ──────────────────────────────────
+processing/models/weights/
+processing/models/*.pt
+processing/models/*.onnx
+processing/models/*.engine
+processing/models/*.pth
+*.pt
+*.onnx
+*.engine
+*.pth
+*.bin
+
+# ─── Assets / Media Uploads ──────────────────────────────────────────
+assets/crops/
+assets/alerts/
+assets/visitors/
+# Keep layouts directory structure but not uploaded images
+assets/layouts/*.png
+assets/layouts/*.jpg
+assets/layouts/*.pdf
+
+# ─── Logs ────────────────────────────────────────────────────────────
+*.log
+logs/
+*.log.*
+
+# ─── Cache ───────────────────────────────────────────────────────────
+.cache/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+__pycache__/
+.DS_Store
+Thumbs.db
+
+# ─── IDE / Editor ────────────────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.cursor/
+
+# ─── Test artifacts ──────────────────────────────────────────────────
+.coverage
+htmlcov/
+coverage.xml
+*.cover
+junit.xml
+test-results/
+
+# ─── Docker ──────────────────────────────────────────────────────────
+# Keep docker-compose files but ignore generated volumes
+docker/volumes/
+docker/data/
+
+# ─── Celery ──────────────────────────────────────────────────────────
+celerybeat-schedule
+celerybeat.pid
