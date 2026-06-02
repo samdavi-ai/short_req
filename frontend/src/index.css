@@ -1089,7 +1089,8 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: var(--black);
+  background: radial-gradient(circle, rgba(10,10,11,0.5) 0%, rgba(10,10,11,0.92) 80%, rgba(10,10,11,0.98) 100%),
+              url('/assets/airport_surveillance_bg.png') no-repeat center center / cover;
   position: relative;
   overflow: hidden;
 }
@@ -1098,22 +1099,37 @@ body {
   position: absolute;
   inset: 0;
   background-image:
-    linear-gradient(var(--border) 1px, transparent 1px),
-    linear-gradient(90deg, var(--border) 1px, transparent 1px);
+    linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px);
   background-size: 60px 60px;
-  opacity: 0.5;
+  opacity: 0.8;
+  pointer-events: none;
 }
 
 .login-card {
-  background: var(--surface-1);
-  border: 1px solid var(--border-hover);
+  background: rgba(17, 17, 19, 0.72);
+  backdrop-filter: blur(20px) saturate(160%);
+  -webkit-backdrop-filter: blur(20px) saturate(160%);
+  border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: var(--radius-xl);
   padding: 40px;
   width: 100%;
   max-width: 420px;
   position: relative;
   z-index: 1;
-  box-shadow: var(--shadow-lg);
+  box-shadow: var(--shadow-lg), 
+              0 0 80px rgba(0, 0, 0, 0.6), 
+              inset 0 1px 1px rgba(255,255,255,0.1),
+              0 0 40px rgba(34, 197, 94, 0.04);
+  transition: border-color var(--t-base) var(--ease), box-shadow var(--t-base) var(--ease);
+}
+
+.login-card:hover {
+  border-color: rgba(34, 197, 94, 0.25);
+  box-shadow: var(--shadow-lg), 
+              0 0 80px rgba(0, 0, 0, 0.7), 
+              inset 0 1px 1px rgba(255,255,255,0.15),
+              0 0 50px rgba(34, 197, 94, 0.08);
 }
 
 .login-logo {
@@ -1121,18 +1137,25 @@ body {
   flex-direction: column;
   align-items: center;
   gap: 12px;
-  margin-bottom: 32px;
+  margin-bottom: 28px;
   text-align: center;
 }
 
 .login-icon {
   width: 56px; height: 56px;
-  background: var(--green);
+  background: linear-gradient(135deg, var(--green) 0%, #15803d 100%);
   border-radius: var(--radius-xl);
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: var(--shadow-green);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: var(--shadow-green), 0 0 25px rgba(34, 197, 94, 0.3);
+  animation: logo-glow 3s ease-in-out infinite alternate;
+}
+
+@keyframes logo-glow {
+  0% { box-shadow: var(--shadow-green), 0 0 15px rgba(34, 197, 94, 0.2); }
+  100% { box-shadow: var(--shadow-green), 0 0 35px rgba(34, 197, 94, 0.5); }
 }
 
 /* ─── Canvas layout editor ───────────────────────────────────────── */

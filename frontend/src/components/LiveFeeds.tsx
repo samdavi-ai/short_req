@@ -27,6 +27,34 @@ function CameraFeedCard({ cam, selected, onClick }: {
 }) {
   const isOffline = cam.status === 'OFFLINE';
   const isMaint = cam.status === 'MAINTENANCE';
+  const videoRef = React.useRef<HTMLVideoElement | null>(null);
+  const [stream, setStream] = React.useState<MediaStream | null>(null);
+
+  React.useEffect(() => {
+    if (selected && !isOffline && !isMaint) {
+      navigator.mediaDevices.getUserMedia({ video: { width: 640, height: 360 } })
+        .then((s) => {
+          setStream(s);
+          if (videoRef.current) {
+            videoRef.current.srcObject = s;
+          }
+        })
+        .catch((err) => {
+          console.error("Webcam access error:", err);
+        });
+    } else {
+      if (stream) {
+        stream.getTracks().forEach((track) => track.stop());
+        setStream(null);
+      }
+    }
+
+    return () => {
+      if (stream) {
+        stream.getTracks().forEach((track) => track.stop());
+      }
+    };
+  }, [selected, isOffline, isMaint]);
 
   return (
     <div
@@ -49,6 +77,14 @@ function CameraFeedCard({ cam, selected, onClick }: {
             <Camera size={28} color="var(--amber-bright)" />
             <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--amber-bright)' }}>MAINTENANCE</span>
           </>
+        ) : selected ? (
+          <video
+            ref={videoRef}
+            autoPlay
+            playsInline
+            muted
+            style={{ width: '100%', height: '100%', objectFit: 'cover', transform: 'scaleX(-1)' }}
+          />
         ) : (
           <>
             {/* Animated scan lines for "live" feel */}
@@ -64,7 +100,7 @@ function CameraFeedCard({ cam, selected, onClick }: {
               ))}
             </svg>
             <Camera size={20} color="rgba(255,255,255,0.15)" />
-            <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.2)' }}>NO STREAM CONFIGURED</span>
+            <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.2)' }}>CLICK TO STREAM WEBCAM</span>
           </>
         )}
       </div>

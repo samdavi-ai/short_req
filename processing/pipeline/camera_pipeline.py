@@ -3,79 +3,132 @@ import time
 import os
 import json
 import redis
+import logging
 from workers.person_detector import PersonDetector
 from workers.single_cam_tracker import SingleCameraTracker
 from workers.face_detector import FaceDetector
-from workers.face_embedder import FaceEmbedder
-from workers.body_reid import BodyReIDEmbedder
-from workers.global_tracker import GlobalTracker
+from workers.intrusion_engine import IntrusionEngine
+from app.core.database import SessionLocal
+from app.models.models import Camera
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 class CameraPipeline:
     def __init__(self, camera_id: int, rtsp_url: str):
         self.camera_id = camera_id
         self.rtsp_url = rtsp_url
-        self.redis_client = redis.from_url(os.getenv("REDIS_URL", "redis://redis:6379/0"))
         
-        # Load AI pipeline components
-        self.detector = PersonDetector("models/yolov8l.onnx", use_gpu=False)
+        # Redis connection
+        redis_url = os.getenv("REDIS_URL", "redis://localhost:6379/0")
+        self.redis_client = redis.from_url(redis_url, decode_responses=True)
+        
+        # Load CPU-optimized OpenCV workers
+        self.detector = PersonDetector()
         self.tracker = SingleCameraTracker()
-        self.face_detector = FaceDetector("models/scrfd_10g.onnx")
-        self.face_embedder = FaceEmbedder("models/arcface_r100.onnx")
-        self.reid_embedder = BodyReIDEmbedder("models/transreid_vit.onnx")
-        self.global_tracker = GlobalTracker()
+        self.face_detector = FaceDetector()
+        self.intrusion_engine = IntrusionEngine(self.redis_client)
         
+        # Retrieve camera specifications from database
+        db = SessionLocal()
+        try:
+            camera = db.query(Camera).filter(Camera.id == self.camera_id).first()
+            if camera:
+                self.floor = camera.floor
+                self.camera_name = camera.name
+            else:
+                self.floor = 1
+                self.camera_name = f"Camera {self.camera_id}"
+        except Exception as e:
+            logger.error("Failed to query camera floor info: %s", e)
+            self.floor = 1
+            self.camera_name = f"Camera {self.camera_id}"
+        finally:
+            db.close()
+            
     def run(self):
-        print(f"Starting inference pipeline on camera {self.camera_id}...")
+        logger.info("Starting live computer vision inference pipeline on '%s' (ID: %d)...", self.camera_name, self.camera_id)
         
-        # Create a simple simulator using local frame reader
-        cap = cv2.VideoCapture(0 if self.rtsp_url.isdigit() else self.rtsp_url)
+        # Initialize video capture (0 for webcam, rtsp_url otherwise)
+        input_source = 0 if self.rtsp_url.isdigit() or self.rtsp_url == "0" else self.rtsp_url
+        cap = cv2.VideoCapture(input_source)
         
+        if not cap.isOpened():
+            logger.error("Failed to open video source: %s", input_source)
+            return
+
+        frame_count = 0
         while cap.isOpened():
             ret, frame = cap.read()
             if not ret:
+                # Loop local video files
+                if isinstance(input_source, str) and os.path.exists(input_source):
+                    cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
+                    continue
                 time.sleep(1)
                 continue
                 
+            frame_count += 1
+            # Skip frames to keep performance optimal
+            if frame_count % 3 != 0:
+                continue
+
+            h, w = frame.shape[:2]
+            
             # 1. Object detection
             detections = self.detector.detect(frame)
             
-            # 2. Local tracking
+            # 2. Centroid tracking
             tracks = self.tracker.update(detections)
             
             for track_id, bbox in tracks:
                 x1, y1, x2, y2 = bbox
-                crop = frame[int(y1):int(y2), int(x1):int(x2)]
+                
+                # Safeguard dimensions
+                x1, y1 = max(0, x1), max(0, y1)
+                x2, y2 = min(w, x2), min(h, y2)
+                
+                crop = frame[y1:y2, x1:x2]
                 if crop.size == 0:
                     continue
                     
-                # 3. Face embedder
+                # 3. Face detection (optional)
                 face_bbox = self.face_detector.detect_faces(crop)
-                face_emb = None
-                if face_bbox:
-                    fx1, fy1, fx2, fy2 = face_bbox
-                    face_crop = crop[fy1:fy2, fx1:fx2]
-                    if face_crop.size > 0:
-                        face_emb = self.face_embedder.extract_embedding(face_crop)
-                        
-                # 4. Body Re-ID Embedder
-                body_emb = self.reid_embedder.extract_embedding(crop)
+                has_face = face_bbox is not None
                 
-                # 5. Global Track Matcher
-                global_id = self.global_tracker.match_or_create(face_emb, body_emb, None, self.camera_id)
+                # 4. Map coordinates to Layout Canvas floorplan size (900x600)
+                cx = int((x1 + x2) / 2)
+                cy = int((y1 + y2) / 2)
+                map_x = int((cx / w) * 900)
+                map_y = int((cy / h) * 600)
                 
-                # Push coordinates and tracking metadata back to WebSocket queue
+                # Stable global tracking UUID
+                global_uuid = f"G-{self.camera_id}-{track_id}"
+                
+                # 5. Evaluate coordinates inside Defined Zones (restricted/loitering)
+                self.intrusion_engine.evaluate_person(
+                    global_id=global_uuid,
+                    track_id=track_id,
+                    camera_id=self.camera_id,
+                    floor=self.floor,
+                    x=map_x,
+                    y=map_y
+                )
+                
+                # 6. Publish real-time track updates to WebSocket server via Redis
                 payload = {
                     "type": "TRACK_UPDATE",
                     "camera_id": self.camera_id,
                     "track_id": track_id,
-                    "global_id": global_id,
-                    "x": int((x1 + x2) / 2),
-                    "y": int((y1 + y2) / 2),
+                    "global_id": global_uuid,
+                    "x": map_x,
+                    "y": map_y,
                     "bbox": [int(x1), int(y1), int(x2), int(y2)],
+                    "has_face": has_face,
                     "timestamp": time.time()
                 }
-                self.redis_client.publish("ws_channel", json.dumps(payload))
+                self.redis_client.publish("ws_events", json.dumps(payload))
                 
-            time.sleep(0.1) # Simulate real frame delay
+            time.sleep(0.03) # ~30 FPS
             
         cap.release()

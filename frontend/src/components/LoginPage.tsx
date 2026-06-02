@@ -120,15 +120,36 @@ export default function LoginPage() {
           </button>
         </form>
 
-        <div style={{ marginTop: 16, textAlign: 'center' }}>
-          <div style={{ fontSize: 12, color: 'var(--text-ghost)', marginBottom: 8 }}>— or —</div>
+        <div style={{ marginTop: 20, textAlign: 'center' }}>
+          <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.1em', color: 'var(--text-ghost)', textTransform: 'uppercase', marginBottom: 12 }}>— or —</div>
           <button
             id="demo-login"
-            className="btn btn-ghost"
-            style={{ width: '100%', justifyContent: 'center', fontSize: 12 }}
+            className="btn"
+            style={{ 
+              width: '100%', 
+              justifyContent: 'center', 
+              fontSize: 12,
+              background: 'rgba(34, 197, 94, 0.06)',
+              borderColor: 'rgba(34, 197, 94, 0.3)',
+              color: 'var(--green-light)',
+              boxShadow: '0 0 15px rgba(34, 197, 94, 0.05)',
+              transition: 'all 0.2s ease',
+            }}
+            onMouseOver={(e) => {
+              e.currentTarget.style.background = 'rgba(34, 197, 94, 0.12)';
+              e.currentTarget.style.borderColor = 'var(--green-bright)';
+              e.currentTarget.style.boxShadow = '0 0 20px rgba(34, 197, 94, 0.15)';
+              e.currentTarget.style.transform = 'translateY(-1px)';
+            }}
+            onMouseOut={(e) => {
+              e.currentTarget.style.background = 'rgba(34, 197, 94, 0.06)';
+              e.currentTarget.style.borderColor = 'rgba(34, 197, 94, 0.3)';
+              e.currentTarget.style.boxShadow = '0 0 15px rgba(34, 197, 94, 0.05)';
+              e.currentTarget.style.transform = 'translateY(0)';
+            }}
             onClick={handleDemoLogin}
           >
-            Launch Demo Mode (No backend required)
+            Launch Demo Mode (Instant Sandbox)
           </button>
         </div>
 

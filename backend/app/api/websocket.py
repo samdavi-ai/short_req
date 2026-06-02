@@ -10,7 +10,7 @@ Architecture:
 import asyncio
 import json
 import logging
-from typing import Dict, Set
+from typing import Dict, Set, Optional
 
 import redis.asyncio as aioredis
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Query
@@ -34,7 +34,7 @@ class ConnectionManager:
         # WebSockets subscribed to all events (no camera filter)
         self._global_subs: Set[WebSocket] = set()
 
-    async def connect(self, websocket: WebSocket, camera_id: int | None = None):
+    async def connect(self, websocket: WebSocket, camera_id: Optional[int] = None):
         await websocket.accept()
         if camera_id is not None:
             self._camera_subs.setdefault(camera_id, set()).add(websocket)
@@ -45,7 +45,7 @@ class ConnectionManager:
             camera_id, len(self._global_subs), len(self._camera_subs),
         )
 
-    def disconnect(self, websocket: WebSocket, camera_id: int | None = None):
+    def disconnect(self, websocket: WebSocket, camera_id: Optional[int] = None):
         if camera_id is not None:
             self._camera_subs.get(camera_id, set()).discard(websocket)
         else:
@@ -205,7 +205,7 @@ async def _handle_client_command(websocket: WebSocket, cmd: dict):
 
 # ─── Internal publish helper (used by API routes to push instant alerts) ──────
 
-_redis_publish_client: aioredis.Redis | None = None
+_redis_publish_client: Optional[aioredis.Redis] = None
 
 
 async def get_publish_client() -> aioredis.Redis:

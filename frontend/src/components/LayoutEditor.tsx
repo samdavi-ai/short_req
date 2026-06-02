@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import {
   Camera, Trash2, Plus, ChevronUp, ChevronDown,
-  Save, RotateCcw, ZoomIn, ZoomOut, Square, Pentagon, MapPin
+  Save, RotateCcw, ZoomIn, ZoomOut, Square, MapPin
 } from 'lucide-react';
 import { useStore } from '../stores/appStore';
 import { api } from '../hooks/api';
@@ -72,6 +72,73 @@ export default function LayoutEditor() {
     { id: 2, name: 'Restricted Area', type: 'RESTRICTED', color: ZONE_COLORS.RESTRICTED,
       points: [{ x: 480, y: 180 }, { x: 700, y: 180 }, { x: 700, y: 300 }, { x: 480, y: 300 }] },
   ]);
+
+  const [liveTracks, setLiveTracks] = useState<Record<string, { x: number; y: number; has_face: boolean; timestamp: number }>>({});
+
+  // ─── WebSocket Event Ingestion ─────────────────────────────────────────────
+  useEffect(() => {
+    if (!token || token === 'demo-token') return;
+
+    const wsUrl = 'ws://localhost:8000/ws';
+    const ws = new WebSocket(wsUrl);
+
+    ws.onmessage = (event) => {
+      try {
+        const payload = JSON.parse(event.data);
+        if (payload.type === 'TRACK_UPDATE') {
+          setLiveTracks((prev) => ({
+            ...prev,
+            [payload.global_id]: {
+              x: payload.x,
+              y: payload.y,
+              has_face: payload.has_face || false,
+              timestamp: Date.now()
+            }
+          }));
+        } else if (payload.type === 'ALERT_NEW') {
+          const alert = payload.data;
+          const currentAlerts = useStore.getState().alerts;
+          useStore.getState().setAlerts([
+            {
+              id: alert.id,
+              alert_type: alert.alert_type,
+              description: alert.description,
+              severity: alert.severity,
+              camera_id: payload.camera_id,
+              timestamp: alert.timestamp,
+              acknowledged: false,
+              acknowledged_by: null
+            },
+            ...currentAlerts
+          ]);
+          addToast(alert.description, 'error');
+        }
+      } catch (err) {
+        console.error('WS Ingest Error:', err);
+      }
+    };
+
+    // Auto-prune stale tracks after 3s of inactivity
+    const interval = setInterval(() => {
+      setLiveTracks((prev) => {
+        const next = { ...prev };
+        let changed = false;
+        const now = Date.now();
+        for (const [id, t] of Object.entries(next)) {
+          if (now - t.timestamp > 3000) {
+            delete next[id];
+            changed = true;
+          }
+        }
+        return changed ? next : prev;
+      });
+    }, 1000);
+
+    return () => {
+      ws.close();
+      clearInterval(interval);
+    };
+  }, [token, addToast]);
 
   // Draw on canvas
   useEffect(() => {
@@ -192,23 +259,46 @@ export default function LayoutEditor() {
 
     // Live person dots
     if (tool === 'select') {
-      for (let i = 0; i < 18; i++) {
-        const seed = (i * 137 + activeFloor * 31) % 1000;
-        const x = (seed % 700) + 50;
-        const y = ((seed * 3) % 400) + 50;
-        const isAlert = i % 11 === 0;
-        ctx.beginPath();
-        ctx.arc(x, y, 4, 0, Math.PI * 2);
-        ctx.fillStyle = isAlert ? '#ef4444' : '#22c55e';
-        ctx.fill();
-        ctx.strokeStyle = 'rgba(0,0,0,0.5)';
-        ctx.lineWidth = 1;
-        ctx.stroke();
+      const activeTracks = Object.values(liveTracks);
+      
+      if (activeTracks.length > 0) {
+        // Render real-time tracks from active CV feeds
+        activeTracks.forEach((track) => {
+          ctx.beginPath();
+          ctx.arc(track.x, track.y, 5, 0, Math.PI * 2);
+          ctx.fillStyle = track.has_face ? '#3b82f6' : '#22c55e'; // Blue on face-lock, green otherwise
+          ctx.fill();
+          ctx.strokeStyle = 'rgba(255,255,255,0.9)';
+          ctx.lineWidth = 1.5;
+          ctx.stroke();
+
+          // Radar concentric ring
+          ctx.beginPath();
+          ctx.arc(track.x, track.y, 9, 0, Math.PI * 2);
+          ctx.strokeStyle = track.has_face ? 'rgba(59,130,246,0.3)' : 'rgba(34,197,94,0.3)';
+          ctx.lineWidth = 1;
+          ctx.stroke();
+        });
+      } else {
+        // Fallback to simulated passenger flow (Demo Mode)
+        for (let i = 0; i < 18; i++) {
+          const seed = (i * 137 + activeFloor * 31) % 1000;
+          const x = (seed % 700) + 50;
+          const y = ((seed * 3) % 400) + 50;
+          const isAlert = i % 11 === 0;
+          ctx.beginPath();
+          ctx.arc(x, y, 4, 0, Math.PI * 2);
+          ctx.fillStyle = isAlert ? '#ef4444' : '#22c55e';
+          ctx.fill();
+          ctx.strokeStyle = 'rgba(0,0,0,0.5)';
+          ctx.lineWidth = 1;
+          ctx.stroke();
+        }
       }
     }
 
     ctx.restore();
-  }, [placedCams, drawnZones, selectedCam, zoom, drawingZone, zoneType, tool, activeFloor]);
+  }, [placedCams, drawnZones, selectedCam, zoom, drawingZone, zoneType, tool, activeFloor, liveTracks]);
 
   const handleCanvasClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
     const rect = canvasRef.current!.getBoundingClientRect();

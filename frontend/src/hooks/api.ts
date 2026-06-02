@@ -11,10 +11,14 @@ function authHeaders(token: string | null) {
 export const api = {
   // Auth
   login: async (username: string, password: string) => {
+    const formData = new URLSearchParams();
+    formData.append('username', username);
+    formData.append('password', password);
+
     const res = await fetch(`${BASE}/auth/login`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ username, password }),
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: formData.toString(),
     });
     if (!res.ok) throw new Error('Invalid credentials');
     return res.json();
