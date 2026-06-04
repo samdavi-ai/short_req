@@ -31,8 +31,21 @@ export interface Visitor {
   fullname: string;
   passport_number: string;
   nationality: string;
+  phone_number?: string;
+  address?: string;
+  purpose?: string;
+  approved_by?: string;
+  requires_escort: boolean;
+  location?: string;
+  entry_time?: string;
+  exit_time?: string;
+  approver_id?: string;
+  department?: string;
+  role?: string;
   status: 'WHITELISTED' | 'BLACKLISTED' | 'WATCHLIST' | 'PENDING';
   created_at: string;
+  photo_path?: string;
+  face_embedding_id?: string;
   current_location?: string;
   last_seen?: string;
 }
@@ -57,6 +70,25 @@ export interface Zone {
   is_active: boolean;
   dwell_alert_seconds: number;
   coordinates: {x: number; y: number}[];
+}
+
+export type IdentityType = 'UNKNOWN' | 'KNOWN_VISITOR' | 'KNOWN_EMPLOYEE' | 'WATCHLIST_MATCH' | 'BLACKLISTED';
+
+export interface LiveTrack {
+  global_id: string;
+  track_id: number;
+  camera_id: number;
+  x: number;
+  y: number;
+  bbox: [number, number, number, number];
+  has_face: boolean;
+  identity_type: IdentityType;
+  matched_name: string | null;
+  matched_person_id: number | null;
+  person_type: 'visitor' | 'employee' | null;
+  matched_via: string;
+  entry_exit: 'IN' | 'OUT' | null;
+  timestamp: number;
 }
 
 export interface AnalyticsStats {
@@ -104,7 +136,7 @@ interface AppStore {
   removeToast: (id: string) => void;
   
   // WebSockets
-  tracks: Record<string, any>;
+  tracks: Record<string, LiveTrack>;
   initWebSocket: () => void;
 }
 
@@ -153,17 +185,33 @@ export const useStore = create<AppStore>((set) => ({
 
   tracks: {},
   initWebSocket: () => {
-    const wsUrl = `ws://${window.location.hostname}:8000/ws/tracking`;
+    const wsUrl = `ws://${window.location.hostname}:8000/ws`;
     const ws = new WebSocket(wsUrl);
     
     ws.onmessage = (event) => {
       try {
         const payload = JSON.parse(event.data);
         if (payload.type === "TRACK_UPDATE") {
+          const track: LiveTrack = {
+            global_id: payload.global_id,
+            track_id: payload.track_id,
+            camera_id: payload.camera_id,
+            x: payload.x,
+            y: payload.y,
+            bbox: payload.bbox,
+            has_face: payload.has_face,
+            identity_type: payload.identity_type || 'UNKNOWN',
+            matched_name: payload.matched_name || null,
+            matched_person_id: payload.matched_person_id || null,
+            person_type: payload.person_type || null,
+            matched_via: payload.matched_via || 'unknown',
+            entry_exit: payload.entry_exit || null,
+            timestamp: payload.timestamp,
+          };
           set((state) => ({
             tracks: {
               ...state.tracks,
-              [payload.global_id]: payload
+              [payload.global_id]: track
             }
           }));
         } else if (payload.type === 'ALERT_NEW') {
@@ -193,7 +241,21 @@ export const useStore = create<AppStore>((set) => ({
     
     ws.onclose = () => {
       console.log("WebSocket closed, attempting reconnect in 5s...");
-      setTimeout(() => set((s) => ({ ...s }) /* Trigger re-init somehow, or rely on a wrapper */), 5000);
+      setTimeout(() => useStore.getState().initWebSocket(), 5000);
     };
+
+    // Purge stale tracks every 10 seconds
+    setInterval(() => {
+      const now = Date.now() / 1000;
+      set((state) => {
+        const fresh: Record<string, LiveTrack> = {};
+        for (const [gid, track] of Object.entries(state.tracks)) {
+          if (now - track.timestamp < 30) {
+            fresh[gid] = track;
+          }
+        }
+        return { tracks: fresh };
+      });
+    }, 10000);
   }
 }));

@@ -100,6 +100,18 @@ export const api = {
       headers: authHeaders(token),
     }).then((r) => r.json()),
 
+  uploadVisitorPhoto: (token: string, id: number, file: File) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    return fetch(`${BASE}/visitors/${id}/photo`, {
+      method: 'POST',
+      headers: {
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: formData,
+    }).then((r) => r.json());
+  },
+
   // Employees
   getEmployees: (token: string) =>
     fetch(`${BASE}/employees/`, { headers: authHeaders(token) }).then((r) => r.json()),

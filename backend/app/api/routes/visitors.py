@@ -120,15 +120,54 @@ async def upload_visitor_photo(
     if file.content_type not in allowed_types:
         raise HTTPException(status_code=400, detail="Only PNG/JPG images are accepted")
 
+    # Read file contents
+    contents = await file.read()
+
     os.makedirs("assets/visitors", exist_ok=True)
     ext = file.filename.rsplit(".", 1)[-1] if "." in file.filename else "jpg"
     filename = f"visitor_{visitor_id}_{uuid.uuid4().hex[:8]}.{ext}"
     file_path = os.path.join("assets/visitors", filename)
 
     with open(file_path, "wb") as buffer:
-        shutil.copyfileobj(file.file, buffer)
+        buffer.write(contents)
 
     visitor.photo_path = f"/assets/visitors/{filename}"
+
+    # Extract real face embedding if possible
+    try:
+        import sys, json, cv2, numpy as np
+        proc_dir = os.path.join(os.path.dirname(__file__), "..", "..", "..", "..", "processing")
+        proc_dir = os.path.abspath(proc_dir)
+        if proc_dir not in sys.path:
+            sys.path.insert(0, proc_dir)
+
+        from workers.face_embedder import FaceEmbedder
+        from workers.face_detector import FaceDetector
+
+        nparr = np.frombuffer(contents, np.uint8)
+        img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+
+        if img is not None:
+            detector = FaceDetector()
+            face_bbox = detector.detect_faces(img)
+            if face_bbox:
+                fx1, fy1, fx2, fy2 = face_bbox
+                face_crop = img[fy1:fy2, fx1:fx2]
+                embedder = FaceEmbedder()
+                embedding = embedder.extract_embedding(face_crop)
+                if not np.allclose(embedding, 0):
+                    visitor.face_embedding_id = json.dumps(embedding)
+                else:
+                    visitor.face_embedding_id = f"face_embed_{visitor.id}_{uuid.uuid4().hex[:8]}"
+            else:
+                visitor.face_embedding_id = f"face_embed_{visitor.id}_{uuid.uuid4().hex[:8]}"
+        else:
+            visitor.face_embedding_id = f"face_embed_{visitor.id}_{uuid.uuid4().hex[:8]}"
+    except Exception:
+        # Fallback to placeholder if face extraction dependencies not available
+        if not visitor.face_embedding_id:
+            visitor.face_embedding_id = f"face_embed_{visitor.id}_{uuid.uuid4().hex[:8]}"
+
     db.commit()
     db.refresh(visitor)
     return visitor

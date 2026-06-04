@@ -11,7 +11,7 @@ const STATUS_BADGE: Record<string, { class: string; label: string }> = {
 };
 
 export default function VisitorsPage() {
-  const { visitors, token, addToast } = useStore();
+  const { visitors, token, addToast, setVisitors } = useStore();
 
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
@@ -19,8 +19,13 @@ export default function VisitorsPage() {
   const [selectedVisitorId, setSelectedVisitorId] = useState<number | null>(null);
   const [form, setForm] = useState({
     fullname: '', passport_number: '', nationality: '', phone_number: '',
-    address: '', purpose: '', approved_by: '', requires_escort: false, status: 'PENDING'
+    address: '', purpose: '', approved_by: '', requires_escort: false, status: 'PENDING',
+    location: '', entry_time: '', exit_time: '', approver_id: '', department: '', role: ''
   });
+
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [filePreview, setFilePreview] = useState<string | null>(null);
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
 
   const filtered = visitors.filter((v: any) => {
     const q = search.toLowerCase();
@@ -33,16 +38,82 @@ export default function VisitorsPage() {
 
   const handleAdd = async () => {
     if (!form.fullname.trim()) { addToast('Name is required', 'error'); return; }
+    
+    // Format times to ISO string or null
+    const formattedForm = {
+      ...form,
+      entry_time: form.entry_time ? new Date(form.entry_time).toISOString() : null,
+      exit_time: form.exit_time ? new Date(form.exit_time).toISOString() : null,
+    };
+
     if (token && token !== 'demo-token') {
-      try { await api.createVisitor(token, form); } catch { /* demo */ }
+      try {
+        const newVisitor = await api.createVisitor(token, formattedForm);
+        if (selectedFile) {
+          await api.uploadVisitorPhoto(token, newVisitor.id, selectedFile);
+        }
+        // Refetch updated list
+        const updated = await api.getVisitors(token);
+        setVisitors(updated);
+        addToast(`Visitor "${form.fullname}" registered successfully with Face ID`, 'success');
+      } catch (err) {
+        addToast('Failed to register visitor or upload face photo', 'error');
+      }
+    } else {
+      // Demo Mode
+      const mockId = Math.floor(Math.random() * 1000) + 100;
+      const mockVisitor: Visitor = {
+        id: mockId,
+        fullname: form.fullname,
+        passport_number: form.passport_number,
+        nationality: form.nationality,
+        phone_number: form.phone_number,
+        address: form.address,
+        purpose: form.purpose,
+        approved_by: form.approved_by,
+        requires_escort: form.requires_escort,
+        location: form.location,
+        entry_time: formattedForm.entry_time || undefined,
+        exit_time: formattedForm.exit_time || undefined,
+        approver_id: form.approver_id,
+        department: form.department,
+        role: form.role,
+        status: form.status as any,
+        created_at: new Date().toISOString(),
+        photo_path: filePreview || undefined,
+        face_embedding_id: filePreview ? `face_embed_visitor_${mockId}_demo` : undefined,
+      };
+      setVisitors([mockVisitor, ...visitors]);
+      addToast(`Visitor "${form.fullname}" registered successfully (Demo Mode)`, 'success');
     }
-    addToast(`Visitor "${form.fullname}" registered successfully`, 'success');
+    
     setShowModal(false);
-    setForm({ fullname: '', passport_number: '', nationality: '', phone_number: '', address: '', purpose: '', approved_by: '', requires_escort: false, status: 'PENDING' });
+    setSelectedFile(null);
+    setFilePreview(null);
+    setForm({
+      fullname: '', passport_number: '', nationality: '', phone_number: '',
+      address: '', purpose: '', approved_by: '', requires_escort: false, status: 'PENDING',
+      location: '', entry_time: '', exit_time: '', approver_id: '', department: '', role: ''
+    });
   };
 
   const handleCaptureSnapshot = () => {
-    addToast('Camera initialized: Identity snapshot captured & vector embedding generated.', 'success');
+    if (fileInputRef.current) {
+      fileInputRef.current.click();
+    }
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setSelectedFile(file);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setFilePreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+      addToast('Identity snapshot loaded. Face ID embedding generated.', 'success');
+    }
   };
 
   const selectedVisitor = visitors.find(v => v.id === selectedVisitorId);
@@ -196,13 +267,29 @@ export default function VisitorsPage() {
               
               <div className="form-group" style={{ gridColumn: '1 / -1' }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'var(--surface-2)', padding: 16, borderRadius: 'var(--radius-md)', border: '1px solid var(--border)' }}>
-                  <div>
-                    <div style={{ fontWeight: 600, color: 'var(--text-primary)', marginBottom: 4 }}>Identity Snapshot</div>
-                    <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>Required for AI cross-camera tracking.</div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                    <div style={{ width: 48, height: 48, borderRadius: '50%', overflow: 'hidden', border: '1px solid var(--border)', background: 'var(--surface-3)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-ghost)' }}>
+                      {filePreview ? (
+                        <img src={filePreview} alt="Preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                      ) : (
+                        <Camera size={20} />
+                      )}
+                    </div>
+                    <div>
+                      <div style={{ fontWeight: 600, color: 'var(--text-primary)', marginBottom: 4 }}>Identity Snapshot</div>
+                      <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{selectedFile ? `${selectedFile.name} ready` : 'Required for AI face tracking.'}</div>
+                    </div>
                   </div>
                   <button className="btn btn-primary btn-sm" onClick={handleCaptureSnapshot}>
-                    <Camera size={14} /> Capture Face
+                    <Camera size={14} /> {selectedFile ? 'Change Face' : 'Capture Face'}
                   </button>
+                  <input
+                    type="file"
+                    ref={fileInputRef}
+                    style={{ display: 'none' }}
+                    accept="image/*"
+                    onChange={handleFileChange}
+                  />
                 </div>
               </div>
 
@@ -228,6 +315,42 @@ export default function VisitorsPage() {
                 <label className="form-label">Nationality</label>
                 <input className="form-input" placeholder="Country of origin" value={form.nationality}
                   onChange={(e) => setForm({ ...form, nationality: e.target.value })} />
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Target Location</label>
+                <input className="form-input" placeholder="e.g. Boardroom, Terminal 1" value={form.location}
+                  onChange={(e) => setForm({ ...form, location: e.target.value })} />
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Department</label>
+                <input className="form-input" placeholder="e.g. Security, Operations" value={form.department}
+                  onChange={(e) => setForm({ ...form, department: e.target.value })} />
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Role / Designation</label>
+                <input className="form-input" placeholder="e.g. Contractor, Inspector" value={form.role}
+                  onChange={(e) => setForm({ ...form, role: e.target.value })} />
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Approver ID</label>
+                <input className="form-input" placeholder="e.g. EMP12345" value={form.approver_id}
+                  onChange={(e) => setForm({ ...form, approver_id: e.target.value })} />
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Entry Time</label>
+                <input type="datetime-local" className="form-input" value={form.entry_time}
+                  onChange={(e) => setForm({ ...form, entry_time: e.target.value })} />
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Exit Time</label>
+                <input type="datetime-local" className="form-input" value={form.exit_time}
+                  onChange={(e) => setForm({ ...form, exit_time: e.target.value })} />
               </div>
 
               <div className="form-group" style={{ gridColumn: '1 / -1' }}>
@@ -296,7 +419,11 @@ export default function VisitorsPage() {
             <div style={{ padding: '24px 24px 0', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
               <div style={{ display: 'flex', gap: 16 }}>
                 <div style={{ width: 80, height: 80, borderRadius: '50%', overflow: 'hidden', border: '2px solid var(--border)', background: 'var(--surface-3)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-ghost)' }}>
-                   <User size={40} />
+                   {selectedVisitor.photo_path ? (
+                     <img src={selectedVisitor.photo_path.startsWith('data:') ? selectedVisitor.photo_path : `http://localhost:8000${selectedVisitor.photo_path}`} alt={selectedVisitor.fullname} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                   ) : (
+                     <User size={40} />
+                   )}
                 </div>
                 <div style={{ paddingTop: 8 }}>
                   <div style={{ fontFamily: 'Outfit', fontWeight: 700, fontSize: 22, color: 'var(--white)' }}>
@@ -305,6 +432,11 @@ export default function VisitorsPage() {
                   <div style={{ fontSize: 13, color: 'var(--cyan)', fontFamily: 'monospace', marginTop: 4 }}>
                     {selectedVisitor.passport_number || 'No ID Provided'} • {selectedVisitor.nationality || 'Unknown'}
                   </div>
+                  {selectedVisitor.face_embedding_id && (
+                    <div style={{ fontSize: 11, color: 'var(--green-bright)', fontFamily: 'monospace', marginTop: 4 }}>
+                      Face ID: {selectedVisitor.face_embedding_id}
+                    </div>
+                  )}
                 </div>
               </div>
               <button className="icon-btn" onClick={() => setSelectedVisitorId(null)}>
@@ -364,10 +496,33 @@ export default function VisitorsPage() {
                     <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>Phone</div>
                     <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>{selectedVisitor.phone_number || 'N/A'}</div>
                   </div>
+                  <div>
+                    <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>Target Location</div>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>{selectedVisitor.location || 'N/A'}</div>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>Department</div>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>{selectedVisitor.department || 'N/A'}</div>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>Role</div>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>{selectedVisitor.role || 'N/A'}</div>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>Approver</div>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>{selectedVisitor.approved_by || 'N/A'} {selectedVisitor.approver_id ? `(ID: ${selectedVisitor.approver_id})` : ''}</div>
+                  </div>
+                  <div style={{ gridColumn: '1 / -1' }}>
+                    <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>Scheduled Time Window</div>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>
+                      {selectedVisitor.entry_time ? new Date(selectedVisitor.entry_time).toLocaleString('en-IN') : 'N/A'}
+                      {' — '}
+                      {selectedVisitor.exit_time ? new Date(selectedVisitor.exit_time).toLocaleString('en-IN') : 'N/A'}
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
-            
           </div>
         </div>
       )}

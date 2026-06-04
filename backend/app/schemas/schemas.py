@@ -208,6 +208,12 @@ class VisitorBase(BaseModel):
     notes: Optional[str] = None
     status: VisitorStatus = VisitorStatus.WHITELISTED
     requires_escort: bool = False
+    location: Optional[str] = None
+    entry_time: Optional[datetime] = None
+    exit_time: Optional[datetime] = None
+    approver_id: Optional[str] = None
+    department: Optional[str] = None
+    role: Optional[str] = None
 
 class VisitorCreate(VisitorBase):
     pass
@@ -222,6 +228,12 @@ class VisitorUpdate(BaseModel):
     notes: Optional[str] = None
     status: Optional[VisitorStatus] = None
     requires_escort: Optional[bool] = None
+    location: Optional[str] = None
+    entry_time: Optional[datetime] = None
+    exit_time: Optional[datetime] = None
+    approver_id: Optional[str] = None
+    department: Optional[str] = None
+    role: Optional[str] = None
 
 class VisitorResponse(VisitorBase):
     id: int

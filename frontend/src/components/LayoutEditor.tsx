@@ -5,6 +5,8 @@ import {
 } from 'lucide-react';
 import { useStore } from '../stores/appStore';
 import { api } from '../hooks/api';
+import PersonJourney from './PersonJourney';
+
 
 interface CamOnCanvas {
   id: number;
@@ -55,6 +57,7 @@ export default function LayoutEditor() {
   const [zoom, setZoom] = useState(1);
   const [selectedCam, setSelectedCam] = useState<number | null>(null);
   const [drawingZone, setDrawingZone] = useState<{ x: number; y: number }[]>([]);
+  const [selectedTrackId, setSelectedTrackId] = useState<string | null>(null);
 
   // Demo cameras placed on canvas
   const [placedCams, setPlacedCams] = useState<CamOnCanvas[]>([
@@ -244,28 +247,104 @@ export default function LayoutEditor() {
       ctx.fillText(cam.name, cam.x, cam.y + 14);
     });
 
-    // 5. Live person dots
+    // 5. Live person dots — color-coded by identity
     if (tool === 'select') {
+      const IDENTITY_COLORS: Record<string, { fill: string; stroke: string; glow: string }> = {
+        KNOWN_EMPLOYEE:  { fill: '#22c55e', stroke: '#16a34a', glow: 'rgba(34, 197, 94, 0.4)' },
+        KNOWN_VISITOR:   { fill: '#3b82f6', stroke: '#2563eb', glow: 'rgba(59, 130, 246, 0.4)' },
+        WATCHLIST_MATCH: { fill: '#f59e0b', stroke: '#d97706', glow: 'rgba(245, 158, 11, 0.5)' },
+        BLACKLISTED:     { fill: '#ef4444', stroke: '#dc2626', glow: 'rgba(239, 68, 68, 0.6)' },
+        UNKNOWN:         { fill: 'rgba(148, 163, 184, 0.7)', stroke: 'rgba(100, 116, 139, 0.8)', glow: 'rgba(148, 163, 184, 0.2)' },
+      };
+
       const activeTracks = Object.values(liveTracks).filter(
-        (t: any) => (Date.now() / 1000 - t.timestamp) < 2.0
+        (t) => (Date.now() / 1000 - t.timestamp) < 5.0
       );
       
       if (activeTracks.length > 0) {
-        activeTracks.forEach((track: any) => {
+        activeTracks.forEach((track) => {
+          const colors = IDENTITY_COLORS[track.identity_type] || IDENTITY_COLORS.UNKNOWN;
+          const isKnown = track.identity_type !== 'UNKNOWN';
+          const isDangerous = track.identity_type === 'BLACKLISTED' || track.identity_type === 'WATCHLIST_MATCH';
+          const dotRadius = isDangerous ? 7 : (isKnown ? 6 : 4);
+
+          // Outer glow ring for known/dangerous persons
+          if (isKnown) {
+            ctx.beginPath();
+            ctx.arc(track.x, track.y, dotRadius + 6, 0, Math.PI * 2);
+            ctx.fillStyle = colors.glow;
+            ctx.fill();
+          }
+
+          // Pulsing ring for dangerous persons
+          if (isDangerous) {
+            const pulse = Math.sin(Date.now() / 200) * 0.3 + 0.7;
+            ctx.beginPath();
+            ctx.arc(track.x, track.y, dotRadius + 10, 0, Math.PI * 2);
+            ctx.strokeStyle = colors.fill + Math.round(pulse * 100).toString(16).padStart(2, '0');
+            ctx.lineWidth = 2;
+            ctx.stroke();
+          }
+
+          // Main dot
           ctx.beginPath();
-          ctx.arc(track.x, track.y, 5, 0, Math.PI * 2);
-          ctx.fillStyle = track.has_face ? 'var(--cyan)' : 'var(--green-bright)';
+          ctx.arc(track.x, track.y, dotRadius, 0, Math.PI * 2);
+          ctx.fillStyle = colors.fill;
           ctx.fill();
           ctx.strokeStyle = 'rgba(255,255,255,0.9)';
           ctx.lineWidth = 1.5;
           ctx.stroke();
 
-          ctx.beginPath();
-          ctx.arc(track.x, track.y, 9, 0, Math.PI * 2);
-          ctx.strokeStyle = track.has_face ? 'var(--cyan-shadow)' : 'var(--green-shadow)';
-          ctx.lineWidth = 1;
-          ctx.stroke();
+          // Name label for known persons
+          if (isKnown && track.matched_name) {
+            const label = track.matched_name;
+            ctx.font = 'bold 9px Inter, sans-serif';
+            const textWidth = ctx.measureText(label).width;
+            const labelX = track.x - textWidth / 2 - 4;
+            const labelY = track.y - dotRadius - 14;
+
+            // Label background
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.75)';
+            ctx.beginPath();
+            ctx.roundRect(labelX, labelY, textWidth + 8, 14, 3);
+            ctx.fill();
+            ctx.strokeStyle = colors.stroke;
+            ctx.lineWidth = 1;
+            ctx.stroke();
+
+            // Label text
+            ctx.fillStyle = '#ffffff';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(label, track.x, labelY + 7);
+          }
+
+          // Identity type badge icon
+          if (isKnown) {
+            const icon = track.identity_type === 'KNOWN_EMPLOYEE' ? '👤' 
+              : track.identity_type === 'KNOWN_VISITOR' ? '🎫'
+              : track.identity_type === 'BLACKLISTED' ? '🚫'
+              : '⚠️';
+            ctx.font = '10px serif';
+            ctx.textAlign = 'center';
+            ctx.fillText(icon, track.x + dotRadius + 8, track.y - 2);
+          }
         });
+
+        // Track count overlay
+        const knownCount = activeTracks.filter(t => t.identity_type !== 'UNKNOWN').length;
+        const unknownCount = activeTracks.length - knownCount;
+        ctx.font = 'bold 10px Outfit, sans-serif';
+        ctx.textAlign = 'left';
+        ctx.textBaseline = 'top';
+        ctx.fillStyle = 'rgba(0,0,0,0.6)';
+        ctx.fillRect(110, 680, 180, 36);
+        ctx.fillStyle = '#22c55e';
+        ctx.fillText(`● ${knownCount} Known`, 118, 686);
+        ctx.fillStyle = 'rgba(148, 163, 184, 0.9)';
+        ctx.fillText(`● ${unknownCount} Unknown`, 118, 700);
+        ctx.fillStyle = '#ffffff';
+        ctx.fillText(`${activeTracks.length} Total`, 220, 693);
       } else {
         // Fallback to simulated passenger flow
         for (let i = 0; i < 18; i++) {
@@ -308,6 +387,19 @@ export default function LayoutEditor() {
       }
       setDrawingZone((prev) => [...prev, { x, y }]);
       return;
+    }
+
+    if (tool === 'select') {
+      const clickedTrack = Object.values(liveTracks).find((t) => {
+        const isActive = (Date.now() / 1000 - t.timestamp) < 5.0;
+        if (!isActive) return false;
+        return Math.sqrt((t.x - x) ** 2 + (t.y - y) ** 2) < 16;
+      });
+
+      if (clickedTrack) {
+        setSelectedTrackId(clickedTrack.global_id);
+        return;
+      }
     }
 
     const clickedCam = placedCams.find(
@@ -669,6 +761,12 @@ export default function LayoutEditor() {
           </div>
         </div>
       </div>
+      {selectedTrackId && (
+        <PersonJourney
+          globalId={selectedTrackId}
+          onClose={() => setSelectedTrackId(null)}
+        />
+      )}
     </div>
   );
 }

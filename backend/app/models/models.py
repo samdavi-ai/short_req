@@ -156,6 +156,12 @@ class Visitor(Base):
     enrolled_by         = Column(String(100))
     approved_by         = Column(String(100))
     requires_escort     = Column(Boolean, default=False)
+    location            = Column(String(255))
+    entry_time          = Column(DateTime(timezone=True))
+    exit_time           = Column(DateTime(timezone=True))
+    approver_id         = Column(String(100))
+    department          = Column(String(100))
+    role                = Column(String(50))
     created_at          = Column(DateTime(timezone=True), server_default=func.now())
     updated_at          = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
