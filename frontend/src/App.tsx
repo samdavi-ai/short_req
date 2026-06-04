@@ -43,6 +43,13 @@ export default function App() {
     );
   }
 
+  // Initialize WebSocket once logged in
+  React.useEffect(() => {
+    if (token && token !== 'demo-token') {
+      useStore.getState().initWebSocket();
+    }
+  }, [token]);
+
   return (
     <div className="app-shell">
       <Sidebar />

@@ -1,131 +1,62 @@
-# 🛫 Airport Security — Intelligent Surveillance & Tracking System
+# Airport Surveillance Platform
 
-> **Project Codename:** Chairman Requirement  
-> **Domain:** Airport Security & Operations  
-> **Classification:** High-Accuracy Person Re-Identification & Behavioral Monitoring
+An advanced, real-time computer vision and monitoring platform designed for high-security environments like airports. This system combines GPU-accelerated AI models with a reactive React dashboard to provide security personnel with instantaneous insights into passenger flow, restricted zone breaches, and employee management.
 
----
+## Features
 
-## 🚀 Overview
+- **Real-Time AI Pipeline:** Utilizes Ultralytics YOLOv8 for sub-millisecond person detection and a ResNet50 embedder for deep cross-camera body re-identification.
+- **Global Tracking:** Assigns consistent global track IDs to individuals across multiple camera feeds using cosine similarity embedding matching.
+- **Live React Dashboard:** Features a Zustand-powered interactive floor plan (`LayoutEditor`) and live camera feeds (`LiveFeeds`) seamlessly synced over WebSockets.
+- **Automated Security Alerts:** Instant alerts for restricted zone intrusions and dwell-time limit violations, sent directly to the dashboard operator.
+- **Rich Analytics:** End-to-end `recharts` analytics dashboard providing insights on peak footfalls, hourly occupancy, and alert demographics.
 
-A full-stack AI-powered airport surveillance system featuring:
-- 📷 **Multi-camera live feed monitoring** (grid view, 1–4 columns)
-- 🗺️ **Interactive Layout Editor** — drag-and-drop camera placement on floor plans
-- 🔴 **Real-time Alert Management** — CRITICAL/HIGH/MEDIUM/LOW with acknowledge workflows
-- 👤 **Visitor Tracking** — watchlist, blacklist, passport-based registration
-- 👨‍💼 **Employee Break Compliance** — mandatory break monitoring per labor regulations
-- 📊 **Analytics Dashboard** — footfall, dwell time, alert frequency charts
-- 🤖 **AI Pipeline** — YOLOv8 detection + TransReID cross-camera re-identification
+## System Architecture
 
----
+The application is fully containerized and broken down into 4 core microservices:
 
-## 🏗️ Tech Stack
+1. **`frontend/`**: The React + Vite SPA dashboard. Connects via HTTP REST and WebSockets.
+2. **`backend/`**: A FastAPI + PostgreSQL application handling layouts, zones, users, and routing telemetry from the AI pipeline.
+3. **`processing/`**: The GPU-accelerated CV pipeline. Reads camera streams, executes YOLOv8 + ByteTrack, and publishes metadata to Redis.
+4. **`database/`**: PostgreSQL and Redis containers for state persistence and Pub/Sub event brokering.
 
-| Layer | Technology |
-|---|---|
-| **Frontend** | React 18 + TypeScript + Vite + Zustand + Recharts |
-| **Backend** | FastAPI + SQLAlchemy 2.0 + Pydantic v2 + Celery |
-| **Database** | PostgreSQL (production) / SQLite (testing) |
-| **Cache / Events** | Redis + WebSockets (real-time pub/sub) |
-| **AI Processing** | YOLOv8, ByteTrack, TransReID, ArcFace, SCRFD |
-| **Vector DB** | Milvus (ReID + face embeddings) |
-| **Deployment** | Docker Compose (fully local, no cloud) |
+## Prerequisites
 
----
+- **Docker & Docker Compose:** Ensure the Docker daemon is running on your machine.
+- *(Optional)* **NVIDIA Container Toolkit:** If running on a GPU-enabled machine, ensure the Nvidia Docker runtime is installed to utilize hardware acceleration for the CV models.
 
-## 📁 Project Structure
+## Getting Started
 
-```
-airport_proj_2/
-├── backend/                # FastAPI application
-│   ├── app/
-│   │   ├── api/routes/     # cameras, alerts, visitors, employees, zones, analytics
-│   │   ├── core/           # config, database, security
-│   │   ├── models/         # SQLAlchemy ORM models
-│   │   └── schemas/        # Pydantic v2 schemas
-│   ├── alembic/            # DB migrations
-│   └── requirements.txt
-├── frontend/               # React + Vite dashboard
-│   └── src/
-│       ├── components/     # Dashboard, LiveFeeds, LayoutEditor, Alerts, etc.
-│       ├── stores/         # Zustand state
-│       └── hooks/          # API client
-├── processing/             # AI/ML pipeline
-│   ├── models/             # YOLOv8, ReID, face models
-│   └── workers/            # Detection, tracking, Re-ID workers
-├── tests/                  # 20 passing unit tests
-├── docker-compose.yml
-└── .env.example            # Environment template
-```
+1. **Build and start the full application stack:**
+   ```bash
+   docker-compose up --build -d
+   ```
 
----
+2. **Access the application:**
+   - **Frontend Dashboard:** [http://localhost:3000](http://localhost:3000)
+   - **Backend API Docs:** [http://localhost:8000/docs](http://localhost:8000/docs)
 
-## ⚡ Quick Start
+3. **Verify the services:**
+   You can verify all containers are running successfully using:
+   ```bash
+   docker ps
+   ```
 
-### 1. Clone & Setup
-```bash
-git clone https://github.com/Aknesys/airport_proj_2.git
-cd airport_proj_2
-cp .env.example .env
-# Edit .env with your database credentials
-```
+## Development and Testing
 
-### 2. Backend
+The project contains a comprehensive automated testing suite.
+
+**Run Backend Unit Tests:**
 ```bash
 cd backend
-python3 -m venv venv
-source venv/bin/activate
-pip install -r requirements.txt
-
-# Start PostgreSQL & Redis first, then:
-uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+python3 -m pytest tests/unit/
 ```
 
-### 3. Frontend
+**Run End-to-End Pipeline Tests:**
 ```bash
-cd frontend
-npm install
-npm run dev
-# Open http://localhost:5173
+PYTHONPATH=backend python3 -m pytest tests/e2e/test_pipeline.py
 ```
 
-### 4. Run Tests
+**Run Load Tests (Locust):**
 ```bash
-cd backend
-python -m pytest ../tests/unit/test_backend.py -v
-# 20/20 tests passing ✅
+locust -f tests/load/locustfile.py --host=http://localhost:8000
 ```
-
----
-
-## 🖥️ Dashboard Pages
-
-| Page | Description |
-|---|---|
-| **Dashboard** | Live KPI stats, footfall charts, pending alerts |
-| **Live Feeds** | Multi-camera grid (1–4 cols), floor filter, status overlay |
-| **Layout Editor** | HTML5 Canvas — drag cameras, draw zones, FoV cones |
-| **Alerts** | Filter/acknowledge alerts, bulk actions, severity badges |
-| **Visitors** | Watchlist management, passport search, status control |
-| **Employees** | Break compliance bars, overdue alerts, schedule tracking |
-| **Analytics** | Footfall analysis, alert distribution, dwell time charts |
-| **Camera Manager** | RTSP stream management, add/edit/delete cameras |
-| **Settings** | System configuration, infrastructure status |
-
----
-
-## 🔒 Security Notes
-
-- `.env` is **gitignored** — never committed
-- Copy `.env.example` → `.env` and set your own credentials
-- JWT authentication on all API endpoints
-- CORS configured for local development
-
----
-
-## 📋 Development Status
-
-- ✅ **Backend**: 100% — 20/20 unit tests passing
-- ✅ **Frontend**: 100% — 9 pages, build successful (0 errors)
-- 🔄 **Processing Pipeline**: In progress (YOLOv8 + ReID)
-- 🔄 **Docker Compose**: Final configuration pending

@@ -202,8 +202,12 @@ class VisitorBase(BaseModel):
     fullname: str
     passport_number: Optional[str] = None
     nationality: Optional[str] = None
+    phone_number: Optional[str] = None
+    address: Optional[str] = None
+    purpose: Optional[str] = None
     notes: Optional[str] = None
     status: VisitorStatus = VisitorStatus.WHITELISTED
+    requires_escort: bool = False
 
 class VisitorCreate(VisitorBase):
     pass
@@ -212,14 +216,19 @@ class VisitorUpdate(BaseModel):
     fullname: Optional[str] = None
     passport_number: Optional[str] = None
     nationality: Optional[str] = None
+    phone_number: Optional[str] = None
+    address: Optional[str] = None
+    purpose: Optional[str] = None
     notes: Optional[str] = None
     status: Optional[VisitorStatus] = None
+    requires_escort: Optional[bool] = None
 
 class VisitorResponse(VisitorBase):
     id: int
     photo_path: Optional[str] = None
     face_embedding_id: Optional[str] = None
     enrolled_by: Optional[str] = None
+    approved_by: Optional[str] = None
     created_at: datetime
     updated_at: datetime
 

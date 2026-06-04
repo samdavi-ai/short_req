@@ -7,6 +7,7 @@ import logging
 from workers.person_detector import PersonDetector
 from workers.single_cam_tracker import SingleCameraTracker
 from workers.face_detector import FaceDetector
+from workers.body_reid import BodyReIDEmbedder
 from workers.intrusion_engine import IntrusionEngine
 from app.core.database import SessionLocal
 from app.models.models import Camera
@@ -23,10 +24,11 @@ class CameraPipeline:
         redis_url = os.getenv("REDIS_URL", "redis://localhost:6379/0")
         self.redis_client = redis.from_url(redis_url, decode_responses=True)
         
-        # Load CPU-optimized OpenCV workers
+        # Load AI workers
         self.detector = PersonDetector()
         self.tracker = SingleCameraTracker()
         self.face_detector = FaceDetector()
+        self.body_reid = BodyReIDEmbedder()
         self.intrusion_engine = IntrusionEngine(self.redis_client)
         
         # Retrieve camera specifications from database
@@ -75,11 +77,11 @@ class CameraPipeline:
 
             h, w = frame.shape[:2]
             
-            # 1. Object detection
-            detections = self.detector.detect(frame)
+            # 1. Object detection & tracking (YOLOv8 + ByteTrack)
+            tracked_objects = self.detector.detect_and_track(frame)
             
-            # 2. Centroid tracking
-            tracks = self.tracker.update(detections)
+            # 2. Local state management
+            tracks = self.tracker.update(tracked_objects)
             
             for track_id, bbox in tracks:
                 x1, y1, x2, y2 = bbox
@@ -96,16 +98,19 @@ class CameraPipeline:
                 face_bbox = self.face_detector.detect_faces(crop)
                 has_face = face_bbox is not None
                 
-                # 4. Map coordinates to Layout Canvas floorplan size (900x600)
+                # 4. Extract Body ReID Embedding
+                embedding = self.body_reid.extract_embedding(crop)
+                
+                # 5. Map coordinates to Layout Canvas floorplan size (900x600)
                 cx = int((x1 + x2) / 2)
                 cy = int((y1 + y2) / 2)
                 map_x = int((cx / w) * 900)
                 map_y = int((cy / h) * 600)
                 
-                # Stable global tracking UUID
+                # Stable global tracking UUID (Wait, we should map this properly using GlobalTracker in Phase 4)
                 global_uuid = f"G-{self.camera_id}-{track_id}"
                 
-                # 5. Evaluate coordinates inside Defined Zones (restricted/loitering)
+                # 6. Evaluate coordinates inside Defined Zones (restricted/loitering)
                 self.intrusion_engine.evaluate_person(
                     global_id=global_uuid,
                     track_id=track_id,
@@ -115,7 +120,7 @@ class CameraPipeline:
                     y=map_y
                 )
                 
-                # 6. Publish real-time track updates to WebSocket server via Redis
+                # 7. Publish real-time track updates to WebSocket server via Redis
                 payload = {
                     "type": "TRACK_UPDATE",
                     "camera_id": self.camera_id,
@@ -125,7 +130,8 @@ class CameraPipeline:
                     "y": map_y,
                     "bbox": [int(x1), int(y1), int(x2), int(y2)],
                     "has_face": has_face,
-                    "timestamp": time.time()
+                    "timestamp": time.time(),
+                    # "embedding": embedding  # Large, maybe don't send over WS, save to Milvus instead
                 }
                 self.redis_client.publish("ws_events", json.dumps(payload))
                 

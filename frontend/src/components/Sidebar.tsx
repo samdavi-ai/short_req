@@ -81,11 +81,21 @@ export default function Sidebar() {
             id="logout-btn"
             onClick={(e) => { e.stopPropagation(); logout(); }}
             style={{
-              background: 'none', border: 'none', cursor: 'pointer',
-              color: 'var(--text-ghost)', display: 'flex', padding: 4,
-              borderRadius: 6, transition: 'color 0.15s',
+              background: 'rgba(255,0,85,0.1)', border: '1px solid rgba(255,0,85,0.3)', cursor: 'pointer',
+              color: 'var(--red)', display: 'flex', padding: '6px',
+              borderRadius: '8px', transition: 'all 0.2s',
             }}
             title="Logout"
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = 'var(--red)';
+              e.currentTarget.style.color = 'white';
+              e.currentTarget.style.transform = 'scale(1.1)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = 'rgba(255,0,85,0.1)';
+              e.currentTarget.style.color = 'var(--red)';
+              e.currentTarget.style.transform = 'scale(1)';
+            }}
           >
             <LogOut size={15} />
           </button>

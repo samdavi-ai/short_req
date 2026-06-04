@@ -25,6 +25,7 @@ function CameraFeedCard({ cam, selected, onClick }: {
   selected: boolean;
   onClick: () => void;
 }) {
+  const tracks = useStore((state) => state.tracks);
   const isOffline = cam.status === 'OFFLINE';
   const isMaint = cam.status === 'MAINTENANCE';
   const videoRef = React.useRef<HTMLVideoElement | null>(null);
@@ -78,13 +79,47 @@ function CameraFeedCard({ cam, selected, onClick }: {
             <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--amber-bright)' }}>MAINTENANCE</span>
           </>
         ) : selected ? (
-          <video
-            ref={videoRef}
-            autoPlay
-            playsInline
-            muted
-            style={{ width: '100%', height: '100%', objectFit: 'cover', transform: 'scaleX(-1)' }}
-          />
+          <div style={{ position: 'relative', width: '100%', height: '100%' }}>
+            <video
+              ref={videoRef}
+              autoPlay
+              playsInline
+              muted
+              style={{ width: '100%', height: '100%', objectFit: 'cover', transform: 'scaleX(-1)' }}
+            />
+            {/* Real-time Bounding Boxes Overlay */}
+            {Object.values(tracks || {})
+              .filter((t: any) => t.camera_id === cam.id && (Date.now() / 1000 - t.timestamp) < 2.0)
+              .map((track: any) => {
+                // Approximate coordinate mapping to the video element bounds (assuming 640x360 standard)
+                const left = (track.bbox[0] / 640) * 100;
+                const top = (track.bbox[1] / 360) * 100;
+                const width = ((track.bbox[2] - track.bbox[0]) / 640) * 100;
+                const height = ((track.bbox[3] - track.bbox[1]) / 360) * 100;
+                return (
+                  <div
+                    key={track.global_id}
+                    style={{
+                      position: 'absolute',
+                      left: `${left}%`,
+                      top: `${top}%`,
+                      width: `${width}%`,
+                      height: `${height}%`,
+                      border: `2px solid ${track.has_face ? '#3b82f6' : '#22c55e'}`,
+                      boxShadow: '0 0 10px rgba(0,0,0,0.5)',
+                      pointerEvents: 'none'
+                    }}
+                  >
+                    <span style={{
+                      position: 'absolute', top: -18, left: -2, background: track.has_face ? '#3b82f6' : '#22c55e', 
+                      color: '#fff', fontSize: 10, padding: '2px 4px', fontWeight: 'bold'
+                    }}>
+                      ID: {track.track_id}
+                    </span>
+                  </div>
+                );
+            })}
+          </div>
         ) : (
           <>
             {/* Animated scan lines for "live" feel */}
@@ -93,7 +128,7 @@ function CameraFeedCard({ cam, selected, onClick }: {
               backgroundImage: 'repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.08) 2px, rgba(0,0,0,0.08) 4px)',
               pointerEvents: 'none',
             }} />
-            {/* Simulated movement dots */}
+            {/* Real movement dots via Websocket Tracks (Wait, this is LiveFeeds... We just show a dummy stream if not active.) */}
             <svg style={{ position: 'absolute', inset: 0, width: '100%', height: '100%' }}>
               {TRACK_DOTS.slice(0, cam.id * 3 % 12).map((dot) => (
                 <circle key={dot.id} cx={`${dot.x}%`} cy={`${dot.y}%`} r="3" fill={dot.color} opacity={0.8} />

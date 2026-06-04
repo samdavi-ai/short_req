@@ -143,14 +143,19 @@ class Visitor(Base):
     fullname            = Column(String(255), nullable=False)
     passport_number     = Column(String(100), index=True)
     nationality         = Column(String(100))
+    phone_number        = Column(String(50))
+    address             = Column(Text)
     photo_path          = Column(String(500))
     face_embedding_id   = Column(String(100))
+    purpose             = Column(Text)
     notes               = Column(Text)
     status              = Column(
         SAEnum(VisitorStatus, name="visitor_status_enum", native_enum=False),
         default=VisitorStatus.WHITELISTED, nullable=False, index=True,
     )
     enrolled_by         = Column(String(100))
+    approved_by         = Column(String(100))
+    requires_escort     = Column(Boolean, default=False)
     created_at          = Column(DateTime(timezone=True), server_default=func.now())
     updated_at          = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 

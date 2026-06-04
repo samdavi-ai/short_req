@@ -23,6 +23,7 @@ export interface Alert {
   timestamp: string;
   acknowledged: boolean;
   acknowledged_by: string | null;
+  snapshot_url?: string;
 }
 
 export interface Visitor {
@@ -32,6 +33,8 @@ export interface Visitor {
   nationality: string;
   status: 'WHITELISTED' | 'BLACKLISTED' | 'WATCHLIST' | 'PENDING';
   created_at: string;
+  current_location?: string;
+  last_seen?: string;
 }
 
 export interface Employee {
@@ -42,6 +45,8 @@ export interface Employee {
   break_interval_minutes: number;
   break_duration_minutes: number;
   is_active: boolean;
+  current_location?: string;
+  last_seen?: string;
 }
 
 export interface Zone {
@@ -97,6 +102,10 @@ interface AppStore {
   toasts: { id: string; message: string; type: 'success' | 'error' | 'info' }[];
   addToast: (message: string, type?: 'success' | 'error' | 'info') => void;
   removeToast: (id: string) => void;
+  
+  // WebSockets
+  tracks: Record<string, any>;
+  initWebSocket: () => void;
 }
 
 export const useStore = create<AppStore>((set) => ({
@@ -141,4 +150,50 @@ export const useStore = create<AppStore>((set) => ({
     }, 4000);
   },
   removeToast: (id) => set((s) => ({ toasts: s.toasts.filter((t) => t.id !== id) })),
+
+  tracks: {},
+  initWebSocket: () => {
+    const wsUrl = `ws://${window.location.hostname}:8000/ws/tracking`;
+    const ws = new WebSocket(wsUrl);
+    
+    ws.onmessage = (event) => {
+      try {
+        const payload = JSON.parse(event.data);
+        if (payload.type === "TRACK_UPDATE") {
+          set((state) => ({
+            tracks: {
+              ...state.tracks,
+              [payload.global_id]: payload
+            }
+          }));
+        } else if (payload.type === 'ALERT_NEW') {
+          const alert = payload.data;
+          const currentAlerts = useStore.getState().alerts;
+          set({
+            alerts: [
+              {
+                id: alert.id,
+                alert_type: alert.alert_type,
+                description: alert.description,
+                severity: alert.severity,
+                camera_id: payload.camera_id,
+                timestamp: alert.timestamp,
+                acknowledged: false,
+                acknowledged_by: null
+              },
+              ...currentAlerts
+            ]
+          });
+          useStore.getState().addToast(alert.description, 'error');
+        }
+      } catch (err) {
+        console.error("Failed to parse websocket message", err);
+      }
+    };
+    
+    ws.onclose = () => {
+      console.log("WebSocket closed, attempting reconnect in 5s...");
+      setTimeout(() => set((s) => ({ ...s }) /* Trigger re-init somehow, or rely on a wrapper */), 5000);
+    };
+  }
 }));

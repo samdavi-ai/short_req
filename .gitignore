@@ -99,3 +99,4 @@ docker/data/
 # ─── Celery ──────────────────────────────────────────────────────────
 celerybeat-schedule
 celerybeat.pid
+test_video.mp4

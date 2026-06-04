@@ -1,16 +1,7 @@
 import React, { useState } from 'react';
-import { ShieldAlert, Check, CheckCheck, Filter, AlertTriangle, X } from 'lucide-react';
-import { useStore } from '../stores/appStore';
+import { ShieldAlert, Check, CheckCheck, AlertTriangle, X, Camera } from 'lucide-react';
+import { useStore, Alert } from '../stores/appStore';
 import { api } from '../hooks/api';
-
-const DEMO_ALERTS = [
-  { id: 1,  alert_type: 'RESTRICTED_ZONE', severity: 'CRITICAL', description: 'Unauthorized person entered Gate B3 restricted area', camera_id: 4, timestamp: new Date(Date.now() - 120000).toISOString(), acknowledged: false, acknowledged_by: null },
-  { id: 2,  alert_type: 'WATCHLIST_MATCH',  severity: 'HIGH',     description: 'Watchlisted individual ID#WL-004 spotted at Terminal 1 Entry', camera_id: 1, timestamp: new Date(Date.now() - 300000).toISOString(), acknowledged: false, acknowledged_by: null },
-  { id: 3,  alert_type: 'DWELL_EXCEEDED',   severity: 'MEDIUM',   description: 'Person has been stationary at Gate A3 for 47 minutes', camera_id: 2, timestamp: new Date(Date.now() - 600000).toISOString(), acknowledged: false, acknowledged_by: null },
-  { id: 4,  alert_type: 'CAMERA_OFFLINE',   severity: 'HIGH',     description: 'Camera "Gate B3" has lost signal — heartbeat timeout', camera_id: 4, timestamp: new Date(Date.now() - 900000).toISOString(), acknowledged: false, acknowledged_by: null },
-  { id: 5,  alert_type: 'BREAK_VIOLATION',  severity: 'MEDIUM',   description: 'Employee E-007 (Ravi Kumar) overdue for break by 45 minutes', camera_id: null, timestamp: new Date(Date.now() - 1800000).toISOString(), acknowledged: true, acknowledged_by: 'supervisor_ali' },
-  { id: 6,  alert_type: 'TAILGATING',       severity: 'HIGH',     description: 'Tailgating detected at Security Checkpoint — 2 persons, 1 badge scan', camera_id: 2, timestamp: new Date(Date.now() - 3600000).toISOString(), acknowledged: true, acknowledged_by: 'operator_1' },
-];
 
 const SEV_ORDER = { CRITICAL: 0, HIGH: 1, MEDIUM: 2, LOW: 3 };
 
@@ -31,12 +22,11 @@ const TYPE_ICON: Record<string, string> = {
 };
 
 export default function AlertsPage() {
-  const { alerts: storeAlerts, token, acknowledgeAlert, user, addToast } = useStore();
-  const alerts = storeAlerts.length > 0 ? storeAlerts : DEMO_ALERTS;
+  const { alerts, token, acknowledgeAlert, user, addToast } = useStore();
 
   const [filter, setFilter] = useState<'all' | 'unack' | 'ack'>('unack');
   const [sevFilter, setSevFilter] = useState<string>('all');
-  const [selected, setSelected] = useState<number[]>([]);
+  const [selectedAlertId, setSelectedAlertId] = useState<number | null>(null);
 
   const sorted = [...alerts]
     .filter((a) => {
@@ -53,7 +43,8 @@ export default function AlertsPage() {
 
   const unackCount = alerts.filter((a) => !a.acknowledged).length;
 
-  const doAck = async (id: number) => {
+  const doAck = async (id: number, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
     if (token && token !== 'demo-token') {
       try {
         await api.acknowledgeAlert(token, id, user?.username || 'operator');
@@ -61,14 +52,13 @@ export default function AlertsPage() {
     }
     acknowledgeAlert(id);
     addToast('Alert acknowledged', 'success');
-    setSelected((prev) => prev.filter((s) => s !== id));
+    if (selectedAlertId === id) setSelectedAlertId(null);
   };
 
   const doAckAll = () => {
     const toAck = sorted.filter((a) => !a.acknowledged).map((a) => a.id);
     toAck.forEach((id) => acknowledgeAlert(id));
     addToast(`${toAck.length} alerts acknowledged`, 'success');
-    setSelected([]);
   };
 
   const formatTime = (ts: string) => {
@@ -81,10 +71,11 @@ export default function AlertsPage() {
     return d.toLocaleDateString();
   };
 
-  return (
-    <div className="page-content">
-      <div style={{ padding: '0' }}>
+  const selectedAlert = alerts.find(a => a.id === selectedAlertId);
 
+  return (
+    <div className="page-content" style={{ position: 'relative' }}>
+      <div style={{ padding: '0' }}>
         {/* Header summary */}
         <div style={{
           padding: '16px 20px',
@@ -166,6 +157,7 @@ export default function AlertsPage() {
                 <div
                   key={a.id}
                   id={`alert-row-${a.id}`}
+                  onClick={() => setSelectedAlertId(a.id)}
                   style={{
                     padding: '14px 20px',
                     borderBottom: '1px solid var(--border)',
@@ -176,6 +168,14 @@ export default function AlertsPage() {
                     transition: 'all 0.2s ease',
                     background: !a.acknowledged && a.severity === 'CRITICAL'
                       ? 'rgba(239,68,68,0.03)' : 'transparent',
+                    cursor: 'pointer',
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = 'var(--surface-2)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = !a.acknowledged && a.severity === 'CRITICAL'
+                      ? 'rgba(239,68,68,0.03)' : 'transparent';
                   }}
                 >
                   {/* Severity indicator */}
@@ -227,7 +227,7 @@ export default function AlertsPage() {
                     <button
                       id={`ack-alert-${a.id}`}
                       className="btn btn-sm btn-secondary"
-                      onClick={() => doAck(a.id)}
+                      onClick={(e) => doAck(a.id, e)}
                       style={{ flexShrink: 0 }}
                     >
                       <Check size={13} /> Acknowledge
@@ -244,6 +244,80 @@ export default function AlertsPage() {
           )}
         </div>
       </div>
+
+      {/* Snapshot Modal */}
+      {selectedAlert && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          background: 'rgba(0, 0, 0, 0.7)', backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000,
+          padding: 24, animation: 'fade-in 0.2s ease-out'
+        }} onClick={() => setSelectedAlertId(null)}>
+          
+          <div style={{
+            background: 'var(--surface-1)', border: '1px solid var(--border)', borderRadius: 'var(--radius-xl)',
+            width: '100%', maxWidth: 800, overflow: 'hidden', boxShadow: '0 24px 64px rgba(0,0,0,0.5)',
+            display: 'flex', flexDirection: 'column'
+          }} onClick={e => e.stopPropagation()}>
+            
+            <div style={{ padding: '20px 24px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <span style={{ fontSize: 24 }}>{TYPE_ICON[selectedAlert.alert_type] || '⚠️'}</span>
+                <div>
+                  <div style={{ fontFamily: 'Outfit', fontWeight: 700, fontSize: 18, color: 'var(--white)' }}>
+                    {selectedAlert.alert_type.replace(/_/g, ' ')}
+                  </div>
+                  <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
+                    {new Date(selectedAlert.timestamp).toLocaleString()}
+                  </div>
+                </div>
+              </div>
+              <button className="icon-btn" onClick={() => setSelectedAlertId(null)}>
+                <X size={20} />
+              </button>
+            </div>
+
+            <div style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 20 }}>
+              <div style={{ fontSize: 14, color: 'var(--text-primary)', lineHeight: 1.5 }}>
+                {selectedAlert.description}
+              </div>
+
+              {selectedAlert.snapshot_url ? (
+                <div style={{ position: 'relative', borderRadius: 'var(--radius-lg)', overflow: 'hidden', background: '#000', border: '1px solid var(--border)', aspectRatio: '16/9' }}>
+                  <img src={selectedAlert.snapshot_url} alt="Alert Snapshot" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  <div style={{ position: 'absolute', top: 12, left: 12, display: 'flex', gap: 8 }}>
+                    <span className="live-badge" style={{ background: 'rgba(0,0,0,0.6)', padding: '6px 12px' }}>
+                      <Camera size={12} style={{ marginRight: 6, display: 'inline-block' }} /> 
+                      CAM #{selectedAlert.camera_id || 'UNKNOWN'}
+                    </span>
+                    <span className={`badge badge-${selectedAlert.severity === 'CRITICAL' || selectedAlert.severity === 'HIGH' ? 'red' : 'amber'}`} style={{ backdropFilter: 'blur(8px)' }}>
+                      {selectedAlert.severity}
+                    </span>
+                  </div>
+                  <div style={{ position: 'absolute', bottom: 12, right: 12, color: 'white', fontFamily: 'monospace', fontSize: 11, background: 'rgba(0,0,0,0.5)', padding: '4px 8px', borderRadius: 4 }}>
+                    {selectedAlert.timestamp}
+                  </div>
+                </div>
+              ) : (
+                <div style={{ height: 300, background: 'var(--surface-2)', borderRadius: 'var(--radius-lg)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)' }}>
+                  <Camera size={48} opacity={0.2} />
+                  <span style={{ marginLeft: 16 }}>No Snapshot Available</span>
+                </div>
+              )}
+
+              {!selectedAlert.acknowledged && (
+                <button 
+                  className="btn btn-primary" 
+                  style={{ width: '100%', padding: '16px', fontSize: 14, justifyContent: 'center' }}
+                  onClick={() => doAck(selectedAlert.id)}
+                >
+                  <CheckCheck size={18} /> ACKNOWLEDGE ALERT
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

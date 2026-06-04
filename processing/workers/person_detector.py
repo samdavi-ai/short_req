@@ -1,35 +1,42 @@
 import numpy as np
 import cv2
+from ultralytics import YOLO
 
 class PersonDetector:
-    def __init__(self, model_path: str = None, use_gpu: bool = False):
+    def __init__(self, model_path: str = 'yolov8n.pt', use_gpu: bool = False):
         self.model_path = model_path
         self.use_gpu = use_gpu
-        self.hog = cv2.HOGDescriptor()
-        self.hog.setSVMDetector(cv2.HOGDescriptor_getDefaultPeopleDetector())
-        print("Initializing CPU-optimized OpenCV HOG human detector ✓")
+        self.device = 0 if use_gpu else 'cpu'
         
-    def detect(self, frame: np.ndarray):
+        # Load YOLOv8 model
+        self.model = YOLO(model_path)
+        print(f"Initializing Ultralytics YOLOv8 human detector/tracker ✓ (Device: {self.device})")
+        
+    def detect_and_track(self, frame: np.ndarray):
         """
-        Detect people in the frame using OpenCV HOG + SVM.
+        Detect and track people in the frame using YOLOv8 built-in ByteTrack.
         Returns:
-            list of list: [[x1, y1, x2, y2, confidence]]
+            list of dict: [{"track_id": int, "bbox": [x1, y1, x2, y2], "conf": float}]
         """
-        # Convert to grayscale for HOG
-        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        # Run tracking with ByteTrack, persist=True is required to keep tracks across frames
+        results = self.model.track(frame, classes=[0], device=self.device, persist=True, verbose=False, tracker="bytetrack.yaml")
         
-        # Multi-scale detection
-        rects, weights = self.hog.detectMultiScale(
-            gray, 
-            winStride=(4, 4), 
-            padding=(8, 8), 
-            scale=1.05
-        )
-        
-        detections = []
-        for (x, y, w, h), weight in zip(rects, weights):
-            # Normalise and filter by weight threshold
-            if weight > 0.2:
-                detections.append([int(x), int(y), int(x + w), int(y + h), float(weight)])
+        tracked_objects = []
+        for result in results:
+            boxes = result.boxes
+            if boxes.id is None:
+                continue
+            
+            for i, box in enumerate(boxes):
+                x1, y1, x2, y2 = box.xyxy[0].tolist()
+                conf = float(box.conf[0])
+                track_id = int(boxes.id[i])
                 
-        return detections
+                if conf > 0.25:
+                    tracked_objects.append({
+                        "track_id": track_id,
+                        "bbox": [int(x1), int(y1), int(x2), int(y2)],
+                        "conf": conf
+                    })
+                    
+        return tracked_objects
