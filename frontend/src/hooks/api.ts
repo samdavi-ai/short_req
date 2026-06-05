@@ -55,6 +55,13 @@ export const api = {
       headers: authHeaders(token),
     }),
 
+  bulkUpdateCameraPositions: (token: string, positions: any[]) =>
+    fetch(`${BASE}/cameras/positions/bulk`, {
+      method: 'POST',
+      headers: authHeaders(token),
+      body: JSON.stringify({ positions }),
+    }).then((r) => r.json()),
+
   // Alerts
   getAlerts: (token: string, ack?: boolean) =>
     fetch(`${BASE}/alerts/${ack !== undefined ? `?acknowledged=${ack}` : ''}`, {
@@ -144,6 +151,13 @@ export const api = {
       method: 'DELETE',
       headers: authHeaders(token),
     }),
+
+  updateZone: (token: string, id: number, data: Record<string, unknown>) =>
+    fetch(`${BASE}/zones/${id}`, {
+      method: 'PATCH',
+      headers: authHeaders(token),
+      body: JSON.stringify(data),
+    }).then((r) => r.json()),
 
   // Layouts
   getLayouts: (token: string) =>

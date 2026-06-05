@@ -10,6 +10,7 @@ export interface Camera {
   x_coord: number;
   y_coord: number;
   angle: number;
+  fov?: number;
   status: 'ACTIVE' | 'OFFLINE' | 'MAINTENANCE';
   is_overhead: boolean;
 }
@@ -70,6 +71,7 @@ export interface Zone {
   is_active: boolean;
   dwell_alert_seconds: number;
   coordinates: {x: number; y: number}[];
+  color?: string;
 }
 
 export type IdentityType = 'UNKNOWN' | 'KNOWN_VISITOR' | 'KNOWN_EMPLOYEE' | 'WATCHLIST_MATCH' | 'BLACKLISTED';

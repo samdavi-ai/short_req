@@ -13,7 +13,7 @@ const DEMO_CAMERAS = [
 ];
 
 export default function CameraManager() {
-  const { cameras: storeCams, token, addToast } = useStore();
+  const { cameras: storeCams, token, addToast, setCameras } = useStore();
   const cameras = storeCams.length > 0 ? storeCams : DEMO_CAMERAS;
 
   const [showModal, setShowModal] = useState(false);
@@ -25,20 +25,37 @@ export default function CameraManager() {
   const handleDelete = async (id: number) => {
     if (!window.confirm('Delete this camera?')) return;
     if (token && token !== 'demo-token') {
-      try { await api.deleteCamera(token, id); } catch { /* demo */ }
+      try {
+        await api.deleteCamera(token, id);
+        const updated = await api.getCameras(token);
+        setCameras(updated);
+        addToast('Camera deleted successfully', 'info');
+      } catch (err) {
+        addToast('Failed to delete camera', 'error');
+      }
+    } else {
+      addToast('Camera deleted (demo)', 'info');
     }
-    addToast('Camera deleted', 'info');
   };
 
   const handleSave = async () => {
     if (!form.name || !form.rtsp_url) { addToast('Name and RTSP URL required', 'error'); return; }
     if (token && token !== 'demo-token') {
       try {
-        if (editId) await api.updateCamera(token, editId, form);
-        else await api.createCamera(token, form);
-      } catch { /* demo */ }
+        if (editId) {
+          await api.updateCamera(token, editId, form);
+        } else {
+          await api.createCamera(token, form);
+        }
+        const updated = await api.getCameras(token);
+        setCameras(updated);
+        addToast(`Camera ${editId ? 'updated' : 'added'} successfully`, 'success');
+      } catch (err) {
+        addToast('Failed to save camera', 'error');
+      }
+    } else {
+      addToast(`Camera ${editId ? 'updated' : 'added'} successfully (demo)`, 'success');
     }
-    addToast(`Camera ${editId ? 'updated' : 'added'} successfully`, 'success');
     setShowModal(false);
     setEditId(null);
     setForm({ name: '', rtsp_url: '', location: '', floor: 1, is_overhead: true, angle: 0, x_coord: 0, y_coord: 0 });
