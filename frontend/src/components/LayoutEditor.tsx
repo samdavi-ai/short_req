@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import {
-  Camera, Trash2, Plus, Save, RotateCcw, ZoomIn, ZoomOut, MapPin, 
-  Settings2, Activity, Info, X
+  Camera, Trash2, Plus, Save, RotateCcw, ZoomIn, ZoomOut, MapPin,
+  Info, X
 } from 'lucide-react';
 import { useStore } from '../stores/appStore';
 import { api } from '../hooks/api';
@@ -249,7 +249,8 @@ export default function LayoutEditor() {
     placedCams.forEach((cam) => {
       const isSelected = selectedCam === cam.id;
       const isOffline = cam.status === 'OFFLINE';
-      const color = isOffline ? 'var(--red)' : 'var(--cyan)';
+      // Use actual hex colors — CSS vars don't work in canvas context
+      const color = isOffline ? '#ff0055' : '#00f0ff';
 
       // FoV cone (Dynamic based on cam.fov)
       const fovRad = (cam.fov * Math.PI) / 180;
@@ -307,7 +308,7 @@ export default function LayoutEditor() {
       }
 
       // Name
-      ctx.fillStyle = isSelected ? 'var(--white)' : 'rgba(255,255,255,0.7)';
+      ctx.fillStyle = isSelected ? '#ffffff' : 'rgba(255,255,255,0.7)';
       ctx.font = isSelected ? 'bold 11px Outfit' : '10px Outfit';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'top';
@@ -373,7 +374,12 @@ export default function LayoutEditor() {
             // Label background
             ctx.fillStyle = 'rgba(0, 0, 0, 0.75)';
             ctx.beginPath();
-            ctx.roundRect(labelX, labelY, textWidth + 8, 14, 3);
+            // roundRect polyfill for older browsers
+            if (ctx.roundRect) {
+              ctx.roundRect(labelX, labelY, textWidth + 8, 14, 3);
+            } else {
+              ctx.rect(labelX, labelY, textWidth + 8, 14);
+            }
             ctx.fill();
             ctx.strokeStyle = colors.stroke;
             ctx.lineWidth = 1;
@@ -657,21 +663,45 @@ export default function LayoutEditor() {
         await api.deleteCamera(token, cam.id);
       }
 
-      // B. Add new cameras (temp ID > 100000000000)
+      // B. Add new cameras (temp ID > 100_000_000_000)
       const camsToAdd = placedCams.filter(c => c.id > 100000000000);
       for (const cam of camsToAdd) {
-        await api.createCamera(token, {
-          name: cam.name,
-          rtsp_url: cam.rtsp_url || `rtsp://127.0.0.1:8554/stream_${Date.now()}`,
-          location: cam.location || `Floor ${activeFloor} Area`,
-          floor: activeFloor,
-          x_coord: cam.x,
-          y_coord: cam.y,
-          angle: cam.angle,
-          fov: cam.fov,
-          is_overhead: cam.is_overhead ?? true,
-          status: cam.status
-        });
+        // Generate a unique RTSP URL to avoid 409 conflicts
+        const uniqueSuffix = `${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+        try {
+          await api.createCamera(token, {
+            name: cam.name,
+            rtsp_url: cam.rtsp_url && !cam.rtsp_url.includes('stream_') 
+              ? cam.rtsp_url 
+              : `rtsp://127.0.0.1:8554/cam_${uniqueSuffix}`,
+            location: cam.location || `Floor ${activeFloor} Area`,
+            floor: activeFloor,
+            x_coord: cam.x,
+            y_coord: cam.y,
+            angle: cam.angle,
+            fov: cam.fov,
+            is_overhead: cam.is_overhead ?? true,
+            status: cam.status
+          });
+        } catch (err: any) {
+          // 409 = duplicate RTSP — retry with a fully random URL
+          if (err.message?.includes('409') || err.message?.includes('already exists')) {
+            await api.createCamera(token, {
+              name: cam.name,
+              rtsp_url: `rtsp://127.0.0.1:8554/cam_${Date.now()}_${Math.random().toString(36).slice(2)}`,
+              location: cam.location || `Floor ${activeFloor} Area`,
+              floor: activeFloor,
+              x_coord: cam.x,
+              y_coord: cam.y,
+              angle: cam.angle,
+              fov: cam.fov,
+              is_overhead: cam.is_overhead ?? true,
+              status: cam.status
+            });
+          } else {
+            throw err;
+          }
+        }
       }
 
       // C. Update existing cameras (coordinates or settings changed)
@@ -701,9 +731,13 @@ export default function LayoutEditor() {
         await api.deleteZone(token, zone.id);
       }
 
-      // B. Add new zones
+      // B. Add new zones (validate ≥ 3 points before sending)
       const zonesToAdd = drawnZones.filter(z => z.id > 100000000000);
       for (const z of zonesToAdd) {
+        if (z.points.length < 3) {
+          addToast(`Zone "${z.name}" needs at least 3 points — skipped`, 'info');
+          continue;
+        }
         await api.createZone(token, {
           name: z.name,
           floor: activeFloor,

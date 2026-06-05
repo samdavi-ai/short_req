@@ -15,7 +15,7 @@ router = APIRouter()
 def list_zones(
     floor: Optional[int] = Query(None, description="Filter by floor"),
     zone_type: Optional[str] = Query(None, description="Filter by type: DWELL|TRIPWIRE|RESTRICTED|LOUNGE"),
-    active_only: bool = Query(True, description="Return only active zones"),
+    active_only: bool = Query(False, description="Return only active zones (default: False = return all)"),
     db: Session = Depends(get_db),
 ):
     """List all configured zones with optional filters."""

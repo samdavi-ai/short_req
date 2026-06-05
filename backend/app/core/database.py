@@ -59,6 +59,10 @@ engine = _build_engine()
 @event.listens_for(engine, "connect")
 def on_connect(dbapi_connection, connection_record):
     logger.debug("Database connection established")
+    # Register custom 'now()' function for SQLite compatibility
+    if engine.dialect.name == "sqlite" and hasattr(dbapi_connection, "create_function"):
+        import datetime
+        dbapi_connection.create_function("now", 0, lambda: datetime.datetime.utcnow().isoformat())
 
 
 SessionLocal = sessionmaker(
