@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { UserCheck, Clock, AlertTriangle, CheckCircle, Plus, Search, X, MapPin, Activity } from 'lucide-react';
 import { useStore, Employee } from '../stores/appStore';
 import { api } from '../hooks/api';
+import { PersonDetailModal, PersonDetailEmployee } from './PersonDetailModal';
 
 function getBreakStatus(minutesSince: number, interval: number) {
   const ratio = minutesSince / interval;
@@ -228,104 +229,22 @@ export default function EmployeesPage() {
         </div>
       )}
 
-      {/* Person Profile Modal */}
       {selectedEmployee && (
-        <div style={{
-          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-          background: 'rgba(0, 0, 0, 0.7)', backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000,
-          padding: 24, animation: 'fade-in 0.2s ease-out'
-        }} onClick={() => setSelectedEmployeeId(null)}>
-          
-          <div style={{
-            background: 'var(--surface-1)', border: '1px solid var(--border)', borderRadius: 'var(--radius-xl)',
-            width: '100%', maxWidth: 500, overflow: 'hidden', boxShadow: '0 24px 64px rgba(0,0,0,0.5)',
-            display: 'flex', flexDirection: 'column'
-          }} onClick={e => e.stopPropagation()}>
-            
-            <div style={{ padding: '24px 24px 0', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-              <div style={{ display: 'flex', gap: 16 }}>
-                <div style={{ width: 80, height: 80, borderRadius: '50%', overflow: 'hidden', border: '2px solid var(--border)', background: 'var(--surface-3)' }}>
-                  <img src="/assets/employee_avatar.png" alt="Avatar" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                </div>
-                <div style={{ paddingTop: 8 }}>
-                  <div style={{ fontFamily: 'Outfit', fontWeight: 700, fontSize: 22, color: 'var(--white)' }}>
-                    {selectedEmployee.fullname}
-                  </div>
-                  <div style={{ fontSize: 13, color: 'var(--cyan)', fontFamily: 'monospace', marginTop: 4 }}>
-                    {selectedEmployee.employee_code} • {selectedEmployee.department}
-                  </div>
-                </div>
-              </div>
-              <button className="icon-btn" onClick={() => setSelectedEmployeeId(null)}>
-                <X size={20} />
-              </button>
-            </div>
-
-            <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: 16 }}>
-              
-              {/* Location Tracker */}
-              <div style={{ padding: 16, background: 'var(--surface-2)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: 'var(--text-ghost)', fontSize: 11, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 12 }}>
-                  <MapPin size={14} /> Current Live Location
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                  <div style={{ width: 10, height: 10, borderRadius: '50%', background: 'var(--green-bright)', boxShadow: '0 0 10px var(--green-bright)' }} />
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: 16, fontWeight: 600, color: 'var(--white)', fontFamily: 'Outfit' }}>
-                      {(selectedEmployee as any).current_location || 'Unknown'}
-                    </div>
-                    <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>
-                      Last seen: {(selectedEmployee as any).last_seen || 'Unknown'}
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Status Info */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-                <div style={{ padding: 12, background: 'var(--surface-2)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)' }}>
-                  <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 4 }}>Current Status</div>
-                  <span className={`badge ${selectedEmployee.is_active ? 'badge-green' : 'badge-gray'}`}>
-                    <span className="badge-dot" />
-                    {selectedEmployee.is_active ? 'On Duty' : 'Off Duty'}
-                  </span>
-                </div>
-                
-                {selectedEmployee.is_active && (
-                  <div style={{ padding: 12, background: 'var(--surface-2)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)' }}>
-                    <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 4 }}>Break Compliance</div>
-                    {(() => {
-                      const bStatus = getBreakStatus((selectedEmployee as any).minutesSinceLast || 0, selectedEmployee.break_interval_minutes);
-                      return (
-                        <span style={{ fontSize: 11, fontWeight: 700, color: bStatus.color, background: bStatus.bg, padding: '3px 8px', borderRadius: 99 }}>
-                          {bStatus.icon} {bStatus.label}
-                        </span>
-                      );
-                    })()}
-                  </div>
-                )}
-              </div>
-              
-              <div style={{ padding: 16, background: 'var(--surface-2)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: 'var(--text-ghost)', fontSize: 11, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 12 }}>
-                  <Activity size={14} /> Schedule Details
-                </div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-                  <div>
-                    <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>Break Interval</div>
-                    <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>Every {selectedEmployee.break_interval_minutes} mins</div>
-                  </div>
-                  <div>
-                    <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>Break Duration</div>
-                    <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>{selectedEmployee.break_duration_minutes} mins</div>
-                  </div>
-                </div>
-              </div>
-            </div>
-            
-          </div>
-        </div>
+        <PersonDetailModal
+          person={{
+            type: 'employee',
+            id: selectedEmployee.id,
+            employee_code: selectedEmployee.employee_code,
+            fullname: selectedEmployee.fullname,
+            department: selectedEmployee.department,
+            is_active: selectedEmployee.is_active,
+            current_location: selectedEmployee.current_location,
+            last_seen: selectedEmployee.last_seen,
+            break_interval_minutes: selectedEmployee.break_interval_minutes,
+            break_duration_minutes: selectedEmployee.break_duration_minutes,
+          } as PersonDetailEmployee}
+          onClose={() => setSelectedEmployeeId(null)}
+        />
       )}
     </div>
   );

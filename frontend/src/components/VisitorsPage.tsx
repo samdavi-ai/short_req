@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Users, Search, Plus, AlertTriangle, Check, Flag, X, Camera, MapPin, Activity, User } from 'lucide-react';
 import { useStore, Visitor } from '../stores/appStore';
 import { api } from '../hooks/api';
+import { PersonDetailModal, PersonDetailVisitor } from './PersonDetailModal';
 
 const STATUS_BADGE: Record<string, { class: string; label: string }> = {
   WHITELISTED: { class: 'badge-green',  label: '✓ Whitelisted' },
@@ -401,130 +402,32 @@ export default function VisitorsPage() {
         </div>
       )}
 
-      {/* Person Profile Modal */}
       {selectedVisitor && (
-        <div style={{
-          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-          background: 'rgba(0, 0, 0, 0.7)', backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000,
-          padding: 24, animation: 'fade-in 0.2s ease-out'
-        }} onClick={() => setSelectedVisitorId(null)}>
-          
-          <div style={{
-            background: 'var(--surface-1)', border: '1px solid var(--border)', borderRadius: 'var(--radius-xl)',
-            width: '100%', maxWidth: 500, overflow: 'hidden', boxShadow: '0 24px 64px rgba(0,0,0,0.5)',
-            display: 'flex', flexDirection: 'column'
-          }} onClick={e => e.stopPropagation()}>
-            
-            <div style={{ padding: '24px 24px 0', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-              <div style={{ display: 'flex', gap: 16 }}>
-                <div style={{ width: 80, height: 80, borderRadius: '50%', overflow: 'hidden', border: '2px solid var(--border)', background: 'var(--surface-3)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-ghost)' }}>
-                   {selectedVisitor.photo_path ? (
-                     <img src={selectedVisitor.photo_path.startsWith('data:') ? selectedVisitor.photo_path : `http://localhost:8000${selectedVisitor.photo_path}`} alt={selectedVisitor.fullname} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                   ) : (
-                     <User size={40} />
-                   )}
-                </div>
-                <div style={{ paddingTop: 8 }}>
-                  <div style={{ fontFamily: 'Outfit', fontWeight: 700, fontSize: 22, color: 'var(--white)' }}>
-                    {selectedVisitor.fullname}
-                  </div>
-                  <div style={{ fontSize: 13, color: 'var(--cyan)', fontFamily: 'monospace', marginTop: 4 }}>
-                    {selectedVisitor.passport_number || 'No ID Provided'} • {selectedVisitor.nationality || 'Unknown'}
-                  </div>
-                  {selectedVisitor.face_embedding_id && (
-                    <div style={{ fontSize: 11, color: 'var(--green-bright)', fontFamily: 'monospace', marginTop: 4 }}>
-                      Face ID: {selectedVisitor.face_embedding_id}
-                    </div>
-                  )}
-                </div>
-              </div>
-              <button className="icon-btn" onClick={() => setSelectedVisitorId(null)}>
-                <X size={20} />
-              </button>
-            </div>
-
-            <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: 16 }}>
-              
-              {/* Location Tracker */}
-              <div style={{ padding: 16, background: 'var(--surface-2)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: 'var(--text-ghost)', fontSize: 11, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 12 }}>
-                  <MapPin size={14} /> Current Live Location
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                  <div style={{ width: 10, height: 10, borderRadius: '50%', background: 'var(--cyan)', boxShadow: '0 0 10px var(--cyan)' }} />
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: 16, fontWeight: 600, color: 'var(--white)', fontFamily: 'Outfit' }}>
-                      {(selectedVisitor as any).current_location || 'Unknown'}
-                    </div>
-                    <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>
-                      Last seen: {(selectedVisitor as any).last_seen || 'Unknown'}
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Status Info */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-                <div style={{ padding: 12, background: 'var(--surface-2)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)' }}>
-                  <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 4 }}>Access Status</div>
-                  <span className={`badge ${STATUS_BADGE[selectedVisitor.status]?.class || 'badge-gray'}`}>
-                    {STATUS_BADGE[selectedVisitor.status]?.label || selectedVisitor.status}
-                  </span>
-                </div>
-                
-                <div style={{ padding: 12, background: 'var(--surface-2)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)' }}>
-                  <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 4 }}>Escort Required</div>
-                  {selectedVisitor.requires_escort ? (
-                    <span className="badge badge-amber" style={{ fontSize: 11, padding: '3px 8px' }}>⚠ REQUIRED</span>
-                  ) : (
-                    <span className="badge badge-gray" style={{ fontSize: 11, padding: '3px 8px' }}>NO</span>
-                  )}
-                </div>
-              </div>
-              
-              <div style={{ padding: 16, background: 'var(--surface-2)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: 'var(--text-ghost)', fontSize: 11, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 12 }}>
-                  <Activity size={14} /> Visit Details
-                </div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-                  <div>
-                    <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>Purpose</div>
-                    <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>{selectedVisitor.purpose || 'N/A'}</div>
-                  </div>
-                  <div>
-                    <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>Phone</div>
-                    <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>{selectedVisitor.phone_number || 'N/A'}</div>
-                  </div>
-                  <div>
-                    <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>Target Location</div>
-                    <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>{selectedVisitor.location || 'N/A'}</div>
-                  </div>
-                  <div>
-                    <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>Department</div>
-                    <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>{selectedVisitor.department || 'N/A'}</div>
-                  </div>
-                  <div>
-                    <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>Role</div>
-                    <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>{selectedVisitor.role || 'N/A'}</div>
-                  </div>
-                  <div>
-                    <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>Approver</div>
-                    <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>{selectedVisitor.approved_by || 'N/A'} {selectedVisitor.approver_id ? `(ID: ${selectedVisitor.approver_id})` : ''}</div>
-                  </div>
-                  <div style={{ gridColumn: '1 / -1' }}>
-                    <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>Scheduled Time Window</div>
-                    <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>
-                      {selectedVisitor.entry_time ? new Date(selectedVisitor.entry_time).toLocaleString('en-IN') : 'N/A'}
-                      {' — '}
-                      {selectedVisitor.exit_time ? new Date(selectedVisitor.exit_time).toLocaleString('en-IN') : 'N/A'}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
+        <PersonDetailModal
+          person={{
+            type: 'visitor',
+            id: selectedVisitor.id,
+            fullname: selectedVisitor.fullname,
+            passport_number: selectedVisitor.passport_number,
+            nationality: selectedVisitor.nationality,
+            phone_number: selectedVisitor.phone_number,
+            department: selectedVisitor.department,
+            role: selectedVisitor.role,
+            location: selectedVisitor.location,
+            entry_time: selectedVisitor.entry_time ? new Date(selectedVisitor.entry_time).toLocaleString('en-IN') : undefined,
+            exit_time: selectedVisitor.exit_time ? new Date(selectedVisitor.exit_time).toLocaleString('en-IN') : undefined,
+            status: selectedVisitor.status,
+            approved_by: selectedVisitor.approved_by,
+            approver_id: selectedVisitor.approver_id,
+            purpose: selectedVisitor.purpose,
+            requires_escort: selectedVisitor.requires_escort,
+            photo_path: selectedVisitor.photo_path,
+            face_embedding_id: selectedVisitor.face_embedding_id,
+            current_location: selectedVisitor.current_location,
+            last_seen: selectedVisitor.last_seen,
+          } as PersonDetailVisitor}
+          onClose={() => setSelectedVisitorId(null)}
+        />
       )}
     </div>
   );

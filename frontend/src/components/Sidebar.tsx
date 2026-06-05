@@ -1,20 +1,21 @@
 import React, { useState } from 'react';
 import {
   LayoutDashboard, Camera, MapPin, ShieldAlert, Users,
-  UserCheck, BarChart3, Settings, LogOut, Pin, PinOff,
+  UserCheck, BarChart3, Settings, LogOut, Pin, PinOff, Fingerprint,
 } from 'lucide-react';
 import { useStore } from '../stores/appStore';
 
 const NAV = [
-  { id: 'dashboard',  label: 'Dashboard',       icon: LayoutDashboard, section: 'MONITOR' },
-  { id: 'live',       label: 'Live Feeds',       icon: Camera,          section: 'MONITOR' },
-  { id: 'layout',     label: 'Layout Editor',    icon: MapPin,          section: 'MONITOR' },
-  { id: 'alerts',     label: 'Alerts',           icon: ShieldAlert,     section: 'OPS',    badge: true },
-  { id: 'visitors',   label: 'Visitors',         icon: Users,           section: 'OPS' },
-  { id: 'employees',  label: 'Employees',        icon: UserCheck,       section: 'OPS' },
-  { id: 'analytics',  label: 'Analytics',        icon: BarChart3,       section: 'INTEL' },
-  { id: 'cameras',    label: 'Cameras',          icon: Camera,          section: 'INTEL' },
-  { id: 'settings',   label: 'Settings',         icon: Settings,        section: 'SYS' },
+  { id: 'dashboard',     label: 'Dashboard',       icon: LayoutDashboard, section: 'MONITOR' },
+  { id: 'live',          label: 'Live Feeds',       icon: Camera,          section: 'MONITOR' },
+  { id: 'layout',        label: 'Layout Editor',    icon: MapPin,          section: 'MONITOR' },
+  { id: 'alerts',        label: 'Alerts',           icon: ShieldAlert,     section: 'OPS',    badge: true },
+  { id: 'visitors',      label: 'Visitors',         icon: Users,           section: 'OPS' },
+  { id: 'employees',     label: 'Employees',        icon: UserCheck,       section: 'OPS' },
+  { id: 'person-lookup', label: 'Person Lookup',    icon: Fingerprint,     section: 'OPS' },
+  { id: 'analytics',     label: 'Analytics',        icon: BarChart3,       section: 'INTEL' },
+  { id: 'cameras',       label: 'Cameras',          icon: Camera,          section: 'INTEL' },
+  { id: 'settings',      label: 'Settings',         icon: Settings,        section: 'SYS' },
 ];
 
 export default function Sidebar() {

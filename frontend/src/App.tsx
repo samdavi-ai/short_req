@@ -19,19 +19,21 @@ import EmployeesPage from './components/EmployeesPage';
 import AnalyticsPage from './components/AnalyticsPage';
 import CameraManager from './components/CameraManager';
 import SettingsPage from './components/SettingsPage';
+import PersonLookupPage from './components/PersonLookupPage';
 
 function renderPage(page: string): React.ReactElement {
   switch (page) {
-    case 'dashboard':  return <Dashboard />;
-    case 'live':       return <LiveFeeds />;
-    case 'layout':     return <LayoutEditor />;
-    case 'alerts':     return <AlertsPage />;
-    case 'visitors':   return <VisitorsPage />;
-    case 'employees':  return <EmployeesPage />;
-    case 'analytics':  return <AnalyticsPage />;
-    case 'cameras':    return <CameraManager />;
-    case 'settings':   return <SettingsPage />;
-    default:           return <Dashboard />;
+    case 'dashboard':      return <Dashboard />;
+    case 'live':           return <LiveFeeds />;
+    case 'layout':         return <LayoutEditor />;
+    case 'alerts':         return <AlertsPage />;
+    case 'visitors':       return <VisitorsPage />;
+    case 'employees':      return <EmployeesPage />;
+    case 'analytics':      return <AnalyticsPage />;
+    case 'cameras':        return <CameraManager />;
+    case 'settings':       return <SettingsPage />;
+    case 'person-lookup':  return <PersonLookupPage />;
+    default:               return <Dashboard />;
   }
 }
 
