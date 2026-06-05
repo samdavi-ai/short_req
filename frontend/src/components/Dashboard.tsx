@@ -1,14 +1,25 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   Camera, ShieldAlert, Users, UserCheck,
   Activity, Eye, AlertTriangle, CheckCircle,
   Clock, MapPin, TrendingUp, TrendingDown,
+  Check, CheckCheck, X
 } from 'lucide-react';
 import { useStore } from '../stores/appStore';
+import { api } from '../hooks/api';
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid,
   Tooltip, ResponsiveContainer, BarChart, Bar,
 } from 'recharts';
+
+const TYPE_ICON: Record<string, string> = {
+  RESTRICTED_ZONE: '🚫',
+  WATCHLIST_MATCH: '👤',
+  DWELL_EXCEEDED:  '⏱',
+  CAMERA_OFFLINE:  '📷',
+  BREAK_VIOLATION: '☕',
+  TAILGATING:      '🚷',
+};
 
 /* ── Hourly mock data ── */
 const mockHourly = Array.from({ length: 12 }, (_, i) => ({
@@ -163,7 +174,9 @@ const threatCellColor = (l: string) =>
 
 /* ─────────────────────────────────────────────── */
 export default function Dashboard() {
-  const { stats, alerts, cameras, visitors, employees } = useStore();
+  const { stats, alerts, cameras, visitors, employees, token, user, addToast, acknowledgeAlert } = useStore();
+
+  const [selectedAlertId, setSelectedAlertId] = useState<number | null>(null);
 
   const totalCams    = stats?.total_cameras   ?? cameras.length;
   const activeCams   = stats?.active_cameras  ?? cameras.filter((c) => c.status === 'ACTIVE').length;
@@ -174,6 +187,24 @@ export default function Dashboard() {
   const activeTracks = stats?.active_tracks   ?? 0;
   const totalEmps    = stats?.total_employees ?? employees.length;
   const empCompliance = totalEmps > 0 ? Math.round(((totalEmps - 2) / totalEmps) * 100) : 100;
+
+  const doAck = async (id: number, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    if (token && token !== 'demo-token') {
+      try {
+        await api.acknowledgeAlert(token, id, user?.username || 'operator');
+      } catch (err) {
+        console.error('Failed to acknowledge alert via API', err);
+      }
+    }
+    acknowledgeAlert(id);
+    addToast('Alert acknowledged', 'success');
+    if (selectedAlertId === id) setSelectedAlertId(null);
+  };
+
+  const activeCritical = useMemo(() => alerts.filter(a => !a.acknowledged && a.severity === 'CRITICAL').length, [alerts]);
+  const activeHigh = useMemo(() => alerts.filter(a => !a.acknowledged && a.severity === 'HIGH').length, [alerts]);
+  const activeMedium = useMemo(() => alerts.filter(a => !a.acknowledged && a.severity === 'MEDIUM').length, [alerts]);
 
   const recentAlerts = useMemo(() =>
     [...alerts]
@@ -392,10 +423,27 @@ export default function Dashboard() {
         <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
           {/* Active alerts */}
           <div style={{ flex: 1, borderBottom: '1px solid var(--border)', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-            <div className="card-header">
+            <div className="card-header" style={{ paddingBottom: 6 }}>
               <div>
                 <div className="card-title">Alerts</div>
                 <div className="card-subtitle">Pending review</div>
+                <div style={{ display: 'flex', gap: 4, marginTop: 4 }}>
+                  {activeCritical > 0 && (
+                    <span style={{ fontSize: 9, fontFamily: 'var(--font-mono)', padding: '1px 4px', background: 'var(--red-dim)', color: 'var(--red-light)', border: '1px solid var(--border-red)', borderRadius: 2 }}>
+                      {activeCritical} CRT
+                    </span>
+                  )}
+                  {activeHigh > 0 && (
+                    <span style={{ fontSize: 9, fontFamily: 'var(--font-mono)', padding: '1px 4px', background: 'rgba(255, 107, 0, 0.1)', color: '#FF8833', border: '1px solid rgba(255, 107, 0, 0.2)', borderRadius: 2 }}>
+                      {activeHigh} HIG
+                    </span>
+                  )}
+                  {activeMedium > 0 && (
+                    <span style={{ fontSize: 9, fontFamily: 'var(--font-mono)', padding: '1px 4px', background: 'rgba(245, 158, 11, 0.1)', color: '#F59E0B', border: '1px solid rgba(245, 158, 11, 0.2)', borderRadius: 2 }}>
+                      {activeMedium} MED
+                    </span>
+                  )}
+                </div>
               </div>
               {unackAlerts > 0 && (
                 <button
@@ -432,8 +480,9 @@ export default function Dashboard() {
                         borderBottom: '1px solid rgba(255,255,255,0.03)',
                         borderLeft: `3px solid ${sevColor(a.severity)}`,
                         transition: 'background var(--t-fast)',
-                        cursor: 'default',
+                        cursor: 'pointer',
                       }}
+                      onClick={() => setSelectedAlertId(a.id)}
                       onMouseEnter={(e) => { (e.currentTarget as HTMLDivElement).style.background = 'rgba(255,255,255,0.02)'; }}
                       onMouseLeave={(e) => { (e.currentTarget as HTMLDivElement).style.background = 'transparent'; }}
                     >
@@ -442,8 +491,12 @@ export default function Dashboard() {
                           fontSize: 10, fontFamily: 'var(--font-mono)', fontWeight: 700,
                           color: sevColor(a.severity), letterSpacing: '0.08em',
                           textTransform: 'uppercase', marginBottom: 2,
+                          display: 'flex', alignItems: 'center', gap: 6
                         }}>
-                          {a.severity} · {a.alert_type.replace(/_/g, ' ')}
+                          <span>{TYPE_ICON[a.alert_type] || '⚠️'}</span>
+                          <span>{a.severity}</span>
+                          <span>·</span>
+                          <span>{a.alert_type.replace(/_/g, ' ')}</span>
                         </div>
                         <div style={{
                           fontSize: 12, color: 'var(--text-secondary)',
@@ -458,10 +511,30 @@ export default function Dashboard() {
                         fontSize: 10, color: 'var(--text-ghost)',
                         fontFamily: 'var(--font-mono)', flexShrink: 0,
                         marginLeft: 8,
-                        display: 'flex', alignItems: 'center', gap: 4,
+                        display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4,
                       }}>
-                        <Clock size={9} aria-hidden="true" />
-                        {new Date(a.timestamp).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                          <Clock size={9} aria-hidden="true" />
+                          {new Date(a.timestamp).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
+                        </div>
+                        <button
+                          className="btn btn-sm btn-ghost"
+                          style={{
+                            fontSize: 8,
+                            padding: '1px 4px',
+                            fontFamily: 'var(--font-mono)',
+                            height: 16,
+                            marginTop: 2,
+                            borderColor: 'var(--border)',
+                          }}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            doAck(a.id);
+                          }}
+                          aria-label={`Ack alert ${a.id}`}
+                        >
+                          ACK
+                        </button>
                       </div>
                     </div>
                   ))}
@@ -534,6 +607,116 @@ export default function Dashboard() {
           </div>
         </div>
       </div>
+
+      {/* Snapshot Modal */}
+      {(() => {
+        const selectedAlert = alerts.find(a => a.id === selectedAlertId);
+        if (!selectedAlert) return null;
+        return (
+          <div style={{
+            position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+            background: 'rgba(7, 9, 15, 0.85)', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000,
+            padding: 24, animation: 'fade-in 0.2s ease-out'
+          }} onClick={() => setSelectedAlertId(null)}>
+            
+            <div style={{
+              background: 'var(--bg-panel)', border: '1px solid var(--orange-border)', borderRadius: 'var(--radius)',
+              width: '100%', maxWidth: 700, overflow: 'hidden', boxShadow: 'var(--shadow-lg)',
+              display: 'flex', flexDirection: 'column', position: 'relative'
+            }} onClick={e => e.stopPropagation()}>
+              
+              {/* Corner brackets */}
+              <div style={{ position: 'absolute', top: 0, left: 0, width: 8, height: 8, borderLeft: '2px solid var(--orange)', borderTop: '2px solid var(--orange)' }} />
+              <div style={{ position: 'absolute', top: 0, right: 0, width: 8, height: 8, borderRight: '2px solid var(--orange)', borderTop: '2px solid var(--orange)' }} />
+              <div style={{ position: 'absolute', bottom: 0, left: 0, width: 8, height: 8, borderLeft: '2px solid var(--orange)', borderBottom: '2px solid var(--orange)' }} />
+              <div style={{ position: 'absolute', bottom: 0, right: 0, width: 8, height: 8, borderRight: '2px solid var(--orange)', borderBottom: '2px solid var(--orange)' }} />
+
+              <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(255,255,255,0.01)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <span style={{ fontSize: 20 }}>{TYPE_ICON[selectedAlert.alert_type] || '⚠️'}</span>
+                  <div>
+                    <div style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: 16, color: 'var(--orange-bright)', letterSpacing: '0.06em', textTransform: 'uppercase' }}>
+                      {selectedAlert.alert_type.replace(/_/g, ' ')}
+                    </div>
+                    <div style={{ fontSize: 10, color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>
+                      ID: {selectedAlert.id} · {new Date(selectedAlert.timestamp).toLocaleString()}
+                    </div>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setSelectedAlertId(null)}
+                  style={{
+                    background: 'transparent',
+                    border: 'none',
+                    color: 'var(--text-muted)',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    padding: 4,
+                    transition: 'color var(--t-fast)'
+                  }}
+                  onMouseEnter={e => e.currentTarget.style.color = 'var(--red)'}
+                  onMouseLeave={e => e.currentTarget.style.color = 'var(--text-muted)'}
+                >
+                  <X size={16} />
+                </button>
+              </div>
+
+              <div style={{ padding: 20, display: 'flex', flexDirection: 'column', gap: 16 }}>
+                <div style={{ fontSize: 13, color: 'var(--text-primary)', lineHeight: 1.5, fontFamily: 'var(--font-body)', background: 'rgba(255,255,255,0.02)', padding: 12, borderLeft: '3px solid var(--orange)' }}>
+                  {selectedAlert.description}
+                </div>
+
+                {selectedAlert.snapshot_url ? (
+                  <div style={{ position: 'relative', overflow: 'hidden', background: '#000', border: '1px solid var(--border)', aspectRatio: '16/9' }}>
+                    <img src={selectedAlert.snapshot_url} alt="Alert Snapshot" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    <div style={{ position: 'absolute', top: 12, left: 12, display: 'flex', gap: 8 }}>
+                      <span className="live-badge" style={{ background: 'rgba(0,0,0,0.7)', border: '1px solid var(--border)' }}>
+                        <Camera size={10} style={{ marginRight: 4, display: 'inline-block' }} /> 
+                        CAM #{selectedAlert.camera_id || 'UNKNOWN'}
+                      </span>
+                      <span className="badge" style={{
+                        background: selectedAlert.severity === 'CRITICAL' ? 'var(--red-dim)' : 'rgba(255, 107, 0, 0.15)',
+                        color: selectedAlert.severity === 'CRITICAL' ? 'var(--red-light)' : 'var(--orange-bright)',
+                        borderColor: selectedAlert.severity === 'CRITICAL' ? 'var(--border-red)' : 'var(--orange-border)'
+                      }}>
+                        {selectedAlert.severity}
+                      </span>
+                    </div>
+                    <div style={{ position: 'absolute', bottom: 12, right: 12, color: 'var(--text-muted)', fontFamily: 'var(--font-mono)', fontSize: 9, background: 'rgba(0,0,0,0.6)', padding: '2px 6px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                      {selectedAlert.timestamp}
+                    </div>
+                  </div>
+                ) : (
+                  <div style={{ height: 200, background: 'var(--bg-input)', border: '1px solid var(--border)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', gap: 8 }}>
+                    <Camera size={32} opacity={0.2} />
+                    <span style={{ fontSize: 11, fontFamily: 'var(--font-mono)', letterSpacing: '0.04em' }}>NO SNAPSHOT RECORDED IN LOGS</span>
+                  </div>
+                )}
+
+                <div style={{ display: 'flex', gap: 10, marginTop: 4 }}>
+                  <button 
+                    className="btn btn-primary" 
+                    style={{ flex: 1, padding: 12, fontSize: 12, justifyContent: 'center', fontFamily: 'var(--font-display)', letterSpacing: '0.08em' }}
+                    onClick={() => doAck(selectedAlert.id)}
+                  >
+                    <CheckCheck size={14} style={{ marginRight: 6 }} /> ACKNOWLEDGE ALERT
+                  </button>
+                  <button
+                    className="btn btn-secondary"
+                    style={{ padding: '0 16px', fontSize: 11, fontFamily: 'var(--font-display)', letterSpacing: '0.08em' }}
+                    onClick={() => setSelectedAlertId(null)}
+                  >
+                    DISMISS
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }
