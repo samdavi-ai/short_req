@@ -26,8 +26,19 @@
   /* Neon Accents */
   --green:        #00f0ff; /* Neon Cyan mapped to "green" for legacy class names */
   --green-bright: #39ff14; /* True neon green for specific highlights */
+  --green-light:  rgba(57, 255, 20, 0.6);
   --green-dim:    rgba(0, 240, 255, 0.1);
   --green-glow:   rgba(0, 240, 255, 0.3);
+
+  /* Cyan — primary accent (same hue, explicit alias) */
+  --cyan:         #00f0ff;
+  --cyan-dim:     rgba(0, 240, 255, 0.1);
+  --cyan-shadow:  rgba(0, 240, 255, 0.3);
+
+  /* Deep Magenta — secondary accent */
+  --magenta:      #d946ef;
+  --magenta-dim:  rgba(217, 70, 239, 0.15);
+  --magenta-glow: rgba(217, 70, 239, 0.4);
 
   /* Alert Red -> Neon Magenta/Pink */
   --red:          #ff0055;
@@ -39,6 +50,17 @@
   /* Amber Warning */
   --amber:        #ffb300;
   --amber-bright: #ffcc00;
+
+  /* Legacy semantic aliases used by older components */
+  --color-primary:    #00f0ff;
+  --color-secondary:  #d946ef;
+  --color-success:    #39ff14;
+  --color-danger:     #ff0055;
+  --color-warning:    #ffb300;
+  --color-text-main:  #ffffff;
+  --color-text-muted: #71717a;
+  --bg-secondary:     rgba(255, 255, 255, 0.05);
+  --black-80:         rgba(0, 0, 0, 0.8);
 
   /* Glass Surfaces */
   --surface-0:    transparent;

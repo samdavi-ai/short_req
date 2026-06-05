@@ -33,6 +33,30 @@ const PAGE_MAP: Record<string, React.ReactElement> = {
 export default function App() {
   const { token, currentPage } = useStore();
 
+  // Initialize WebSocket once logged in — MUST be before any early return
+  React.useEffect(() => {
+    if (token && token !== 'demo-token') {
+      useStore.getState().initWebSocket();
+      // Load initial data
+      const { setCameras, setAlerts, setVisitors, setEmployees, setZones } = useStore.getState();
+      const headers = { Authorization: `Bearer ${token}` };
+      const base = 'http://localhost:8000';
+      Promise.all([
+        fetch(`${base}/cameras/`, { headers }).then(r => r.ok ? r.json() : []),
+        fetch(`${base}/alerts/?limit=50`, { headers }).then(r => r.ok ? r.json() : []),
+        fetch(`${base}/visitors/?limit=100`, { headers }).then(r => r.ok ? r.json() : []),
+        fetch(`${base}/employees/?limit=100`, { headers }).then(r => r.ok ? r.json() : []),
+        fetch(`${base}/zones/`, { headers }).then(r => r.ok ? r.json() : []),
+      ]).then(([cameras, alerts, visitors, employees, zones]) => {
+        if (Array.isArray(cameras))  setCameras(cameras);
+        if (Array.isArray(alerts))   setAlerts(alerts);
+        if (Array.isArray(visitors)) setVisitors(visitors);
+        if (Array.isArray(employees)) setEmployees(employees);
+        if (Array.isArray(zones))    setZones(zones);
+      }).catch(console.error);
+    }
+  }, [token]);
+
   // Not authenticated
   if (!token) {
     return (
@@ -42,13 +66,6 @@ export default function App() {
       </>
     );
   }
-
-  // Initialize WebSocket once logged in
-  React.useEffect(() => {
-    if (token && token !== 'demo-token') {
-      useStore.getState().initWebSocket();
-    }
-  }, [token]);
 
   return (
     <div className="app-shell">
