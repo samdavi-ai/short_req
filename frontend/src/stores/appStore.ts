@@ -67,11 +67,48 @@ export interface Zone {
   id: number;
   name: string;
   floor: number;
+  building_id?: number;
   zone_type: 'RESTRICTED' | 'DWELL' | 'TRIPWIRE' | 'LOUNGE';
   is_active: boolean;
   dwell_alert_seconds: number;
   coordinates: {x: number; y: number}[];
   color?: string;
+}
+
+export interface Site {
+  id: number;
+  name: string;
+  address?: string;
+  latitude?: number;
+  longitude?: number;
+  is_active: boolean;
+  created_at: string;
+}
+
+export type BuildingType = 'INDOOR' | 'OUTDOOR' | 'MIXED';
+
+export interface FloorDef {
+  id: number;
+  building_id: number;
+  level: number;
+  label: string;
+  sort_order: number;
+  created_at: string;
+}
+
+export interface Building {
+  id: number;
+  site_id: number;
+  name: string;
+  building_type: BuildingType;
+  description?: string;
+  x_position: number;
+  y_position: number;
+  map_width: number;
+  map_height: number;
+  is_active: boolean;
+  created_at: string;
+  floors: FloorDef[];
 }
 
 export type IdentityType = 'UNKNOWN' | 'KNOWN_VISITOR' | 'KNOWN_EMPLOYEE' | 'WATCHLIST_MATCH' | 'BLACKLISTED';
@@ -124,6 +161,12 @@ interface AppStore {
   zones: Zone[];
   stats: AnalyticsStats | null;
 
+  // Sites & Buildings
+  sites: Site[];
+  buildings: Building[];
+  activeSiteId: number | null;
+  activeBuildingId: number | null;
+
   setCameras: (c: Camera[]) => void;
   setAlerts: (a: Alert[]) => void;
   setVisitors: (v: Visitor[]) => void;
@@ -131,6 +174,11 @@ interface AppStore {
   setZones: (z: Zone[]) => void;
   setStats: (s: AnalyticsStats) => void;
   acknowledgeAlert: (id: number) => void;
+
+  setSites: (s: Site[]) => void;
+  setBuildings: (b: Building[]) => void;
+  setActiveSite: (id: number | null) => void;
+  setActiveBuilding: (id: number | null) => void;
 
   // Toast
   toasts: { id: string; message: string; type: 'success' | 'error' | 'info' }[];
@@ -164,6 +212,11 @@ export const useStore = create<AppStore>((set) => ({
   zones: [],
   stats: null,
 
+  sites: [],
+  buildings: [],
+  activeSiteId: null,
+  activeBuildingId: null,
+
   setCameras: (cameras) => set({ cameras }),
   setAlerts: (alerts) => set({ alerts }),
   setVisitors: (visitors) => set({ visitors }),
@@ -174,6 +227,11 @@ export const useStore = create<AppStore>((set) => ({
     set((s) => ({
       alerts: s.alerts.map((a) => (a.id === id ? { ...a, acknowledged: true } : a)),
     })),
+
+  setSites: (sites) => set({ sites }),
+  setBuildings: (buildings) => set({ buildings }),
+  setActiveSite: (activeSiteId) => set({ activeSiteId }),
+  setActiveBuilding: (activeBuildingId) => set({ activeBuildingId }),
 
   toasts: [],
   addToast: (message, type = 'info') => {

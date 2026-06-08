@@ -239,4 +239,122 @@ export const api = {
     await checkOk(res);
     return res.json();
   },
+
+  // Sites
+  getSites: async (token: string) => {
+    const res = await fetch(`${BASE}/sites/`, { headers: authHeaders(token) });
+    await checkOk(res);
+    return res.json();
+  },
+
+  getSite: async (token: string, siteId: number) => {
+    const res = await fetch(`${BASE}/sites/${siteId}`, { headers: authHeaders(token) });
+    await checkOk(res);
+    return res.json();
+  },
+
+  createSite: async (token: string, data: Record<string, unknown>) => {
+    const res = await fetch(`${BASE}/sites/`, {
+      method: 'POST',
+      headers: authHeaders(token),
+      body: JSON.stringify(data),
+    });
+    await checkOk(res);
+    return res.json();
+  },
+
+  updateSite: async (token: string, id: number, data: Record<string, unknown>) => {
+    const res = await fetch(`${BASE}/sites/${id}`, {
+      method: 'PATCH',
+      headers: authHeaders(token),
+      body: JSON.stringify(data),
+    });
+    await checkOk(res);
+    return res.json();
+  },
+
+  deleteSite: async (token: string, id: number) => {
+    const res = await fetch(`${BASE}/sites/${id}`, {
+      method: 'DELETE',
+      headers: authHeaders(token),
+    });
+    if (!res.ok && res.status !== 404) await checkOk(res);
+  },
+
+  // Buildings
+  getBuildings: async (token: string, siteId?: number) => {
+    const url = siteId ? `${BASE}/buildings/?site_id=${siteId}` : `${BASE}/buildings/`;
+    const res = await fetch(url, { headers: authHeaders(token) });
+    await checkOk(res);
+    return res.json();
+  },
+
+  getBuilding: async (token: string, buildingId: number) => {
+    const res = await fetch(`${BASE}/buildings/${buildingId}`, { headers: authHeaders(token) });
+    await checkOk(res);
+    return res.json();
+  },
+
+  createBuilding: async (token: string, data: Record<string, unknown>) => {
+    const res = await fetch(`${BASE}/buildings/`, {
+      method: 'POST',
+      headers: authHeaders(token),
+      body: JSON.stringify(data),
+    });
+    await checkOk(res);
+    return res.json();
+  },
+
+  updateBuilding: async (token: string, id: number, data: Record<string, unknown>) => {
+    const res = await fetch(`${BASE}/buildings/${id}`, {
+      method: 'PATCH',
+      headers: authHeaders(token),
+      body: JSON.stringify(data),
+    });
+    await checkOk(res);
+    return res.json();
+  },
+
+  deleteBuilding: async (token: string, id: number) => {
+    const res = await fetch(`${BASE}/buildings/${id}`, {
+      method: 'DELETE',
+      headers: authHeaders(token),
+    });
+    if (!res.ok && res.status !== 404) await checkOk(res);
+  },
+
+  // Floors
+  getFloors: async (token: string, buildingId: number) => {
+    const res = await fetch(`${BASE}/buildings/${buildingId}/floors`, { headers: authHeaders(token) });
+    await checkOk(res);
+    return res.json();
+  },
+
+  createFloor: async (token: string, buildingId: number, data: Record<string, unknown>) => {
+    const res = await fetch(`${BASE}/buildings/${buildingId}/floors`, {
+      method: 'POST',
+      headers: authHeaders(token),
+      body: JSON.stringify(data),
+    });
+    await checkOk(res);
+    return res.json();
+  },
+
+  updateFloor: async (token: string, buildingId: number, floorId: number, data: Record<string, unknown>) => {
+    const res = await fetch(`${BASE}/buildings/${buildingId}/floors/${floorId}`, {
+      method: 'PATCH',
+      headers: authHeaders(token),
+      body: JSON.stringify(data),
+    });
+    await checkOk(res);
+    return res.json();
+  },
+
+  deleteFloor: async (token: string, buildingId: number, floorId: number) => {
+    const res = await fetch(`${BASE}/buildings/${buildingId}/floors/${floorId}`, {
+      method: 'DELETE',
+      headers: authHeaders(token),
+    });
+    if (!res.ok && res.status !== 404) await checkOk(res);
+  },
 };

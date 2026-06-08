@@ -13,7 +13,7 @@ from fastapi.staticfiles import StaticFiles
 from prometheus_client import make_asgi_app, Counter, Histogram
 import os
 
-from app.api.routes import cameras, tracks, zones, visitors, employees, alerts, layouts, analytics, enrollment
+from app.api.routes import cameras, tracks, zones, visitors, employees, alerts, layouts, analytics, enrollment, sites, buildings
 from app.api.routes.auth import router as auth_router
 from app.api.websocket import ws_router, redis_subscriber
 from app.core.config import settings
@@ -133,6 +133,8 @@ app.mount("/assets", StaticFiles(directory=settings.ASSETS_DIR), name="assets")
 API_PREFIX = ""  # Routes are at root for now; add /api/v1 prefix later if needed
 
 app.include_router(auth_router,      prefix="/auth",      tags=["Auth"])
+app.include_router(sites.router,     prefix="/sites",     tags=["Sites"])
+app.include_router(buildings.router, prefix="/buildings", tags=["Buildings"])
 app.include_router(cameras.router,   prefix="/cameras",   tags=["Cameras"])
 app.include_router(tracks.router,    prefix="/tracks",    tags=["Tracks"])
 app.include_router(zones.router,     prefix="/zones",     tags=["Zones"])

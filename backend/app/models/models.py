@@ -47,6 +47,11 @@ class AlertSeverity(str, enum.Enum):
     MEDIUM = "MEDIUM"
     LOW = "LOW"
 
+class BuildingType(str, enum.Enum):
+    INDOOR = "INDOOR"
+    OUTDOOR = "OUTDOOR"
+    MIXED = "MIXED"
+
 class AlertType(str, enum.Enum):
     RESTRICTED_ZONE = "RESTRICTED_ZONE"
     WATCHLIST_MATCH = "WATCHLIST_MATCH"
@@ -54,6 +59,61 @@ class AlertType(str, enum.Enum):
     DWELL_EXCEEDED = "DWELL_EXCEEDED"
     CAMERA_OFFLINE = "CAMERA_OFFLINE"
     TAILGATING = "TAILGATING"
+
+
+# ─── Sites ────────────────────────────────────────────────────────────────────
+
+class Site(Base):
+    __tablename__ = "sites"
+
+    id         = Column(Integer, primary_key=True)
+    name       = Column(String(255), nullable=False, unique=True)
+    address    = Column(Text)
+    latitude   = Column(Float)
+    longitude  = Column(Float)
+    is_active  = Column(Boolean, default=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    buildings = relationship("Building", back_populates="site", cascade="all, delete-orphan")
+
+
+# ─── Buildings ────────────────────────────────────────────────────────────────
+
+class Building(Base):
+    __tablename__ = "buildings"
+
+    id            = Column(Integer, primary_key=True)
+    site_id       = Column(Integer, ForeignKey("sites.id", ondelete="CASCADE"), nullable=False, index=True)
+    name          = Column(String(255), nullable=False)
+    building_type = Column(
+        SAEnum(BuildingType, name="building_type_enum", native_enum=False),
+        default=BuildingType.INDOOR, nullable=False,
+    )
+    description   = Column(Text)
+    x_position    = Column(Float, default=0.0)     # campus map X position
+    y_position    = Column(Float, default=0.0)     # campus map Y position
+    map_width     = Column(Float, default=200.0)   # campus map visual width
+    map_height    = Column(Float, default=150.0)   # campus map visual height
+    is_active     = Column(Boolean, default=True)
+    created_at    = Column(DateTime(timezone=True), server_default=func.now())
+
+    site   = relationship("Site", back_populates="buildings")
+    floors = relationship("FloorLevel", back_populates="building", cascade="all, delete-orphan", order_by="FloorLevel.sort_order")
+
+
+# ─── Floors ───────────────────────────────────────────────────────────────────
+
+class FloorLevel(Base):
+    __tablename__ = "floors"
+
+    id          = Column(Integer, primary_key=True)
+    building_id = Column(Integer, ForeignKey("buildings.id", ondelete="CASCADE"), nullable=False, index=True)
+    level       = Column(Integer, default=0, nullable=False)
+    label       = Column(String(100), nullable=False)
+    sort_order  = Column(Integer, default=0)
+    created_at  = Column(DateTime(timezone=True), server_default=func.now())
+
+    building = relationship("Building", back_populates="floors")
 
 
 # ─── User (Operators / Supervisors) ───────────────────────────────────────────
@@ -84,6 +144,7 @@ class Camera(Base):
     location    = Column(String(255))
     description = Column(Text)
     floor       = Column(Integer, default=1, nullable=False, index=True)
+    building_id = Column(Integer, ForeignKey("buildings.id", ondelete="SET NULL"), index=True)
     x_coord     = Column(Float, default=0.0)
     y_coord     = Column(Float, default=0.0)
     angle       = Column(Float, default=0.0)
@@ -104,15 +165,19 @@ class Camera(Base):
 
 class Layout(Base):
     __tablename__ = "layouts"
+    __table_args__ = (
+        UniqueConstraint('building_id', 'floor_num', name='uq_layout_building_floor'),
+    )
 
-    id         = Column(Integer, primary_key=True)
-    floor_num  = Column(Integer, unique=True, nullable=False, index=True)
-    name       = Column(String(255), default="Floor Plan")
-    image_path = Column(String(500), nullable=False)
-    width      = Column(Integer, default=1920)
-    height     = Column(Integer, default=1080)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    id          = Column(Integer, primary_key=True)
+    floor_num   = Column(Integer, nullable=False, index=True)
+    building_id = Column(Integer, ForeignKey("buildings.id", ondelete="SET NULL"), index=True)
+    name        = Column(String(255), default="Floor Plan")
+    image_path  = Column(String(500), nullable=False)
+    width       = Column(Integer, default=1920)
+    height      = Column(Integer, default=1080)
+    created_at  = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at  = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
 
 # ─── Zones ────────────────────────────────────────────────────────────────────
@@ -123,6 +188,7 @@ class Zone(Base):
     id                  = Column(Integer, primary_key=True)
     name                = Column(String(255), nullable=False)
     floor               = Column(Integer, default=1, nullable=False, index=True)
+    building_id         = Column(Integer, ForeignKey("buildings.id", ondelete="SET NULL"), index=True)
     coordinates         = Column(JSON, nullable=False)
     zone_type           = Column(
         SAEnum(ZoneType, name="zone_type_enum", native_enum=False),

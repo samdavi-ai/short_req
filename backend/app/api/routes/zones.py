@@ -16,6 +16,7 @@ def list_zones(
     floor: Optional[int] = Query(None, description="Filter by floor"),
     zone_type: Optional[str] = Query(None, description="Filter by type: DWELL|TRIPWIRE|RESTRICTED|LOUNGE"),
     active_only: bool = Query(False, description="Return only active zones (default: False = return all)"),
+    building_id: Optional[int] = Query(None, description="Filter by building"),
     db: Session = Depends(get_db),
 ):
     """List all configured zones with optional filters."""
@@ -26,6 +27,8 @@ def list_zones(
         query = query.filter(Zone.zone_type == zone_type)
     if active_only:
         query = query.filter(Zone.is_active == True)
+    if building_id is not None:
+        query = query.filter(Zone.building_id == building_id)
     return query.order_by(Zone.floor, Zone.id).all()
 
 

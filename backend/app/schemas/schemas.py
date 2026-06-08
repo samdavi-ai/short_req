@@ -7,7 +7,6 @@ from typing import Optional, List, Dict, Any
 from datetime import datetime
 from enum import Enum
 
-
 # ─── Enums (mirrors models, used in API contracts) ────────────────────────────
 
 class CameraStatus(str, Enum):
@@ -40,6 +39,105 @@ class AlertType(str, Enum):
     DWELL_EXCEEDED = "DWELL_EXCEEDED"
     CAMERA_OFFLINE = "CAMERA_OFFLINE"
     TAILGATING = "TAILGATING"
+
+class BuildingType(str, Enum):
+    INDOOR = "INDOOR"
+    OUTDOOR = "OUTDOOR"
+    MIXED = "MIXED"
+
+
+# ─── Sites ────────────────────────────────────────────────────────────────────
+
+class SiteCreate(BaseModel):
+    name: str
+    address: Optional[str] = None
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
+
+class SiteUpdate(BaseModel):
+    name: Optional[str] = None
+    address: Optional[str] = None
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
+    is_active: Optional[bool] = None
+
+class SiteResponse(BaseModel):
+    id: int
+    name: str
+    address: Optional[str] = None
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
+    is_active: bool
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+# ─── Floors ───────────────────────────────────────────────────────────────────
+
+class FloorCreate(BaseModel):
+    level: int = 0
+    label: str
+    sort_order: int = 0
+
+class FloorUpdate(BaseModel):
+    level: Optional[int] = None
+    label: Optional[str] = None
+    sort_order: Optional[int] = None
+
+class FloorResponse(BaseModel):
+    id: int
+    building_id: int
+    level: int
+    label: str
+    sort_order: int
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+# ─── Buildings ────────────────────────────────────────────────────────────────
+
+class BuildingCreate(BaseModel):
+    site_id: int
+    name: str
+    building_type: BuildingType = BuildingType.INDOOR
+    description: Optional[str] = None
+    x_position: float = 0.0
+    y_position: float = 0.0
+    map_width: float = 200.0
+    map_height: float = 150.0
+
+class BuildingUpdate(BaseModel):
+    name: Optional[str] = None
+    building_type: Optional[BuildingType] = None
+    description: Optional[str] = None
+    x_position: Optional[float] = None
+    y_position: Optional[float] = None
+    map_width: Optional[float] = None
+    map_height: Optional[float] = None
+    is_active: Optional[bool] = None
+
+class BuildingResponse(BaseModel):
+    id: int
+    site_id: int
+    name: str
+    building_type: BuildingType
+    description: Optional[str] = None
+    x_position: float = 0.0
+    y_position: float = 0.0
+    map_width: float = 200.0
+    map_height: float = 150.0
+    is_active: bool
+    created_at: datetime
+    floors: List[FloorResponse] = []
+
+    model_config = {"from_attributes": True}
+
+class SiteWithBuildingsResponse(SiteResponse):
+    buildings: List[BuildingResponse] = []
+
+    model_config = {"from_attributes": True}
 
 
 # ─── Auth ─────────────────────────────────────────────────────────────────────
@@ -84,6 +182,7 @@ class CameraBase(BaseModel):
     location: Optional[str] = None
     description: Optional[str] = None
     floor: int = 1
+    building_id: Optional[int] = None
     x_coord: float = 0.0
     y_coord: float = 0.0
     angle: float = 0.0
@@ -101,6 +200,7 @@ class CameraUpdate(BaseModel):
     location: Optional[str] = None
     description: Optional[str] = None
     floor: Optional[int] = None
+    building_id: Optional[int] = None
     x_coord: Optional[float] = None
     y_coord: Optional[float] = None
     angle: Optional[float] = None
@@ -165,6 +265,7 @@ class ZoneCoordinate(BaseModel):
 class ZoneBase(BaseModel):
     name: str
     floor: int = 1
+    building_id: Optional[int] = None
     coordinates: List[ZoneCoordinate]
     zone_type: ZoneType = ZoneType.DWELL
     dwell_alert_seconds: int = 300
@@ -185,6 +286,7 @@ class ZoneUpdate(BaseModel):
     name: Optional[str] = None
     coordinates: Optional[List[ZoneCoordinate]] = None
     zone_type: Optional[ZoneType] = None
+    building_id: Optional[int] = None
     dwell_alert_seconds: Optional[int] = None
     color: Optional[str] = None
     is_active: Optional[bool] = None

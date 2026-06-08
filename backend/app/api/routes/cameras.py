@@ -18,6 +18,7 @@ router = APIRouter()
 def list_cameras(
     floor: Optional[int] = Query(None, description="Filter by floor number"),
     status: Optional[str] = Query(None, description="Filter by status"),
+    building_id: Optional[int] = Query(None, description="Filter by building"),
     db: Session = Depends(get_db),
 ):
     """List all cameras with optional filters."""
@@ -26,6 +27,8 @@ def list_cameras(
         query = query.filter(Camera.floor == floor)
     if status:
         query = query.filter(Camera.status == status)
+    if building_id is not None:
+        query = query.filter(Camera.building_id == building_id)
     return query.order_by(Camera.floor, Camera.id).all()
 
 
