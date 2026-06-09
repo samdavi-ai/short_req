@@ -10,6 +10,7 @@ const PAGE_TITLES: Record<string, string> = {
   alerts:    'Alerts',
   visitors:  'Visitors',
   employees: 'Employees',
+  'person-lookup': 'Person Lookup',
   analytics: 'Analytics',
   cameras:   'Cameras',
   settings:  'Settings',

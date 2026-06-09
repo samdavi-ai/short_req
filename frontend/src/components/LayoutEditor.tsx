@@ -6,6 +6,29 @@ import {
 import { useStore, type Building, type FloorDef, type Site } from '../stores/appStore';
 import { api } from '../hooks/api';
 import PersonJourney from './PersonJourney';
+import FloorScene3D from './layout3d/FloorScene3D';
+import {
+  clampToFloorBounds as clampToFloorBoundsShared,
+  distToSegment as distToSegmentShared,
+  formatLength as formatLengthShared,
+  getFloorBounds as getFloorBoundsShared,
+  getWallAngleDeg as getWallAngleDegShared,
+  getWallLengthPx as getWallLengthPxShared,
+  isPointInPolygon as isPointInPolygonShared,
+  pxToUnit as pxToUnitShared,
+  snapAngle as snapAngleShared,
+  unitToPx as unitToPxShared,
+} from '../features/layout-engine/geometry';
+import {
+  drawArchElement as drawArchElementShared,
+  drawWallOnCanvas as drawWallOnCanvasShared,
+} from '../features/layout-engine/render2d';
+import { getCanvasPosFromClient as getCanvasPosFromClientShared } from '../features/layout-engine/viewport';
+import type { FloorBounds } from '../features/layout-engine/types';
+import { useSimulatorStore } from '../stores/simulatorStore';
+import { tickSimulation } from '../features/simulator/engine';
+import type { AgentBehavior, SimulatorAgent } from '../features/simulator/types';
+import SimulatorHUD, { KEMPEGOWDA_CAMERAS } from './SimulatorHUD';
 
 // ─── Existing Interfaces ──────────────────────────────────────────────────────
 
@@ -74,36 +97,48 @@ const CAMERA_TYPES = [
   { label: 'Face Capture',    icon: '◈', type: 'face' },
 ];
 
+// ── Real airport: Kempegowda International Airport, Bangalore ─────────────────
+// Source: Site Acceptance Test, ATS Complex Alpha-1 (GEM/2024/B/4568766)
 const DEMO_SITES: Site[] = [
-  { id: -1, name: 'JFK Airport Complex', address: 'Queens, New York', latitude: 40.6413, longitude: -73.7781, is_active: true, created_at: '' },
+  { id: -1, name: 'Kempegowda International Airport', address: 'ATS Complex, Alpha-1, Bangalore, Karnataka', latitude: 13.1986, longitude: 77.7066, is_active: true, created_at: '' },
 ];
 
 const DEMO_BUILDINGS: Building[] = [
-  { id: -1, site_id: -1, name: 'Terminal 1', building_type: 'INDOOR', is_active: true, created_at: '',
-    x_position: 100, y_position: 80, map_width: 280, map_height: 200,
+  {
+    id: -1, site_id: -1, name: 'Terminal 1 — ATS Complex', building_type: 'INDOOR', is_active: true, created_at: '',
+    x_position: 80, y_position: 60, map_width: 320, map_height: 240,
     floors: [
-      { id: -1, building_id: -1, level: -1, label: 'Basement', sort_order: 0, created_at: '' },
-      { id: -2, building_id: -1, level: 0,  label: 'Ground',   sort_order: 1, created_at: '' },
-      { id: -3, building_id: -1, level: 1,  label: 'Floor 1',  sort_order: 2, created_at: '' },
-      { id: -4, building_id: -1, level: 2,  label: 'Floor 2',  sort_order: 3, created_at: '' },
-      { id: -5, building_id: -1, level: 3,  label: 'Roof',     sort_order: 4, created_at: '' },
+      { id: -1, building_id: -1, level: 0,  label: 'Ground Floor',  sort_order: 0, created_at: '' },
+      { id: -2, building_id: -1, level: 1,  label: 'Departures',    sort_order: 1, created_at: '' },
+      { id: -3, building_id: -1, level: 2,  label: 'Boarding Gates',sort_order: 2, created_at: '' },
     ],
   },
-  { id: -2, site_id: -1, name: 'Outdoor Perimeter', building_type: 'OUTDOOR', is_active: true, created_at: '',
-    x_position: 450, y_position: 80, map_width: 220, map_height: 160,
+  {
+    id: -2, site_id: -1, name: 'Airside Operations', building_type: 'OUTDOOR', is_active: true, created_at: '',
+    x_position: 460, y_position: 60, map_width: 240, map_height: 180,
     floors: [
-      { id: -6, building_id: -2, level: 0, label: 'Ground Level', sort_order: 0, created_at: '' },
+      { id: -4, building_id: -2, level: 0, label: 'Tarmac Level', sort_order: 0, created_at: '' },
     ],
   },
-  { id: -3, site_id: -1, name: 'Parking Garage A', building_type: 'MIXED', is_active: true, created_at: '',
-    x_position: 100, y_position: 340, map_width: 240, map_height: 160,
+  {
+    id: -3, site_id: -1, name: 'Baggage & Arrivals Hall', building_type: 'INDOOR', is_active: true, created_at: '',
+    x_position: 80, y_position: 360, map_width: 280, map_height: 180,
     floors: [
-      { id: -7, building_id: -3, level: 0, label: 'Ground', sort_order: 0, created_at: '' },
-      { id: -8, building_id: -3, level: 1, label: 'Level 1', sort_order: 1, created_at: '' },
-      { id: -9, building_id: -3, level: 2, label: 'Level 2', sort_order: 2, created_at: '' },
+      { id: -5, building_id: -3, level: 0, label: 'Arrivals Ground', sort_order: 0, created_at: '' },
+      { id: -6, building_id: -3, level: 1, label: 'Baggage Claim',   sort_order: 1, created_at: '' },
+    ],
+  },
+  {
+    id: -4, site_id: -1, name: 'Parking Structure', building_type: 'MIXED', is_active: true, created_at: '',
+    x_position: 460, y_position: 320, map_width: 220, map_height: 200,
+    floors: [
+      { id: -7, building_id: -4, level: 0, label: 'P1 Ground',  sort_order: 0, created_at: '' },
+      { id: -8, building_id: -4, level: 1, label: 'P2 Level 1', sort_order: 1, created_at: '' },
+      { id: -9, building_id: -4, level: 2, label: 'P3 Level 2', sort_order: 2, created_at: '' },
     ],
   },
 ];
+
 
 const ARCH_ELEMENT_TYPES: { type: ArchElementType; label: string; icon: string }[] = [
   { type: 'DOOR',        label: 'Single Door',  icon: '🚪' },
@@ -118,346 +153,16 @@ const WALL_COLOR = '#ffffff';
 
 // ─── Utility Functions ────────────────────────────────────────────────────────
 
-const isPointInPolygon = (point: { x: number; y: number }, vs: { x: number; y: number }[]) => {
-  const x = point.x, y = point.y;
-  let inside = false;
-  for (let i = 0, j = vs.length - 1; i < vs.length; j = i++) {
-    const xi = vs[i].x, yi = vs[i].y;
-    const xj = vs[j].x, yj = vs[j].y;
-    const intersect = ((yi > y) !== (yj > y))
-        && (x < (xj - xi) * (y - yi) / (yj - yi) + xi);
-    if (intersect) inside = !inside;
-  }
-  return inside;
-};
-
-function getWallLengthPx(w: WallSegment): number {
-  return Math.sqrt((w.endX - w.startX) ** 2 + (w.endY - w.startY) ** 2);
-}
-
-function getWallAngleDeg(w: WallSegment): number {
-  const rad = Math.atan2(w.endY - w.startY, w.endX - w.startX);
-  let deg = (rad * 180) / Math.PI;
-  if (deg < 0) deg += 360;
-  return deg;
-}
-
-function pxToUnit(px: number, pxPerFoot: number, unit: MeasureUnit): number {
-  const feet = px / pxPerFoot;
-  if (unit === 'ft') return feet;
-  return feet * 0.3048; // meters
-}
-
-function unitToPx(value: number, pxPerFoot: number, unit: MeasureUnit): number {
-  if (unit === 'ft') return value * pxPerFoot;
-  return (value / 0.3048) * pxPerFoot;
-}
-
-function formatLength(px: number, pxPerFoot: number, unit: MeasureUnit): string {
-  const val = pxToUnit(px, pxPerFoot, unit);
-  if (unit === 'ft') {
-    const wholeFeet = Math.floor(val);
-    const inches = Math.round((val - wholeFeet) * 12);
-    if (inches === 0) return `${wholeFeet}'`;
-    if (inches === 12) return `${wholeFeet + 1}'`;
-    return `${wholeFeet}'-${inches}"`;
-  }
-  return `${val.toFixed(2)} m`;
-}
-
-function snapAngle(angleDeg: number): number {
-  const snaps = [0, 45, 90, 135, 180, 225, 270, 315, 360];
-  let closest = snaps[0];
-  let minDist = Math.abs(angleDeg - snaps[0]);
-  for (const s of snaps) {
-    const dist = Math.abs(angleDeg - s);
-    if (dist < minDist) { minDist = dist; closest = s; }
-  }
-  return closest === 360 ? 0 : closest;
-}
-
-function distToSegment(px: number, py: number, x1: number, y1: number, x2: number, y2: number): number {
-  const dx = x2 - x1, dy = y2 - y1;
-  const lenSq = dx * dx + dy * dy;
-  if (lenSq === 0) return Math.sqrt((px - x1) ** 2 + (py - y1) ** 2);
-  let t = ((px - x1) * dx + (py - y1) * dy) / lenSq;
-  t = Math.max(0, Math.min(1, t));
-  const projX = x1 + t * dx, projY = y1 + t * dy;
-  return Math.sqrt((px - projX) ** 2 + (py - projY) ** 2);
-}
-
-
-// ─── Canvas Drawing Helpers ───────────────────────────────────────────────────
-
-function drawWallOnCanvas(
-  ctx: CanvasRenderingContext2D,
-  wall: WallSegment,
-  isSelected: boolean,
-  pxPerFoot: number,
-  unit: MeasureUnit,
-  showDimensions: boolean
-) {
-  const { startX, startY, endX, endY, thickness, color } = wall;
-  const dx = endX - startX, dy = endY - startY;
-  const len = Math.sqrt(dx * dx + dy * dy);
-  if (len < 1) return;
-  const nx = -dy / len, ny = dx / len;
-  const halfT = thickness / 2;
-
-  // Wall body
-  ctx.beginPath();
-  ctx.moveTo(startX + nx * halfT, startY + ny * halfT);
-  ctx.lineTo(endX + nx * halfT,   endY + ny * halfT);
-  ctx.lineTo(endX - nx * halfT,   endY - ny * halfT);
-  ctx.lineTo(startX - nx * halfT, startY - ny * halfT);
-  ctx.closePath();
-
-  ctx.fillStyle = isSelected ? (color + 'dd') : (color + '55');
-  ctx.fill();
-  ctx.strokeStyle = isSelected ? '#f59e0b' : (color + '88');
-  ctx.lineWidth = isSelected ? 2 : 1;
-  ctx.stroke();
-
-  // Selection handles
-  if (isSelected) {
-    for (const [hx, hy] of [[startX, startY], [endX, endY]] as [number, number][]) {
-      ctx.beginPath();
-      ctx.arc(hx, hy, 6, 0, Math.PI * 2);
-      ctx.fillStyle = '#f59e0b';
-      ctx.fill();
-      ctx.strokeStyle = '#000';
-      ctx.lineWidth = 1.5;
-      ctx.stroke();
-    }
-    // Glow
-    ctx.shadowColor = '#f59e0b';
-    ctx.shadowBlur = 12;
-    ctx.beginPath();
-    ctx.moveTo(startX, startY);
-    ctx.lineTo(endX, endY);
-    ctx.strokeStyle = '#f59e0b44';
-    ctx.lineWidth = thickness + 4;
-    ctx.stroke();
-    ctx.shadowBlur = 0;
-  }
-
-  // Dimension label
-  if (showDimensions && len > 30) {
-    const midX = (startX + endX) / 2;
-    const midY = (startY + endY) / 2;
-    const angleDeg = getWallAngleDeg(wall);
-    const lengthStr = formatLength(len, pxPerFoot, unit);
-    const angleStr = `${angleDeg.toFixed(1)}°`;
-    const label = `${lengthStr}  ∠${angleStr}`;
-
-    ctx.save();
-    ctx.translate(midX, midY);
-    let textAngle = Math.atan2(dy, dx);
-    // Keep text readable (not upside down)
-    if (textAngle > Math.PI / 2 || textAngle < -Math.PI / 2) {
-      textAngle += Math.PI;
-    }
-    ctx.rotate(textAngle);
-    ctx.font = 'bold 10px "JetBrains Mono", monospace';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'bottom';
-
-    const tw = ctx.measureText(label).width + 12;
-    ctx.fillStyle = 'rgba(0,0,0,0.75)';
-    ctx.fillRect(-tw / 2, -22, tw, 16);
-    ctx.strokeStyle = isSelected ? '#f59e0b44' : 'rgba(255,255,255,0.15)';
-    ctx.lineWidth = 1;
-    ctx.strokeRect(-tw / 2, -22, tw, 16);
-
-    ctx.fillStyle = isSelected ? '#f59e0b' : 'rgba(255,255,255,0.8)';
-    ctx.fillText(label, 0, -9);
-    ctx.restore();
-  }
-}
-
-function drawArchElement(
-  ctx: CanvasRenderingContext2D,
-  el: ArchElement,
-  isSelected: boolean
-) {
-  ctx.save();
-  ctx.translate(el.x, el.y);
-  ctx.rotate((el.rotation * Math.PI) / 180);
-
-  const w = el.width;
-  const accent = isSelected ? '#f59e0b' : '#00f0ff';
-  const fillA = isSelected ? 'rgba(245,158,11,0.25)' : 'rgba(0,240,255,0.12)';
-
-  switch (el.type) {
-    case 'DOOR': {
-      // Gap + arc sweep
-      ctx.strokeStyle = accent;
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.moveTo(-w / 2, 0);
-      ctx.lineTo(-w / 2, -4);
-      ctx.moveTo(w / 2, 0);
-      ctx.lineTo(w / 2, -4);
-      ctx.stroke();
-      // Arc
-      const dir = el.openDirection === 'RIGHT' ? 1 : -1;
-      ctx.beginPath();
-      ctx.arc(dir === 1 ? -w / 2 : w / 2, 0, w, dir === 1 ? -Math.PI / 2 : -Math.PI, dir === 1 ? 0 : -Math.PI / 2);
-      ctx.strokeStyle = accent + '66';
-      ctx.lineWidth = 1.5;
-      ctx.setLineDash([4, 3]);
-      ctx.stroke();
-      ctx.setLineDash([]);
-      // Door leaf
-      ctx.beginPath();
-      ctx.moveTo(dir === 1 ? -w / 2 : w / 2, 0);
-      ctx.lineTo(dir === 1 ? -w / 2 + w : w / 2 - w, 0);
-      ctx.strokeStyle = accent;
-      ctx.lineWidth = 3;
-      ctx.stroke();
-      break;
-    }
-    case 'DOUBLE_DOOR': {
-      // Two arcs from center
-      ctx.strokeStyle = accent;
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.moveTo(-w / 2, 0); ctx.lineTo(-w / 2, -4);
-      ctx.moveTo(w / 2, 0); ctx.lineTo(w / 2, -4);
-      ctx.stroke();
-      // Left leaf arc
-      ctx.beginPath();
-      ctx.arc(0, 0, w / 2, -Math.PI, -Math.PI / 2);
-      ctx.strokeStyle = accent + '55';
-      ctx.lineWidth = 1.5;
-      ctx.setLineDash([3, 3]);
-      ctx.stroke();
-      // Right leaf arc
-      ctx.beginPath();
-      ctx.arc(0, 0, w / 2, -Math.PI / 2, 0);
-      ctx.stroke();
-      ctx.setLineDash([]);
-      // Leaves
-      ctx.beginPath();
-      ctx.moveTo(-w / 2, 0); ctx.lineTo(0, 0);
-      ctx.moveTo(0, 0); ctx.lineTo(w / 2, 0);
-      ctx.strokeStyle = accent;
-      ctx.lineWidth = 3;
-      ctx.stroke();
-      break;
-    }
-    case 'WINDOW': {
-      // Parallel lines (glass)
-      ctx.strokeStyle = accent;
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.moveTo(-w / 2, -3); ctx.lineTo(w / 2, -3);
-      ctx.moveTo(-w / 2, 3);  ctx.lineTo(w / 2, 3);
-      ctx.stroke();
-      // Cross hatches
-      ctx.strokeStyle = accent + '44';
-      ctx.lineWidth = 1;
-      const count = Math.max(2, Math.floor(w / 15));
-      for (let i = 0; i <= count; i++) {
-        const lx = -w / 2 + (w / count) * i;
-        ctx.beginPath();
-        ctx.moveTo(lx, -3); ctx.lineTo(lx, 3);
-        ctx.stroke();
-      }
-      // Frame
-      ctx.strokeStyle = accent;
-      ctx.lineWidth = 1.5;
-      ctx.strokeRect(-w / 2, -5, w, 10);
-      break;
-    }
-    case 'COLUMN': {
-      // Filled square with crosshatch
-      const s = w / 2;
-      ctx.fillStyle = fillA;
-      ctx.fillRect(-s, -s, w, w);
-      ctx.strokeStyle = accent;
-      ctx.lineWidth = 1.5;
-      ctx.strokeRect(-s, -s, w, w);
-      // Cross
-      ctx.beginPath();
-      ctx.moveTo(-s, -s); ctx.lineTo(s, s);
-      ctx.moveTo(s, -s); ctx.lineTo(-s, s);
-      ctx.strokeStyle = accent + '66';
-      ctx.lineWidth = 1;
-      ctx.stroke();
-      break;
-    }
-    case 'STAIRS': {
-      // Parallel treads with arrow
-      const steps = 5;
-      const stepW = w / steps;
-      ctx.strokeStyle = accent;
-      ctx.lineWidth = 1.5;
-      for (let i = 0; i <= steps; i++) {
-        const sx = -w / 2 + stepW * i;
-        ctx.beginPath();
-        ctx.moveTo(sx, -10); ctx.lineTo(sx, 10);
-        ctx.stroke();
-      }
-      // Border
-      ctx.strokeRect(-w / 2, -10, w, 20);
-      // Arrow
-      ctx.beginPath();
-      ctx.moveTo(-w / 4, 0); ctx.lineTo(w / 4, 0);
-      ctx.moveTo(w / 4 - 5, -4); ctx.lineTo(w / 4, 0); ctx.lineTo(w / 4 - 5, 4);
-      ctx.strokeStyle = accent;
-      ctx.lineWidth = 2;
-      ctx.stroke();
-      break;
-    }
-    case 'ELEVATOR': {
-      // Filled box with ⬆ arrows
-      const s = w / 2;
-      ctx.fillStyle = fillA;
-      ctx.fillRect(-s, -s, w, w);
-      ctx.strokeStyle = accent;
-      ctx.lineWidth = 2;
-      ctx.strokeRect(-s, -s, w, w);
-      // Up arrow
-      ctx.beginPath();
-      ctx.moveTo(0, s * 0.4); ctx.lineTo(0, -s * 0.4);
-      ctx.moveTo(-4, -s * 0.15); ctx.lineTo(0, -s * 0.4); ctx.lineTo(4, -s * 0.15);
-      ctx.strokeStyle = accent;
-      ctx.lineWidth = 2;
-      ctx.stroke();
-      // Down arrow
-      ctx.beginPath();
-      ctx.moveTo(0, -s * 0.4); ctx.lineTo(0, s * 0.4);
-      ctx.moveTo(-4, s * 0.15); ctx.lineTo(0, s * 0.4); ctx.lineTo(4, s * 0.15);
-      ctx.stroke();
-      break;
-    }
-  }
-
-  // Selection ring
-  if (isSelected) {
-    ctx.beginPath();
-    ctx.arc(0, 0, w / 2 + 10, 0, Math.PI * 2);
-    ctx.strokeStyle = '#f59e0b55';
-    ctx.lineWidth = 1.5;
-    ctx.setLineDash([5, 3]);
-    ctx.stroke();
-    ctx.setLineDash([]);
-  }
-
-  // Label
-  if (el.label) {
-    ctx.font = 'bold 9px Outfit, sans-serif';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'top';
-    ctx.fillStyle = isSelected ? '#f59e0b' : 'rgba(255,255,255,0.6)';
-    // Unrotate the text so it's always readable
-    ctx.rotate(-(el.rotation * Math.PI) / 180);
-    ctx.fillText(el.label, 0, w / 2 + 6);
-  }
-
-  ctx.restore();
-}
+const isPointInPolygon = isPointInPolygonShared;
+const getWallLengthPx = getWallLengthPxShared;
+const getWallAngleDeg = getWallAngleDegShared;
+const pxToUnit = pxToUnitShared;
+const unitToPx = unitToPxShared;
+const formatLength = formatLengthShared;
+const snapAngle = snapAngleShared;
+const distToSegment = distToSegmentShared;
+const drawWallOnCanvas = drawWallOnCanvasShared;
+const drawArchElement = drawArchElementShared;
 
 
 // ─── Main Component ───────────────────────────────────────────────────────────
@@ -469,6 +174,8 @@ export default function LayoutEditor() {
           setSites, setBuildings, setActiveSite, setActiveBuilding } = useStore();
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const campusCanvasRef = useRef<HTMLCanvasElement>(null);
+  const canvasAreaRef = useRef<HTMLDivElement>(null);
+  const [canvasSize, setCanvasSize] = useState({ width: 1200, height: 800 });
   const [activeFloor, setActiveFloor] = useState(1);
   const [tool, setTool] = useState<EditorTool>('select');
   const [zoneType, setZoneType] = useState<'RESTRICTED' | 'DWELL' | 'TRIPWIRE' | 'LOUNGE'>('RESTRICTED');
@@ -482,7 +189,7 @@ export default function LayoutEditor() {
   const spaceHeld = useRef(false);
 
   // View mode: 'floor' shows single building floor, 'campus' shows all buildings on site map
-  const [viewMode, setViewMode] = useState<'floor' | 'campus' | 'campus-3d'>('floor');
+  const [viewMode, setViewMode] = useState<'floor' | 'floor-3d' | 'campus' | 'campus-3d'>('floor');
   const [campusDragId, setCampusDragId] = useState<number | null>(null);
   const [campusSelectedId, setCampusSelectedId] = useState<number | null>(null);
   const campusDragOffset = useRef({ x: 0, y: 0 });
@@ -552,6 +259,7 @@ export default function LayoutEditor() {
   const [drawingZone, setDrawingZone] = useState<{ x: number; y: number }[]>([]);
   const [selectedTrackId, setSelectedTrackId] = useState<string | null>(null);
   const [isDirty, setIsDirty] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
 
   // Placed components local state
   const [placedCams, setPlacedCams] = useState<CamOnCanvas[]>([]);
@@ -577,6 +285,32 @@ export default function LayoutEditor() {
 
   // Wall endpoint drag state
   const [draggingWallEndpoint, setDraggingWallEndpoint] = useState<{ wallId: number; endpoint: 'start' | 'end' } | null>(null);
+  const simulatorEnabled = useSimulatorStore((s) => s.enabled);
+  const simulatorMode = useSimulatorStore((s) => s.mode);
+  const simulatorRunning = useSimulatorStore((s) => s.running);
+  const simulatorSeed = useSimulatorStore((s) => s.seed);
+  const simulatorSpeed = useSimulatorStore((s) => s.speed);
+  const simulatorTick = useSimulatorStore((s) => s.tick);
+  const simulatorAgents = useSimulatorStore((s) => s.agents);
+  const simulatorTimeline = useSimulatorStore((s) => s.timeline);
+  const simulatorPointer = useSimulatorStore((s) => s.pointer);
+  const setSimulatorMode = useSimulatorStore((s) => s.setMode);
+  const setSimulatorEnabled = useSimulatorStore((s) => s.setEnabled);
+  const setSimulatorRunning = useSimulatorStore((s) => s.setRunning);
+  const setSimulatorSpeed = useSimulatorStore((s) => s.setSpeed);
+  const setSimulatorTick = useSimulatorStore((s) => s.setTick);
+  const setSimulatorAgents = useSimulatorStore((s) => s.setAgents);
+  const pushSimulatorEvents = useSimulatorStore((s) => s.pushEvents);
+  const setSimulatorPointer = useSimulatorStore((s) => s.setPointer);
+  const resetSimulator = useSimulatorStore((s) => s.reset);
+  const exportSimulatorSnapshot = useSimulatorStore((s) => s.exportSnapshot);
+  const importSimulatorSnapshot = useSimulatorStore((s) => s.importSnapshot);
+
+  const [spawnCount, setSpawnCount] = useState(3);
+  const [spawnBehavior, setSpawnBehavior] = useState<AgentBehavior>('roam');
+  const [simPushBackend, setSimPushBackend] = useState(false);
+  const [simSessionId, setSimSessionId] = useState<string | null>(null);
+  const isSimulatorActive = simulatorEnabled && simulatorMode === 'simulator';
 
   // Helper to clear all selections
   const clearSelections = useCallback(() => {
@@ -585,6 +319,15 @@ export default function LayoutEditor() {
     setSelectedWall(null);
     setSelectedArch(null);
   }, []);
+
+  const getFloorBounds = useCallback((width: number, height: number): FloorBounds => {
+    return getFloorBoundsShared(width, height);
+  }, []);
+
+  const clampToFloorBounds = useCallback((x: number, y: number, radius = 12) => {
+    const b = getFloorBounds(canvasSize.width, canvasSize.height);
+    return clampToFloorBoundsShared(x, y, b, radius);
+  }, [canvasSize.width, canvasSize.height, getFloorBounds]);
 
   // Apply grid snapping
   const snapPos = useCallback((x: number, y: number): { x: number; y: number } => {
@@ -599,7 +342,9 @@ export default function LayoutEditor() {
   // Sync with store cameras/zones on floor change or initial loading
   useEffect(() => {
     if (token && token !== 'demo-token') {
-      const floorCams = cameras.filter(c => c.floor === activeFloor).map(c => ({
+      const floorCams = cameras
+        .filter(c => c.floor === activeFloor && ((c as any).building_id ?? null) === (currentBuildingId ?? null))
+        .map(c => ({
         id: c.id,
         x: c.x_coord,
         y: c.y_coord,
@@ -613,7 +358,9 @@ export default function LayoutEditor() {
       }));
       setPlacedCams(floorCams);
 
-      const floorZones = zones.filter(z => z.floor === activeFloor).map(z => ({
+      const floorZones = zones
+        .filter(z => z.floor === activeFloor && (z.building_id ?? null) === (currentBuildingId ?? null))
+        .map(z => ({
         id: z.id,
         name: z.name,
         points: z.coordinates,
@@ -625,42 +372,234 @@ export default function LayoutEditor() {
       setDrawnZones(floorZones);
       setIsDirty(false);
     } else {
-      // Demo fallback
-      setPlacedCams([
-        { id: 1, x: 220, y: 150, angle: 45,  fov: 60, name: 'Gate A1', status: 'ACTIVE', rtsp_url: 'rtsp://192.168.1.10:554/stream1', location: 'Terminal 1 Entry', is_overhead: true },
-        { id: 2, x: 480, y: 320, angle: 135, fov: 90, name: 'Security Main', status: 'ACTIVE', rtsp_url: 'rtsp://192.168.1.11:554/stream1', location: 'Main Security', is_overhead: false },
-        { id: 3, x: 800, y: 230, angle: 270, fov: 45, name: 'Baggage Line',  status: 'ACTIVE', rtsp_url: 'rtsp://192.168.1.12:554/stream1', location: 'Arrivals Hall', is_overhead: true },
-        { id: 4, x: 350, y: 580, angle: 90,  fov: 70, name: 'Retail North',   status: 'OFFLINE', rtsp_url: 'rtsp://192.168.1.13:554/stream1', location: 'Boarding Gate B3', is_overhead: true },
-      ]);
+      // Demo fallback — Kempegowda International Airport (ATS Complex Alpha-1)
+      // 14 × CP PLUS CP-UNC-TB21ZL65-VMDS-V2-27135 cameras as per SAT document
+      setPlacedCams(KEMPEGOWDA_CAMERAS.map(c => ({
+        id: c.id, x: c.x, y: c.y, angle: c.angle, fov: c.fov,
+        name: c.name, status: c.status,
+        rtsp_url: `rtsp://192.168.1.${c.id - 9000}:554/stream1`,
+        location: c.location, is_overhead: c.is_overhead,
+      })));
       setDrawnZones([
-        { id: 1, name: 'Gate A3 Zone', type: 'DWELL', color: ZONE_COLORS.DWELL, dwell_alert_seconds: 900, is_active: true,
-          points: [{ x: 150, y: 250 }, { x: 350, y: 250 }, { x: 350, y: 350 }, { x: 150, y: 350 }] },
-        { id: 2, name: 'Restricted Area', type: 'RESTRICTED', color: ZONE_COLORS.RESTRICTED, dwell_alert_seconds: 0, is_active: true,
-          points: [{ x: 580, y: 180 }, { x: 900, y: 180 }, { x: 900, y: 300 }, { x: 580, y: 300 }] },
+        { id: 1, name: 'Security Check Alpha', type: 'RESTRICTED', color: ZONE_COLORS.RESTRICTED, dwell_alert_seconds: 0, is_active: true,
+          points: [{ x: 380, y: 160 }, { x: 540, y: 160 }, { x: 540, y: 380 }, { x: 380, y: 380 }] },
+        { id: 2, name: 'Boarding Gate Lounge A', type: 'DWELL', color: ZONE_COLORS.DWELL, dwell_alert_seconds: 900, is_active: true,
+          points: [{ x: 600, y: 120 }, { x: 800, y: 120 }, { x: 800, y: 320 }, { x: 600, y: 320 }] },
+        { id: 3, name: 'Boarding Gate Lounge B', type: 'DWELL', color: ZONE_COLORS.DWELL, dwell_alert_seconds: 900, is_active: true,
+          points: [{ x: 600, y: 380 }, { x: 800, y: 380 }, { x: 800, y: 560 }, { x: 600, y: 560 }] },
+        { id: 4, name: 'Airside Restricted', type: 'RESTRICTED', color: ZONE_COLORS.RESTRICTED, dwell_alert_seconds: 0, is_active: true,
+          points: [{ x: 880, y: 100 }, { x: 1060, y: 100 }, { x: 1060, y: 620 }, { x: 880, y: 620 }] },
+        { id: 5, name: 'Duty-Free Retail', type: 'LOUNGE', color: ZONE_COLORS.LOUNGE, dwell_alert_seconds: 1800, is_active: true,
+          points: [{ x: 480, y: 100 }, { x: 600, y: 100 }, { x: 600, y: 280 }, { x: 480, y: 280 }] },
+        { id: 6, name: 'Entry Tripwire North', type: 'TRIPWIRE', color: ZONE_COLORS.TRIPWIRE, dwell_alert_seconds: 0, is_active: true,
+          points: [{ x: 95, y: 60 }, { x: 175, y: 60 }, { x: 175, y: 200 }, { x: 95, y: 200 }] },
+        { id: 7, name: 'Entry Tripwire South', type: 'TRIPWIRE', color: ZONE_COLORS.TRIPWIRE, dwell_alert_seconds: 0, is_active: true,
+          points: [{ x: 95, y: 480 }, { x: 175, y: 480 }, { x: 175, y: 660 }, { x: 95, y: 660 }] },
+        { id: 8, name: 'Baggage Claim', type: 'DWELL', color: ZONE_COLORS.DWELL, dwell_alert_seconds: 1200, is_active: true,
+          points: [{ x: 750, y: 280 }, { x: 900, y: 280 }, { x: 900, y: 440 }, { x: 750, y: 440 }] },
       ]);
-      // Demo walls
+      // Terminal walls — ATS Complex Alpha-1 layout
       setWalls([
-        { id: 101, startX: 100, startY: 100, endX: 1100, endY: 100, thickness: 6, color: WALL_COLOR, label: 'North Wall' },
-        { id: 102, startX: 100, startY: 100, endX: 100, endY: 700, thickness: 6, color: WALL_COLOR, label: 'West Wall' },
-        { id: 103, startX: 1100, startY: 100, endX: 1100, endY: 700, thickness: 6, color: WALL_COLOR, label: 'East Wall' },
-        { id: 104, startX: 100, startY: 700, endX: 1100, endY: 700, thickness: 6, color: WALL_COLOR, label: 'South Wall' },
-        { id: 105, startX: 400, startY: 100, endX: 400, endY: 400, thickness: 4, color: WALL_COLOR, label: 'Security Wall N' },
-        { id: 106, startX: 400, startY: 550, endX: 400, endY: 700, thickness: 4, color: WALL_COLOR, label: 'Security Wall S' },
-        { id: 107, startX: 750, startY: 100, endX: 750, endY: 500, thickness: 4, color: WALL_COLOR, label: 'Baggage Wall' },
-        { id: 108, startX: 750, startY: 500, endX: 1100, endY: 500, thickness: 4, color: WALL_COLOR, label: 'Gate Wall' },
+        { id: 101, startX: 100, startY: 100, endX: 1080, endY: 100, thickness: 7, color: WALL_COLOR, label: 'North Perimeter' },
+        { id: 102, startX: 100, startY: 100, endX: 100,  endY: 660, thickness: 7, color: WALL_COLOR, label: 'West Perimeter' },
+        { id: 103, startX: 1080, startY: 100, endX: 1080, endY: 660, thickness: 7, color: WALL_COLOR, label: 'East Perimeter' },
+        { id: 104, startX: 100, startY: 660, endX: 1080, endY: 660, thickness: 7, color: WALL_COLOR, label: 'South Perimeter' },
+        // Security division wall
+        { id: 105, startX: 380, startY: 100, endX: 380, endY: 380, thickness: 5, color: WALL_COLOR, label: 'Security Wall N' },
+        { id: 106, startX: 380, startY: 460, endX: 380, endY: 660, thickness: 5, color: WALL_COLOR, label: 'Security Wall S' },
+        // Airside partition
+        { id: 107, startX: 870, startY: 100, endX: 870, endY: 660, thickness: 5, color: WALL_COLOR, label: 'Airside Wall' },
+        // NVR/Switch room
+        { id: 108, startX: 100, startY: 100, endX: 200, endY: 100, thickness: 4, color: WALL_COLOR, label: 'Server Room N' },
+        { id: 109, startX: 200, startY: 100, endX: 200, endY: 180, thickness: 4, color: WALL_COLOR, label: 'Server Room E' },
+        { id: 110, startX: 100, startY: 180, endX: 200, endY: 180, thickness: 4, color: WALL_COLOR, label: 'Server Room S' },
       ]);
       setArchElements([
-        { id: 201, type: 'DOOR', x: 400, y: 475, width: 40, rotation: 0, label: 'Security Gate', openDirection: 'RIGHT' },
-        { id: 202, type: 'WINDOW', x: 600, y: 100, width: 50, rotation: 0, label: 'Observation' },
-        { id: 203, type: 'ELEVATOR', x: 150, y: 650, width: 30, rotation: 0, label: 'Elev A' },
-        { id: 204, type: 'STAIRS', x: 1050, y: 650, width: 40, rotation: 0, label: 'Stairs B' },
+        { id: 201, type: 'DOOR', x: 380, y: 425, width: 44, rotation: 0, label: 'Security Gate', openDirection: 'RIGHT' },
+        { id: 202, type: 'DOOR', x: 150, y: 100, width: 44, rotation: 90, label: 'Entry North', openDirection: 'RIGHT' },
+        { id: 203, type: 'DOOR', x: 150, y: 660, width: 44, rotation: 90, label: 'Entry South', openDirection: 'LEFT' },
+        { id: 204, type: 'DOOR', x: 870, y: 360, width: 44, rotation: 0, label: 'Airside Gate', openDirection: 'RIGHT' },
+        { id: 205, type: 'ELEVATOR', x: 140, y: 155, width: 30, rotation: 0, label: 'Elev A' },
+        { id: 206, type: 'STAIRS', x: 1040, y: 620, width: 40, rotation: 0, label: 'Emergency Exit' },
+        { id: 207, type: 'COLUMN', x: 550, y: 380, width: 18, rotation: 0, label: 'Col-1' },
+        { id: 208, type: 'COLUMN', x: 780, y: 380, width: 18, rotation: 0, label: 'Col-2' },
+        { id: 209, type: 'WINDOW', x: 590, y: 100, width: 80, rotation: 0, label: 'Window A' },
+        { id: 210, type: 'WINDOW', x: 730, y: 100, width: 80, rotation: 0, label: 'Window B' },
       ]);
       setIsDirty(false);
     }
     clearSelections();
-  }, [activeFloor, token, cameras.length, zones.length, clearSelections]);
+  }, [activeFloor, token, cameras, zones, clearSelections, currentBuildingId]);
 
   const liveTracks = useStore((state) => state.tracks);
+
+  // spawnAgents now accepts either inline (from HUD presets) or spawns default agents
+  const spawnAgents = useCallback((freshAgents?: SimulatorAgent[]) => {
+    const floorBounds = getFloorBounds(canvasSize.width, canvasSize.height);
+    const width = floorBounds.right - floorBounds.left;
+    const height = floorBounds.bottom - floorBounds.top;
+    if (freshAgents) {
+      // From HUD preset — just load them
+      setSimulatorAgents(freshAgents);
+      setSimulatorTick(0);
+      addToast(`Scenario loaded — ${freshAgents.length} agents spawned`, 'success');
+      return;
+    }
+    const base = Date.now();
+    const count = Math.max(1, Math.min(64, spawnCount));
+    const fresh: SimulatorAgent[] = Array.from({ length: count }).map((_, i) => {
+      const x = floorBounds.left + ((i + 1) / (count + 1)) * width;
+      const y = floorBounds.top + ((i * 73) % Math.max(60, Math.floor(height))) + 20;
+      return {
+        id: `sim-agent-${base + i}`,
+        x,
+        y: Math.min(floorBounds.bottom - 20, y),
+        vx: 0, vy: 0,
+        speed: 40 + (i % 5) * 8,
+        behavior: spawnBehavior,
+        headingDeg: (i * 47) % 360,
+        trail: [], zoneEnterTimes: {}, lastZones: [],
+        detectedByCameras: [], alertState: 'none' as const,
+      };
+    });
+    setSimulatorAgents(fresh);
+    setSimulatorTick(0);
+    addToast(`Spawned ${fresh.length} simulation agents`, 'success');
+  }, [addToast, canvasSize.height, canvasSize.width, getFloorBounds, setSimulatorAgents, setSimulatorTick, spawnBehavior, spawnCount]);
+
+  const runSimulationTick = useCallback(async () => {
+    if (!isSimulatorActive) return;
+    const floorBounds = getFloorBounds(canvasSize.width, canvasSize.height);
+    const nowMs = Date.now();
+    const dtSec = 0.1 * simulatorSpeed;
+    // Pass real camera FoV data and walls to engine for detection events
+    const engineCams = placedCams.map(c => ({ id: c.id, x: c.x, y: c.y, angle: c.angle, fov: c.fov }));
+    const engineWalls = walls.map(w => ({ id: w.id, startX: w.startX, startY: w.startY, endX: w.endX, endY: w.endY, thickness: w.thickness }));
+    const { agents: nextAgents, events, heatmapUpdates } = tickSimulation({
+      nowMs,
+      dtSec,
+      bounds: floorBounds,
+      zones: drawnZones,
+      agents: simulatorAgents,
+      cameras: engineCams,
+      walls: engineWalls,
+      seed: simulatorSeed,
+    });
+    setSimulatorAgents(nextAgents);
+    setSimulatorTick(simulatorTick + 1);
+    pushSimulatorEvents(events, heatmapUpdates);
+
+    if (simPushBackend && token && token !== 'demo-token') {
+      try {
+        if (!simSessionId) {
+          const started = await api.startSimulation(token, {
+            floor: activeFloor,
+            building_id: currentBuildingId ?? null,
+            site_id: currentSiteId ?? null,
+            seed: simulatorSeed,
+            speed: simulatorSpeed,
+          });
+          setSimSessionId(started.session_id);
+        }
+        if (simSessionId) {
+          await api.tickSimulation(token, {
+            session_id: simSessionId,
+            tick: simulatorTick + 1,
+            events: events.map((e) => ({
+              type: e.type,
+              ...e.payload,
+            })),
+          });
+        }
+      } catch {
+        // non-blocking in frontend-only mode
+      }
+    }
+  }, [
+    activeFloor,
+    canvasSize.height,
+    canvasSize.width,
+    currentBuildingId,
+    currentSiteId,
+    drawnZones,
+    getFloorBounds,
+    isSimulatorActive,
+    pushSimulatorEvents,
+    setSimulatorAgents,
+    setSimulatorTick,
+    simPushBackend,
+    simulatorAgents,
+    simulatorSeed,
+    simSessionId,
+    setSimSessionId,
+    simulatorSpeed,
+    simulatorTick,
+    token,
+  ]);
+
+  useEffect(() => {
+    if (!isSimulatorActive || !simulatorRunning) return;
+    const interval = setInterval(() => {
+      void runSimulationTick();
+    }, 100);
+    return () => clearInterval(interval);
+  }, [isSimulatorActive, simulatorRunning, runSimulationTick]);
+
+  useEffect(() => {
+    if (isSimulatorActive) return;
+    if (!simSessionId || !token || token === 'demo-token') return;
+    void api.stopSimulation(token, simSessionId).catch(() => {});
+    setSimSessionId(null);
+  }, [isSimulatorActive, simSessionId, token]);
+
+  const exportScenario = useCallback(() => {
+    const snapshot = exportSimulatorSnapshot(activeFloor, currentBuildingId ?? null, currentSiteId ?? null, drawnZones);
+    const blob = new Blob([JSON.stringify(snapshot, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `layout-sim-${currentBuildingId ?? 'na'}-${activeFloor}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+    addToast('Scenario exported', 'success');
+  }, [activeFloor, addToast, currentBuildingId, currentSiteId, drawnZones, exportSimulatorSnapshot]);
+
+  const importScenario = useCallback((file?: File) => {
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const parsed = JSON.parse(String(reader.result ?? '{}'));
+        importSimulatorSnapshot(parsed);
+        setSimulatorMode('simulator');
+        addToast('Scenario imported', 'success');
+      } catch {
+        addToast('Invalid scenario file', 'error');
+      }
+    };
+    reader.readAsText(file);
+  }, [addToast, importSimulatorSnapshot, setSimulatorMode]);
+
+  // Keep floor/campus canvases responsive to actual viewport size.
+  useEffect(() => {
+    const el = canvasAreaRef.current;
+    if (!el) return;
+
+    const updateSize = () => {
+      const nextWidth = Math.max(640, Math.floor(el.clientWidth));
+      const nextHeight = Math.max(420, Math.floor(el.clientHeight));
+      setCanvasSize((prev) =>
+        prev.width === nextWidth && prev.height === nextHeight
+          ? prev
+          : { width: nextWidth, height: nextHeight }
+      );
+    };
+
+    updateSize();
+    const ro = new ResizeObserver(updateSize);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
 
   // Handle Escape key to cancel drawing + Space for pan mode
   useEffect(() => {
@@ -707,8 +646,9 @@ export default function LayoutEditor() {
       const mouseX = e.clientX - rect.left;
       const mouseY = e.clientY - rect.top;
 
-      // Compute zoom factor
-      const delta = e.deltaY > 0 ? -0.08 : 0.08;
+      // Slow down and smooth out zoom (proportional to current zoom level)
+      const zoomFactor = 0.001;
+      const delta = -e.deltaY * zoomFactor * zoom;
       const newZoom = Math.max(0.15, Math.min(5, zoom + delta));
       const scale = newZoom / zoom;
 
@@ -935,7 +875,9 @@ export default function LayoutEditor() {
       const rect = canvas.getBoundingClientRect();
       const mouseX = e.clientX - rect.left;
       const mouseY = e.clientY - rect.top;
-      const delta = e.deltaY > 0 ? -0.08 : 0.08;
+      // Slow down and smooth out zoom (proportional to current zoom level)
+      const zoomFactor = 0.001;
+      const delta = -e.deltaY * zoomFactor * zoom;
       const newZoom = Math.max(0.15, Math.min(5, zoom + delta));
       const scale = newZoom / zoom;
       setPanX(mouseX - (mouseX - panX) * scale);
@@ -982,23 +924,35 @@ export default function LayoutEditor() {
       drawWallOnCanvas(ctx, wall, selectedWall === wall.id, pxPerFoot, measureUnit, showDimensions);
     });
 
+    const floorBounds = getFloorBounds(canvas.width, canvas.height);
+    const floorWidth = floorBounds.right - floorBounds.left;
+    const floorHeight = floorBounds.bottom - floorBounds.top;
+    const floorCenterX = floorBounds.left + floorWidth / 2;
+    const floorCenterY = floorBounds.top + floorHeight / 2;
+
     // Security Gates / Scanners label (if demo security walls exist)
     if (walls.some(w => w.label === 'Security Wall N') && walls.some(w => w.label === 'Security Wall S')) {
       ctx.fillStyle = 'rgba(0, 240, 255, 0.05)';
-      ctx.fillRect(380, 400, 40, 150); 
+      const gateW = Math.max(24, Math.floor(floorWidth * 0.04));
+      const gateH = Math.max(80, Math.floor(floorHeight * 0.26));
+      const gateX = floorBounds.left + floorWidth * 0.3;
+      const gateY = floorCenterY - gateH / 2;
+      ctx.fillRect(gateX, gateY, gateW, gateH);
       ctx.fillStyle = 'rgba(255, 255, 255, 0.2)';
       ctx.font = '8px Outfit'; ctx.textAlign = 'center';
-      ctx.fillText('X-RAY SCANNERS', 400, 475);
+      ctx.fillText('X-RAY SCANNERS', gateX + gateW / 2, gateY + gateH / 2);
     }
 
     // Architectural Labels
     ctx.fillStyle = 'rgba(255, 255, 255, 0.15)';
-    ctx.font = 'bold 32px Outfit';
+    const titleSize = Math.max(18, Math.min(32, Math.floor(floorWidth * 0.04)));
+    ctx.font = `bold ${titleSize}px Outfit`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText('DEPARTURES', 250, 150);
-    ctx.fillText('SECURITY CLEARANCE', 575, 150);
-    ctx.fillText('TERMINAL GATES', 925, 150);
+    const titleY = floorBounds.top + Math.max(24, Math.floor(floorHeight * 0.08));
+    ctx.fillText('DEPARTURES', floorBounds.left + floorWidth * 0.18, titleY);
+    ctx.fillText('SECURITY CLEARANCE', floorCenterX, titleY);
+    ctx.fillText('TERMINAL GATES', floorBounds.left + floorWidth * 0.82, titleY);
 
     // 3. Draw Architectural Elements
     archElements.forEach((el) => {
@@ -1157,8 +1111,189 @@ export default function LayoutEditor() {
       ctx.fillText(cam.name, cam.x, cam.y + 14);
     });
 
-    // 6. Live person dots — color-coded by identity
-    if (tool === 'select') {
+    // 6. Simulator overlays
+    if (isSimulatorActive) {
+      const simOverlays = useSimulatorStore.getState().overlays;
+      const simHeatmap = useSimulatorStore.getState().heatmap;
+      const nowMs = Date.now();
+
+      // ── Heatmap layer ────────────────────────────────────────────────────────
+      if (simOverlays.heatmap && Object.keys(simHeatmap).length > 0) {
+        const maxVal = Math.max(...Object.values(simHeatmap));
+        for (const [key, val] of Object.entries(simHeatmap)) {
+          const [gx, gy] = key.split(',').map(Number);
+          const t = Math.min(1, val / (maxVal * 0.5));
+          const alpha = t * 0.45;
+          // Color: blue → yellow → red
+          const r = Math.round(t > 0.5 ? 255 : t * 2 * 255);
+          const g = Math.round(t < 0.5 ? t * 2 * 200 : (1 - (t - 0.5) * 2) * 200);
+          const b = Math.round(t < 0.5 ? 255 : 0);
+          ctx.fillStyle = `rgba(${r},${g},${b},${alpha})`;
+          ctx.fillRect(gx * 20, gy * 20, 20, 20);
+        }
+      }
+
+      const occupancy: Record<number, number> = {};
+      drawnZones.forEach((z) => { occupancy[z.id] = 0; });
+
+      // ── Agent trails ─────────────────────────────────────────────────────────
+      simulatorAgents.forEach((agent) => {
+        drawnZones.forEach((zone) => {
+          if (zone.points.length >= 3 && isPointInPolygon({ x: agent.x, y: agent.y }, zone.points)) {
+            occupancy[zone.id] = (occupancy[zone.id] ?? 0) + 1;
+          }
+        });
+
+        if (simOverlays.trails && agent.trail.length > 1) {
+          const trailColor = agent.color ?? '#00f0ff';
+          ctx.beginPath();
+          ctx.moveTo(agent.trail[0].x, agent.trail[0].y);
+          for (let i = 1; i < agent.trail.length; i++) {
+            const alpha = (i / agent.trail.length) * 0.35;
+            ctx.lineTo(agent.trail[i].x, agent.trail[i].y);
+          }
+          ctx.strokeStyle = trailColor + '44';
+          ctx.lineWidth = 1.5;
+          ctx.stroke();
+        }
+      });
+
+      // ── Agents (drawn after trails so dots are on top) ───────────────────────
+      simulatorAgents.forEach((agent) => {
+        const agentColor = agent.color ?? '#00f0ff';
+        const isWatchlist = agent.identityType === 'WATCHLIST';
+        const isKnown = agent.identityType && agent.identityType !== 'UNKNOWN';
+        const dotRadius = isWatchlist ? 8 : (isKnown ? 7 : 5);
+        const alertAge = agent.alertAt ? nowMs - agent.alertAt : Infinity;
+
+        // Alert pulse ring (fades out after 2.5s)
+        if (agent.alertState && agent.alertState !== 'none' && alertAge < 2500) {
+          const pulseProgress = alertAge / 2500;
+          const pulseRadius = dotRadius + 8 + pulseProgress * 22;
+          const pulseAlpha = (1 - pulseProgress) * 0.7;
+          const pulseColor = agent.alertState === 'restricted' ? `rgba(239,68,68,${pulseAlpha})` : `rgba(245,158,11,${pulseAlpha})`;
+          ctx.beginPath();
+          ctx.arc(agent.x, agent.y, pulseRadius, 0, Math.PI * 2);
+          ctx.strokeStyle = pulseColor;
+          ctx.lineWidth = 2.5;
+          ctx.stroke();
+        }
+
+        // Watchlist danger pulse (continuous)
+        if (isWatchlist) {
+          const pulse = Math.sin(nowMs / 220) * 0.35 + 0.65;
+          ctx.beginPath();
+          ctx.arc(agent.x, agent.y, dotRadius + 12, 0, Math.PI * 2);
+          ctx.strokeStyle = `rgba(245,158,11,${pulse * 0.6})`;
+          ctx.lineWidth = 2;
+          ctx.stroke();
+        }
+
+        // Glow ring for known agents
+        if (isKnown) {
+          ctx.beginPath();
+          ctx.arc(agent.x, agent.y, dotRadius + 5, 0, Math.PI * 2);
+          ctx.fillStyle = agentColor + '22';
+          ctx.fill();
+        }
+
+        // Main dot
+        ctx.beginPath();
+        ctx.arc(agent.x, agent.y, dotRadius, 0, Math.PI * 2);
+        ctx.fillStyle = agentColor;
+        ctx.fill();
+        ctx.strokeStyle = 'rgba(255,255,255,0.9)';
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+
+        // Camera-detected indicator (small dot on side)
+        if (agent.detectedByCameras && agent.detectedByCameras.length > 0) {
+          ctx.beginPath();
+          ctx.arc(agent.x + dotRadius + 3, agent.y - dotRadius - 3, 3, 0, Math.PI * 2);
+          ctx.fillStyle = '#00f0ff';
+          ctx.fill();
+        }
+
+        // Name / ID label
+        if (simOverlays.agentLabels) {
+          const label = agent.name
+            ? agent.name.split(' ')[0] // first name only
+            : agent.id.replace(/sim-agent-\d+-/, 'A-').slice(0, 8);
+          ctx.font = isKnown ? 'bold 9px Inter, sans-serif' : '8px Inter, sans-serif';
+          const textWidth = ctx.measureText(label).width;
+          const labelX = agent.x - textWidth / 2 - 3;
+          const labelY = agent.y - dotRadius - 15;
+          // pill background
+          ctx.fillStyle = 'rgba(0,0,0,0.7)';
+          ctx.beginPath();
+          if (ctx.roundRect) { ctx.roundRect(labelX, labelY, textWidth + 6, 13, 3); }
+          else { ctx.rect(labelX, labelY, textWidth + 6, 13); }
+          ctx.fill();
+          ctx.strokeStyle = agentColor + '88';
+          ctx.lineWidth = 1;
+          ctx.stroke();
+          ctx.fillStyle = isKnown ? '#ffffff' : 'rgba(255,255,255,0.7)';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText(label, agent.x, labelY + 6.5);
+        }
+      });
+
+      // ── Camera detection flash ─────────────────────────────────────────────
+      if (simOverlays.cameraDetectionFlash) {
+        const detectedCamIds = new Set(simulatorAgents.flatMap(a => a.detectedByCameras ?? []));
+        placedCams.forEach(cam => {
+          if (detectedCamIds.has(cam.id)) {
+            ctx.beginPath();
+            ctx.arc(cam.x, cam.y, 16, 0, Math.PI * 2);
+            ctx.strokeStyle = 'rgba(0,240,255,0.6)';
+            ctx.lineWidth = 2.5;
+            ctx.setLineDash([]);
+            ctx.stroke();
+            ctx.fillStyle = 'rgba(0,240,255,0.12)';
+            ctx.fill();
+          }
+        });
+      }
+
+      // ── Zone occupancy badges ──────────────────────────────────────────────
+      if (simOverlays.zoneOccupancy) {
+        drawnZones.forEach((zone) => {
+          if (zone.points.length < 3) return;
+          const cx = zone.points.reduce((s, p) => s + p.x, 0) / zone.points.length;
+          const cy = zone.points.reduce((s, p) => s + p.y, 0) / zone.points.length;
+          const occ = occupancy[zone.id] ?? 0;
+          // Color based on occupancy level
+          const badgeColor = occ === 0 ? 'rgba(100,116,139,0.9)' : occ <= 5 ? 'rgba(34,197,94,0.9)' : occ <= 10 ? 'rgba(245,158,11,0.9)' : 'rgba(239,68,68,0.9)';
+          const bgColor = occ === 0 ? 'rgba(0,0,0,0.5)' : occ <= 5 ? 'rgba(34,197,94,0.15)' : occ <= 10 ? 'rgba(245,158,11,0.15)' : 'rgba(239,68,68,0.2)';
+          const badgeW = 64;
+          const badgeH = 20;
+          ctx.fillStyle = bgColor;
+          ctx.beginPath();
+          if (ctx.roundRect) { ctx.roundRect(cx - badgeW / 2, cy + 12, badgeW, badgeH, 4); }
+          else { ctx.rect(cx - badgeW / 2, cy + 12, badgeW, badgeH); }
+          ctx.fill();
+          ctx.strokeStyle = badgeColor;
+          ctx.lineWidth = 1;
+          ctx.stroke();
+          ctx.fillStyle = badgeColor;
+          ctx.font = 'bold 10px Outfit, sans-serif';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText(`👥 ${occ}${occ === 0 ? ' empty' : ''}`, cx, cy + 22);
+        });
+      }
+
+      // Sim mode watermark
+      ctx.font = 'bold 11px Outfit, sans-serif';
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'top';
+      ctx.fillStyle = 'rgba(0,240,255,0.25)';
+      ctx.fillText('⚡ SIMULATION MODE', 115, 110);
+    }
+
+    // 7. Live person dots — color-coded by identity
+    if (tool === 'select' && !isSimulatorActive) {
       const IDENTITY_COLORS: Record<string, { fill: string; stroke: string; glow: string }> = {
         KNOWN_EMPLOYEE:  { fill: '#22c55e', stroke: '#16a34a', glow: 'rgba(34, 197, 94, 0.4)' },
         KNOWN_VISITOR:   { fill: '#3b82f6', stroke: '#2563eb', glow: 'rgba(59, 130, 246, 0.4)' },
@@ -1271,17 +1406,20 @@ export default function LayoutEditor() {
     }
 
     ctx.restore();
-  }, [placedCams, drawnZones, selectedCam, selectedZone, selectedWall, selectedArch, zoom, panX, panY, drawingZone, zoneType, tool, activeFloor, liveTracks, walls, archElements, drawingWall, wallPreviewEnd, pxPerFoot, measureUnit, showDimensions]);
+  }, [placedCams, drawnZones, selectedCam, selectedZone, selectedWall, selectedArch, zoom, panX, panY, drawingZone, zoneType, tool, activeFloor, liveTracks, walls, archElements, drawingWall, wallPreviewEnd, pxPerFoot, measureUnit, showDimensions, getFloorBounds, isSimulatorActive, simulatorAgents]);
+
+
 
   // ─── Mouse Handlers ─────────────────────────────────────────────────────
 
-  const getCanvasPos = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
+  const getCanvasPosFromClient = useCallback((clientX: number, clientY: number) => {
     const rect = canvasRef.current!.getBoundingClientRect();
-    return {
-      x: (e.clientX - rect.left) / zoom - panX / zoom,
-      y: (e.clientY - rect.top) / zoom - panY / zoom,
-    };
+    return getCanvasPosFromClientShared(clientX, clientY, rect, { zoom, panX, panY });
   }, [zoom, panX, panY]);
+
+  const getCanvasPos = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
+    return getCanvasPosFromClient(e.clientX, e.clientY);
+  }, [getCanvasPosFromClient]);
 
   const handleMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
     // Middle-click or Space+left-click starts panning
@@ -1330,6 +1468,14 @@ export default function LayoutEditor() {
       if (clickedCam) {
         setDraggedCamId(clickedCam.id);
         isDraggingRef.current = true;
+        dragStartPos.current = { x, y };
+        return;
+      }
+
+      // Left click on empty space in select mode starts panning!
+      if (e.button === 0) {
+        isPanning.current = true;
+        panStart.current = { x: e.clientX - panX, y: e.clientY - panY };
         dragStartPos.current = { x, y };
         return;
       }
@@ -1393,8 +1539,10 @@ export default function LayoutEditor() {
 
     // Drag camera
     if (isDraggingRef.current && draggedCamId !== null) {
+      const nextPosRaw = snapToGrid ? snapPos(x, y) : { x, y };
+      const nextPos = clampToFloorBounds(nextPosRaw.x, nextPosRaw.y);
       setPlacedCams((prev) =>
-        prev.map((c) => (c.id === draggedCamId ? { ...c, x, y } : c))
+        prev.map((c) => (c.id === draggedCamId ? { ...c, x: nextPos.x, y: nextPos.y } : c))
       );
       setIsDirty(true);
     }
@@ -1559,9 +1707,9 @@ export default function LayoutEditor() {
 
   const handleDrop = (e: React.DragEvent<HTMLCanvasElement>) => {
     e.preventDefault();
-    const rect = canvasRef.current!.getBoundingClientRect();
-    const x = (e.clientX - rect.left) / zoom;
-    const y = (e.clientY - rect.top) / zoom;
+    const posFromClient = getCanvasPosFromClient(e.clientX, e.clientY);
+    const snapped = snapToGrid ? snapPos(posFromClient.x, posFromClient.y) : posFromClient;
+    const { x, y } = clampToFloorBounds(snapped.x, snapped.y);
 
     // Check if dropping an arch element
     const archType = e.dataTransfer.getData('arch-type') as ArchElementType;
@@ -1664,16 +1812,30 @@ export default function LayoutEditor() {
     addToast('Demo template loaded! Click Save Layout to write to database.', 'info');
   };
 
+  const clearLayout = () => {
+    if (window.confirm("Are you sure you want to clear the entire layout? This will delete all cameras, zones, walls, and architectural elements from this floor. This action cannot be undone unless you Discard changes.")) {
+      setPlacedCams([]);
+      setDrawnZones([]);
+      setWalls([]);
+      setArchElements([]);
+      clearSelections();
+      setIsDirty(true);
+      addToast("Layout cleared! Click 'Save Layout' to persist changes to the database.", "info");
+    }
+  };
+
   // Transactional database saving pipeline
-  const saveLayout = async () => {
+  const saveLayout = async (silentParam?: any) => {
+    const silent = silentParam === true;
     if (!token || token === 'demo-token') {
-      addToast('Demo Mode: Layout changes saved locally!', 'success');
+      if (!silent) addToast('Demo Mode: Layout changes saved locally!', 'success');
       setIsDirty(false);
       return;
     }
 
     try {
-      addToast('Saving layout to database...', 'info');
+      setIsSaving(true);
+      if (!silent) addToast('Saving layout to database...', 'info');
 
       // 1. Process Cameras
       const storeFloorCams = cameras.filter(c => c.floor === activeFloor);
@@ -1695,6 +1857,7 @@ export default function LayoutEditor() {
               : `rtsp://127.0.0.1:8554/cam_${uniqueSuffix}`,
             location: cam.location || `Floor ${activeFloor} Area`,
             floor: activeFloor,
+            building_id: currentBuildingId ?? undefined,
             x_coord: cam.x,
             y_coord: cam.y,
             angle: cam.angle,
@@ -1709,6 +1872,7 @@ export default function LayoutEditor() {
               rtsp_url: `rtsp://127.0.0.1:8554/cam_${Date.now()}_${Math.random().toString(36).slice(2)}`,
               location: cam.location || `Floor ${activeFloor} Area`,
               floor: activeFloor,
+              building_id: currentBuildingId ?? undefined,
               x_coord: cam.x,
               y_coord: cam.y,
               angle: cam.angle,
@@ -1729,6 +1893,7 @@ export default function LayoutEditor() {
           rtsp_url: cam.rtsp_url,
           location: cam.location,
           floor: activeFloor,
+          building_id: currentBuildingId ?? undefined,
           x_coord: cam.x,
           y_coord: cam.y,
           angle: cam.angle,
@@ -1739,7 +1904,7 @@ export default function LayoutEditor() {
       }
 
       // 2. Process Zones
-      const storeFloorZones = zones.filter(z => z.floor === activeFloor);
+      const storeFloorZones = zones.filter(z => z.floor === activeFloor && (z.building_id ?? null) === (currentBuildingId ?? null));
       const drawnIds = new Set(drawnZones.map(z => z.id));
 
       const zonesToDelete = storeFloorZones.filter(z => !drawnIds.has(z.id));
@@ -1756,6 +1921,7 @@ export default function LayoutEditor() {
         await api.createZone(token, {
           name: z.name,
           floor: activeFloor,
+          building_id: currentBuildingId ?? undefined,
           coordinates: z.points,
           zone_type: z.type,
           dwell_alert_seconds: z.dwell_alert_seconds ?? 300,
@@ -1768,6 +1934,7 @@ export default function LayoutEditor() {
       for (const z of zonesToUpdate) {
         await api.updateZone(token, z.id, {
           name: z.name,
+          building_id: currentBuildingId ?? undefined,
           coordinates: z.points,
           zone_type: z.type,
           dwell_alert_seconds: z.dwell_alert_seconds ?? 300,
@@ -1783,12 +1950,25 @@ export default function LayoutEditor() {
       setZones(updatedZones);
 
       setIsDirty(false);
-      addToast('Blueprint layout saved successfully to database!', 'success');
+      if (!silent) addToast('Blueprint layout saved successfully to database!', 'success');
     } catch (err: any) {
       console.error(err);
       addToast(`Error saving layout: ${err.message || err}`, 'error');
+    } finally {
+      setIsSaving(false);
     }
   };
+
+  // Debounced auto-save effect
+  useEffect(() => {
+    if (!isDirty || isSaving) return;
+
+    const timer = setTimeout(() => {
+      void saveLayout(true);
+    }, 1500);
+
+    return () => clearTimeout(timer);
+  }, [isDirty, placedCams, drawnZones, walls, archElements, isSaving]);
 
   // ─── Data Lookups ─────────────────────────────────────────────────────────
 
@@ -1800,7 +1980,7 @@ export default function LayoutEditor() {
   // ─── Render ─────────────────────────────────────────────────────────────
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', gap: 16 }}>
+    <div className="page-content" style={{ display: 'flex', flexDirection: 'column', gap: 16, minHeight: 0, height: '100%', overflow: 'hidden' }}>
       
       {/* Top Action Bar */}
       <div className="card" style={{ padding: '12px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderRadius: 'var(--radius-lg)' }}>
@@ -1809,37 +1989,99 @@ export default function LayoutEditor() {
             <MapPin size={18} />
           </div>
           <div>
-            <div style={{ fontFamily: 'Outfit', fontWeight: 700, fontSize: 16, color: 'var(--white)' }}>Layout Editor</div>
-            <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
-              {isDirty ? `Unsaved changes on ${activeBuilding?.name ?? 'Building'} — ${activeFloorLabel}` : `${activeBuilding?.name ?? 'Building'} — ${activeFloorLabel}`}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <div style={{ fontFamily: 'Outfit', fontWeight: 700, fontSize: 16, color: 'var(--white)' }}>Layout Editor</div>
+              {isSaving ? (
+                <span style={{
+                  fontSize: 10, fontFamily: 'var(--font-mono)', padding: '2px 8px', borderRadius: 100,
+                  background: 'rgba(255, 107, 0, 0.15)', color: 'var(--orange)', border: '1px solid var(--orange-border)',
+                  display: 'flex', alignItems: 'center', gap: 4
+                }}>
+                  <span className="status-dot" style={{ background: 'var(--orange)', width: 6, height: 6, borderRadius: '50%' }} />
+                  SAVING...
+                </span>
+              ) : isDirty ? (
+                <span style={{
+                  fontSize: 10, fontFamily: 'var(--font-mono)', padding: '2px 8px', borderRadius: 100,
+                  background: 'rgba(245, 158, 11, 0.15)', color: 'var(--amber)', border: '1px solid rgba(245, 158, 11, 0.3)',
+                  display: 'flex', alignItems: 'center', gap: 4
+                }}>
+                  <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--amber)' }} />
+                  UNSAVED CHANGES
+                </span>
+              ) : (
+                <span style={{
+                  fontSize: 10, fontFamily: 'var(--font-mono)', padding: '2px 8px', borderRadius: 100,
+                  background: 'rgba(74, 222, 128, 0.15)', color: 'var(--green)', border: '1px solid rgba(74, 222, 128, 0.3)',
+                  display: 'flex', alignItems: 'center', gap: 4
+                }}>
+                  <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--green)' }} />
+                  SAVED ✓
+                </span>
+              )}
+            </div>
+            <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>
+              {activeBuilding?.name ?? 'Building'} — {activeFloorLabel}
             </div>
           </div>
         </div>
-        <div style={{ display: 'flex', gap: 12 }}>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: 'var(--text-secondary)' }}>
+            <input
+              type="checkbox"
+              checked={simulatorEnabled}
+              onChange={(e) => {
+                setSimulatorEnabled(e.target.checked);
+                if (!e.target.checked) setSimulatorMode('editor');
+              }}
+            />
+            SIMULATOR_ENABLED
+          </label>
+          {simulatorEnabled && (
+            <div className="unit-selector" style={{ marginRight: 8 }}>
+              <button className={simulatorMode === 'editor' ? 'active' : ''} onClick={() => setSimulatorMode('editor')}>Edit</button>
+              <button className={simulatorMode === 'simulator' ? 'active' : ''} onClick={() => setSimulatorMode('simulator')}>Simulate</button>
+            </div>
+          )}
           {placedCams.length === 0 && drawnZones.length === 0 && walls.length === 0 && (
             <button className="btn btn-secondary" onClick={loadDemoTemplate}>
               <Plus size={14} /> Load Demo Template
             </button>
           )}
+          {(placedCams.length > 0 || drawnZones.length > 0 || walls.length > 0 || archElements.length > 0) && (
+            <button className="btn btn-danger" onClick={clearLayout}>
+              <Trash2 size={14} /> Clear Full Layout
+            </button>
+          )}
           <button className="btn btn-secondary" onClick={discardChanges}>Discard</button>
-          <button className="btn btn-primary" onClick={saveLayout}>
+          <button className="btn btn-primary" onClick={() => saveLayout(false)}>
             <Save size={14} /> Save Layout
           </button>
         </div>
       </div>
 
       <div className="layout-editor-main" style={{ 
-        flex: 1, 
+        height: 'calc(100vh - 220px)',
+        minHeight: 0,
         display: 'grid', 
         gridTemplateColumns: '260px 1fr 300px', 
         gap: '24px',
         overflow: 'hidden'
       }}>
 
-        {/* Left: Tools Palette */}
-        <div className="layout-sidebar-left" style={{ padding: '0', display: 'flex', flexDirection: 'column', gap: 16, overflowY: 'auto' }}>
-          
-          {/* Site Selector */}
+        {/* Left: Tools Palette / Simulator HUD */}
+        <div className="layout-sidebar-left" style={{ padding: '0', display: 'flex', flexDirection: 'column', gap: 16, overflowY: 'auto', minHeight: 0, maxHeight: '100%' }}>
+          {/* Show SimulatorHUD when simulator mode is active */}
+          {isSimulatorActive && (
+            <SimulatorHUD
+              onSpawn={spawnAgents}
+              onExport={exportScenario}
+              onImport={(file) => importScenario(file)}
+              floorBounds={getFloorBounds(canvasSize.width, canvasSize.height)}
+              runTick={() => { void runSimulationTick(); }}
+            />
+          )}
+          {!isSimulatorActive && (<>
           <div className="card" style={{ padding: 12, borderRadius: 'var(--radius-lg)' }}>
             <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.12em', color: 'var(--text-ghost)', textTransform: 'uppercase', marginBottom: 8 }}>
               📍 Site
@@ -2098,6 +2340,69 @@ export default function LayoutEditor() {
 
           {/* Mode & Cameras */}
           <div className="card" style={{ padding: 12, borderRadius: 'var(--radius-lg)' }}>
+            {isSimulatorActive && (
+              <div style={{ marginBottom: 12, padding: 10, borderRadius: 'var(--radius-sm)', border: '1px solid var(--cyan-shadow)', background: 'var(--cyan-dim)' }}>
+                <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.12em', color: 'var(--cyan)', textTransform: 'uppercase', marginBottom: 8 }}>
+                  Simulator Controls
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 8 }}>
+                  <button className="btn btn-secondary" onClick={() => setSimulatorRunning(!simulatorRunning)}>
+                    {simulatorRunning ? 'Pause' : 'Play'}
+                  </button>
+                  <button className="btn btn-secondary" onClick={() => { void runSimulationTick(); }}>Step</button>
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 8 }}>
+                  <button className="btn btn-ghost" onClick={() => resetSimulator()}>Reset</button>
+                  <button className="btn btn-ghost" onClick={() => spawnAgents()}>Spawn</button>
+                </div>
+                <div style={{ marginBottom: 8 }}>
+                  <div style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 4 }}>Speed: {simulatorSpeed.toFixed(1)}x</div>
+                  <input
+                    type="range"
+                    min="0.5"
+                    max="4"
+                    step="0.1"
+                    value={simulatorSpeed}
+                    onChange={(e) => setSimulatorSpeed(parseFloat(e.target.value))}
+                    style={{ width: '100%' }}
+                  />
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 8 }}>
+                  <input
+                    type="number"
+                    min="1"
+                    max="64"
+                    value={spawnCount}
+                    onChange={(e) => setSpawnCount(Math.max(1, Math.min(64, parseInt(e.target.value || '1'))))}
+                    className="form-input"
+                  />
+                  <select className="form-select" value={spawnBehavior} onChange={(e) => setSpawnBehavior(e.target.value as AgentBehavior)}>
+                    <option value="roam">Roam</option>
+                    <option value="patrol">Patrol</option>
+                    <option value="direct">Direct</option>
+                  </select>
+                </div>
+                <div style={{ display: 'flex', gap: 6 }}>
+                  <button className="btn btn-ghost" style={{ flex: 1 }} onClick={exportScenario}>Export</button>
+                  <label className="btn btn-ghost" style={{ flex: 1 }}>
+                    Import
+                    <input
+                      type="file"
+                      accept="application/json"
+                      style={{ display: 'none' }}
+                      onChange={(e) => importScenario(e.target.files?.[0])}
+                    />
+                  </label>
+                </div>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 8, fontSize: 10, color: 'var(--text-secondary)' }}>
+                  <input type="checkbox" checked={simPushBackend} onChange={(e) => setSimPushBackend(e.target.checked)} />
+                  Push events to backend WS path
+                </label>
+                <div style={{ marginTop: 8, fontSize: 10, color: 'var(--text-muted)' }}>
+                  Tick #{simulatorTick} · Agents {simulatorAgents.length} · Events {simulatorTimeline.length}
+                </div>
+              </div>
+            )}
             <button
               className={`btn ${tool === 'select' ? 'btn-primary' : 'btn-ghost'}`}
               style={{ width: '100%', marginBottom: 16, justifyContent: 'center' }}
@@ -2254,10 +2559,11 @@ export default function LayoutEditor() {
               </div>
             </div>
           </div>
+          </>)}
         </div>
 
         {/* Center: Canvas Area */}
-        <div className="layout-canvas-area" style={{ position: 'relative' }}>
+        <div className="layout-canvas-area" style={{ position: 'relative', minHeight: 0 }} ref={canvasAreaRef}>
           
           <div style={{ 
             width: '100%', height: '100%', 
@@ -2287,10 +2593,29 @@ export default function LayoutEditor() {
                 className={`btn btn-sm ${viewMode === 'floor' ? 'btn-primary' : 'btn-ghost'}`}
                 style={{ borderRadius: 100, fontSize: 11, padding: '5px 14px' }}
                 onClick={() => { setViewMode('floor'); setZoom(1); setPanX(0); setPanY(0); }}
-              >📐 Floor</button>
+              >📐 2D Floor</button>
+              <button
+                className={`btn btn-sm ${viewMode === 'floor-3d' ? 'btn-primary' : 'btn-ghost'}`}
+                style={{ borderRadius: 100, fontSize: 11, padding: '5px 14px' }}
+                onClick={() => { setViewMode('floor-3d'); setZoom(1); setPanX(0); setPanY(0); }}
+              >🧊 3D Floor</button>
             </div>
 
-            {viewMode === 'floor' ? (
+            {viewMode === 'floor-3d' ? (
+               <FloorScene3D 
+                 cameras={placedCams}
+                 zones={drawnZones}
+                 walls={walls}
+                 pxPerFoot={pxPerFoot}
+                editMode={tool === 'select' && !isSimulatorActive}
+                 selectedCamId={selectedCam}
+                 onSelectCam={setSelectedCam}
+                 onUpdateCam={(id, pos, angle) => {
+                   setPlacedCams(prev => prev.map(c => c.id === id ? { ...c, x: pos.x, y: pos.y, angle } : c));
+                   setIsDirty(true);
+                 }}
+               />
+            ) : viewMode === 'floor' ? (
               <>
             <div style={{
               position: 'absolute', top: 20, left: 24, zIndex: 10,
@@ -2305,22 +2630,62 @@ export default function LayoutEditor() {
             <canvas
               ref={canvasRef}
               className="layout-canvas"
-              width={1200}
-              height={800}
+              width={canvasSize.width}
+              height={canvasSize.height}
               style={{
                 width: '100%', height: '100%',
-                cursor: isPanning.current ? 'grabbing' : spaceHeld.current ? 'grab' : tool === 'wall' ? 'crosshair' : tool === 'zone' ? 'crosshair' : (draggedCamId || draggedArchId || draggingWallEndpoint ? 'grabbing' : 'default'),
+                cursor: isSimulatorActive
+                  ? 'default'
+                  : isPanning.current
+                    ? 'grabbing'
+                    : spaceHeld.current
+                      ? 'grab'
+                      : tool === 'wall'
+                        ? 'crosshair'
+                        : tool === 'zone'
+                          ? 'crosshair'
+                          : (draggedCamId || draggedArchId || draggingWallEndpoint ? 'grabbing' : 'default'),
               }}
-              onMouseDown={handleMouseDown}
+              onMouseDown={isSimulatorActive ? undefined : handleMouseDown}
               onMouseMove={handleMouseMove}
-              onMouseUp={handleMouseUp}
+              onMouseUp={isSimulatorActive ? undefined : handleMouseUp}
               onDoubleClick={handleDoubleClick}
-              onClick={handleCanvasClick}
-              onDrop={handleDrop}
+              onClick={isSimulatorActive ? undefined : handleCanvasClick}
+              onDrop={isSimulatorActive ? undefined : handleDrop}
               onDragOver={(e) => e.preventDefault()}
+              onMouseLeave={isSimulatorActive ? undefined : handleMouseUp}
               onContextMenu={(e) => e.preventDefault()}
               onAuxClick={(e) => e.preventDefault()}
             />
+
+            {isSimulatorActive && (
+              <div style={{
+                position: 'absolute',
+                top: 64,
+                left: 24,
+                zIndex: 10,
+                background: 'rgba(15,15,20,0.82)',
+                border: '1px solid var(--cyan-shadow)',
+                borderRadius: 'var(--radius-md)',
+                padding: '8px 10px',
+                minWidth: 220,
+              }}>
+                <div style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 6 }}>
+                  Timeline {Math.min(simulatorPointer + 1, simulatorTimeline.length)} / {simulatorTimeline.length}
+                </div>
+                <input
+                  type="range"
+                  min={0}
+                  max={Math.max(0, simulatorTimeline.length - 1)}
+                  value={Math.min(simulatorPointer, Math.max(0, simulatorTimeline.length - 1))}
+                  onChange={(e) => setSimulatorPointer(parseInt(e.target.value || '0'))}
+                  style={{ width: '100%' }}
+                />
+                <div style={{ fontSize: 10, color: 'var(--cyan)', marginTop: 6 }}>
+                  {simulatorTimeline[Math.min(simulatorPointer, Math.max(0, simulatorTimeline.length - 1))]?.type ?? 'No events yet'}
+                </div>
+              </div>
+            )}
 
             {/* Pan/Zoom hint overlay */}
             <div style={{
@@ -2386,8 +2751,8 @@ export default function LayoutEditor() {
                 <canvas
                   ref={campusCanvasRef}
                   className="layout-canvas"
-                  width={1200}
-                  height={800}
+                  width={canvasSize.width}
+                  height={canvasSize.height}
                   style={{
                     width: '100%', height: '100%',
                     cursor: isPanning.current ? 'grabbing' : spaceHeld.current ? 'grab' : campusDragId ? 'grabbing' : 'default',
@@ -2526,7 +2891,7 @@ export default function LayoutEditor() {
         </div>
 
         {/* Right: Properties */}
-        <div className="layout-sidebar-right card" style={{ display: 'flex', flexDirection: 'column', overflowY: 'auto' }}>
+        <div className="layout-sidebar-right card" style={{ display: 'flex', flexDirection: 'column', overflowY: 'auto', minHeight: 0, maxHeight: '100%' }}>
           <div className="card-header" style={{ padding: '16px' }}>
             <div className="card-title">Properties</div>
           </div>
@@ -2991,6 +3356,25 @@ export default function LayoutEditor() {
                     </button>
                   </div>
                 ))}
+              </div>
+            </div>
+          )}
+
+          {isSimulatorActive && (
+            <div style={{ borderTop: '1px solid var(--border)', padding: '16px' }}>
+              <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-ghost)', textTransform: 'uppercase', letterSpacing: '0.12em', marginBottom: 10 }}>
+                Simulator Event Log
+              </div>
+              <div style={{ maxHeight: 160, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {simulatorTimeline.slice(-24).reverse().map((evt) => (
+                  <div key={evt.id} style={{ padding: '8px 10px', background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)' }}>
+                    <div style={{ fontSize: 11, color: evt.type === 'ALERT_NEW' ? 'var(--red)' : 'var(--cyan)', fontWeight: 700 }}>{evt.type}</div>
+                    <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>{evt.agentId} · {new Date(evt.ts).toLocaleTimeString()}</div>
+                  </div>
+                ))}
+                {simulatorTimeline.length === 0 && (
+                  <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>No simulation events yet.</div>
+                )}
               </div>
             </div>
           )}

@@ -12,6 +12,7 @@ import {
   MapPin, Clock, Users, Eye, TrendingUp, AlertTriangle,
   Hash, Globe, Building2, Briefcase, Key, FileText
 } from 'lucide-react';
+import { resolveAssetUrl } from '../config/runtime';
 
 /* ─────────────────────────────────────────────────── */
 /* Types                                               */
@@ -117,8 +118,7 @@ function getBorderColor(p: PersonDetail): string {
 
 function getPhotoSrc(p: PersonDetail): string | undefined {
   if (!p.photo_path) return undefined;
-  if (p.photo_path.startsWith('data:') || p.photo_path.startsWith('http')) return p.photo_path;
-  return `http://localhost:8000${p.photo_path}`;
+  return resolveAssetUrl(p.photo_path);
 }
 
 /* ─────────────────────────────────────────────────── */

@@ -1,5 +1,6 @@
 // Zustand global store — mirrors backend API state
 import { create } from 'zustand';
+import { getWebSocketUrl } from '../config/runtime';
 
 export interface Camera {
   id: number;
@@ -188,6 +189,10 @@ interface AppStore {
   // WebSockets
   tracks: Record<string, LiveTrack>;
   initWebSocket: () => void;
+  closeWebSocket: () => void;
+  websocket: WebSocket | null;
+  reconnectTimeoutId: ReturnType<typeof setTimeout> | null;
+  trackCleanupIntervalId: ReturnType<typeof setInterval> | null;
 }
 
 export const useStore = create<AppStore>((set) => ({
@@ -198,6 +203,7 @@ export const useStore = create<AppStore>((set) => ({
     set({ user, token });
   },
   logout: () => {
+    useStore.getState().closeWebSocket();
     localStorage.removeItem('token');
     set({ user: null, token: null, currentPage: 'login' });
   },
@@ -244,9 +250,27 @@ export const useStore = create<AppStore>((set) => ({
   removeToast: (id) => set((s) => ({ toasts: s.toasts.filter((t) => t.id !== id) })),
 
   tracks: {},
+  websocket: null,
+  reconnectTimeoutId: null,
+  trackCleanupIntervalId: null,
+  closeWebSocket: () => {
+    const { websocket, reconnectTimeoutId, trackCleanupIntervalId } = useStore.getState();
+    if (reconnectTimeoutId) clearTimeout(reconnectTimeoutId);
+    if (trackCleanupIntervalId) clearInterval(trackCleanupIntervalId);
+    if (websocket && websocket.readyState === WebSocket.OPEN) websocket.close();
+    set({ websocket: null, reconnectTimeoutId: null, trackCleanupIntervalId: null });
+  },
   initWebSocket: () => {
-    const wsUrl = `ws://${window.location.hostname}:8000/ws`;
+    const prev = useStore.getState();
+    if (prev.reconnectTimeoutId) clearTimeout(prev.reconnectTimeoutId);
+    if (prev.trackCleanupIntervalId) clearInterval(prev.trackCleanupIntervalId);
+    if (prev.websocket && (prev.websocket.readyState === WebSocket.OPEN || prev.websocket.readyState === WebSocket.CONNECTING)) {
+      prev.websocket.close();
+    }
+
+    const wsUrl = getWebSocketUrl();
     const ws = new WebSocket(wsUrl);
+    set({ websocket: ws, reconnectTimeoutId: null });
     
     ws.onmessage = (event) => {
       try {
@@ -301,11 +325,12 @@ export const useStore = create<AppStore>((set) => ({
     
     ws.onclose = () => {
       console.log("WebSocket closed, attempting reconnect in 5s...");
-      setTimeout(() => useStore.getState().initWebSocket(), 5000);
+      const timeoutId = setTimeout(() => useStore.getState().initWebSocket(), 5000);
+      set({ reconnectTimeoutId: timeoutId, websocket: null });
     };
 
     // Purge stale tracks every 10 seconds
-    setInterval(() => {
+    const cleanupId = setInterval(() => {
       const now = Date.now() / 1000;
       set((state) => {
         const fresh: Record<string, LiveTrack> = {};
@@ -317,5 +342,6 @@ export const useStore = create<AppStore>((set) => ({
         return { tracks: fresh };
       });
     }, 10000);
+    set({ trackCleanupIntervalId: cleanupId });
   }
 }));

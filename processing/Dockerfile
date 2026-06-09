@@ -13,10 +13,11 @@ RUN apt-get update && apt-get install -y \
 
 WORKDIR /app
 
-COPY requirements.txt .
+COPY processing/requirements.txt .
 RUN pip3 install --no-cache-dir -r requirements.txt
 
-COPY . .
+COPY processing/ .
+COPY backend/app ./app
 
 # Run the camera pipeline coordinator as the main entrypoint
 CMD ["python3", "-m", "pipeline.camera_pipeline"]

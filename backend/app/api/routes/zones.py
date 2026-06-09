@@ -47,6 +47,7 @@ def create_zone(zone_in: ZoneCreate, db: Session = Depends(get_db)):
     db_zone = Zone(
         name=zone_in.name,
         floor=zone_in.floor,
+        building_id=zone_in.building_id,
         coordinates=[c.model_dump() for c in zone_in.coordinates],
         zone_type=zone_in.zone_type,
         dwell_alert_seconds=zone_in.dwell_alert_seconds,

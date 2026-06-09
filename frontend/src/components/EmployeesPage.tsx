@@ -12,7 +12,7 @@ function getBreakStatus(minutesSince: number, interval: number) {
 }
 
 export default function EmployeesPage() {
-  const { employees, token, addToast } = useStore();
+  const { employees, token, addToast, setEmployees } = useStore();
 
   const [search, setSearch] = useState('');
   const [deptFilter, setDeptFilter] = useState('all');
@@ -39,8 +39,23 @@ export default function EmployeesPage() {
 
   const handleAdd = async () => {
     if (!form.fullname || !form.employee_code) { addToast('Name and code required', 'error'); return; }
+    if (form.break_interval_minutes <= 0 || form.break_duration_minutes <= 0) {
+      addToast('Break interval and duration must be positive', 'error');
+      return;
+    }
     if (token && token !== 'demo-token') {
-      try { await api.createEmployee(token, form); } catch { /* demo */ }
+      try {
+        await api.createEmployee(token, form);
+      } catch {
+        addToast('Failed to create employee', 'error');
+        return;
+      }
+      try {
+        const updated = await api.getEmployees(token);
+        setEmployees(updated);
+      } catch {
+        addToast('Employee created but refresh failed', 'info');
+      }
     }
     addToast(`Employee "${form.fullname}" added`, 'success');
     setShowModal(false);
@@ -209,12 +224,12 @@ export default function EmployeesPage() {
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
                 <div className="form-group">
                   <label className="form-label">Break Interval (min)</label>
-                  <input id="emp-interval-input" className="form-input" type="number" value={form.break_interval_minutes}
+                  <input id="emp-interval-input" className="form-input" type="number" min={1} value={form.break_interval_minutes}
                     onChange={(e) => setForm({ ...form, break_interval_minutes: +e.target.value })} />
                 </div>
                 <div className="form-group">
                   <label className="form-label">Break Duration (min)</label>
-                  <input id="emp-duration-input" className="form-input" type="number" value={form.break_duration_minutes}
+                  <input id="emp-duration-input" className="form-input" type="number" min={1} value={form.break_duration_minutes}
                     onChange={(e) => setForm({ ...form, break_duration_minutes: +e.target.value })} />
                 </div>
               </div>

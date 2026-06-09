@@ -13,7 +13,7 @@ from fastapi.staticfiles import StaticFiles
 from prometheus_client import make_asgi_app, Counter, Histogram
 import os
 
-from app.api.routes import cameras, tracks, zones, visitors, employees, alerts, layouts, analytics, enrollment, sites, buildings
+from app.api.routes import cameras, tracks, zones, visitors, employees, alerts, layouts, analytics, enrollment, sites, buildings, simulation
 from app.api.routes.auth import router as auth_router
 from app.api.websocket import ws_router, redis_subscriber
 from app.core.config import settings
@@ -142,6 +142,7 @@ app.include_router(visitors.router,  prefix="/visitors",  tags=["Visitors"])
 app.include_router(employees.router, prefix="/employees", tags=["Employees"])
 app.include_router(alerts.router,    prefix="/alerts",    tags=["Alerts"])
 app.include_router(layouts.router,   prefix="/layouts",   tags=["Layouts"])
+app.include_router(simulation.router, prefix="/simulation", tags=["Simulation"])
 app.include_router(analytics.router,    prefix="/analytics",    tags=["Analytics"])
 app.include_router(enrollment.router,   prefix="/enrollment",   tags=["Enrollment"])
 app.include_router(ws_router,                                   tags=["WebSockets"])

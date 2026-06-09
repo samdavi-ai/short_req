@@ -1101,12 +1101,12 @@ airport-surveillance-system/
 │  │  /            → frontend:3000 (React dashboard)                     │   │
 │  │  /api/*       → backend:8000 (FastAPI)                              │   │
 │  │  /ws          → backend:8000 (WebSocket upgrade)                    │   │
-│  │  /minio       → minio:9001 (admin console)                         │   │
+│  │  /minio       → minio:9001 (admin console)                          │   │
 │  │  /grafana     → grafana:3000 (monitoring dashboards)                │   │
 │  └─────────────────────────────────────────────────────────────────────┘   │
-│                                                                             │
+│                                                                            │
 │  ┌─── APPLICATION CONTAINERS ──────────────────────────────────────────┐   │
-│  │                                                                      │   │
+│  │                                                                     │   │
 │  │  ┌─────────────────┐  ┌─────────────────┐  ┌──────────────────┐     │   │
 │  │  │ frontend        │  │ backend         │  │ celery-worker    │     │   │
 │  │  │ Port: 3000      │  │ Port: 8000      │  │ (no exposed port)│     │   │
@@ -1115,9 +1115,9 @@ airport-surveillance-system/
 │  │  │ CPU: 0.5 core   │  │ CPU: 2 cores    │  │ CPU: 1 core      │     │   │
 │  │  │ RAM: 512 MB     │  │ RAM: 2 GB       │  │ RAM: 1 GB        │     │   │
 │  │  └─────────────────┘  └─────────────────┘  └──────────────────┘     │   │
-│  │                                                                      │   │
-│  └──────────────────────────────────────────────────────────────────────┘   │
-│                                                                             │
+│  │                                                                     │   │
+│  └─────────────────────────────────────────────────────────────────────┘   │
+│                                                                            │
 │  ┌─── GPU PROCESSING CONTAINER(S) ─────────────────────────────────────┐   │
 │  │  (Uses NVIDIA Container Toolkit for GPU passthrough)                 │   │
 │  │                                                                      │   │
@@ -1137,22 +1137,22 @@ airport-surveillance-system/
 │  │  └──────────────────────────────────────────────────────────────┘    │   │
 │  │                                                                      │   │
 │  │  GPU Requirements:                                                   │   │
-│  │  • NVIDIA GPU (RTX 3060+ / A30 / A100)                              │   │
+│  │  • NVIDIA GPU (RTX 3060+ / A30 / A100)                               │   │
 │  │  • NVIDIA Driver 525+ installed on host                              │   │
 │  │  • NVIDIA Container Toolkit installed                                │   │
 │  │  • docker compose with runtime: nvidia support                       │   │
 │  └──────────────────────────────────────────────────────────────────────┘   │
 │                                                                             │
-│  ┌─── DATA LAYER (Docker Volumes for Persistence) ─────────────────────┐   │
+│  ┌─── DATA LAYER (Docker Volumes for Persistence) ─────────────────────┐    │
 │  │                                                                      │   │
-│  │  ┌─────────────────┐  ┌─────────────────┐  ┌──────────────────┐     │   │
+│  │  ┌─────────────────┐  ┌─────────────────┐  ┌──────────────────┐      │   │
 │  │  │ postgresql       │  │ redis           │  │ milvus           │     │   │
-│  │  │ Port: 5432      │  │ Port: 6379      │  │ Port: 19530      │     │   │
-│  │  │ Volume:         │  │ Volume:         │  │ Volume:          │     │   │
-│  │  │  pgdata:/data   │  │  redis:/data    │  │  milvus:/data    │     │   │
-│  │  │ Backup: manual  │  │ Persistence: on │  │ Standalone mode  │     │   │
-│  │  │  via script     │  │                 │  │                  │     │   │
-│  │  └─────────────────┘  └─────────────────┘  └──────────────────┘     │   │
+│  │  │ Port: 5432      │  │ Port: 6379      │  │ Port: 19530      │      │   │
+│  │  │ Volume:         │  │ Volume:         │  │ Volume:          │      │   │
+│  │  │  pgdata:/data   │  │  redis:/data    │  │  milvus:/data    │      │   │
+│  │  │ Backup: manual  │  │ Persistence: on │  │ Standalone mode  │      │   │
+│  │  │  via script     │  │                 │  │                  │      │   │
+│  │  └─────────────────┘  └─────────────────┘  └──────────────────┘      │   │
 │  │                                                                      │   │
 │  │  ┌─────────────────┐                                                 │   │
 │  │  │ minio           │                                                 │   │

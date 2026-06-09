@@ -57,6 +57,11 @@ export default function AlertsPage() {
 
   const doAckAll = () => {
     const toAck = sorted.filter((a) => !a.acknowledged).map((a) => a.id);
+    if (token && token !== 'demo-token' && toAck.length > 0) {
+      api.bulkAcknowledge(token, toAck, user?.username || 'operator').catch(() => {
+        addToast('Some alerts could not be acknowledged on server', 'error');
+      });
+    }
     toAck.forEach((id) => acknowledgeAlert(id));
     addToast(`${toAck.length} alerts acknowledged`, 'success');
   };

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   LayoutDashboard, Camera, MapPin, ShieldAlert,
-  Users, UserCheck, BarChart3, Settings, Search, X,
+  Users, UserCheck, BarChart3, Settings, Search, X, Fingerprint,
 } from 'lucide-react';
 import { useStore } from '../stores/appStore';
 
@@ -30,6 +30,7 @@ export default function CommandPalette({ onClose }: { onClose: () => void }) {
     { id: 'alerts',     label: 'Alerts',        sub: 'Alert management',           icon: ShieldAlert,     group: 'Pages', action: () => setPage('alerts'),     key: 'G A' },
     { id: 'visitors',   label: 'Visitors',      sub: 'Visitor records & watchlist',icon: Users,           group: 'Pages', action: () => setPage('visitors'),   key: 'G V' },
     { id: 'employees',  label: 'Employees',     sub: 'Staff monitoring & breaks',  icon: UserCheck,       group: 'Pages', action: () => setPage('employees'),  key: 'G M' },
+    { id: 'person-lookup', label: 'Person Lookup', sub: 'Search person profiles', icon: Fingerprint, group: 'Pages', action: () => setPage('person-lookup'), key: 'G P' },
     { id: 'analytics',  label: 'Analytics',     sub: 'Reports & intelligence',     icon: BarChart3,       group: 'Pages', action: () => setPage('analytics'),  key: 'G I' },
     { id: 'cameras',    label: 'Cameras',       sub: 'Camera management',          icon: Camera,          group: 'Pages', action: () => setPage('cameras'),    key: 'G C' },
     { id: 'settings',   label: 'Settings',      sub: 'System configuration',       icon: Settings,        group: 'Pages', action: () => setPage('settings'),   key: 'G S' },

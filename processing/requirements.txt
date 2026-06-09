@@ -6,7 +6,7 @@ psycopg2-binary==2.9.6
 pydantic==2.0.3
 pymilvus==2.3.0
 ultralytics==8.0.124
-onnxruntime-gpu==1.15.1
+onnxruntime==1.15.1
 Pillow==9.5.0
 requests==2.31.0
 prometheus-client==0.17.0

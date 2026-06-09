@@ -119,6 +119,25 @@ export default function VisitorsPage() {
 
   const selectedVisitor = visitors.find(v => v.id === selectedVisitorId);
 
+  const updateVisitorStatus = async (visitorId: number, status: Visitor['status']) => {
+    if (token && token !== 'demo-token') {
+      try {
+        await api.setVisitorStatus(token, visitorId, status);
+        const updated = await api.getVisitors(token);
+        setVisitors(updated);
+        addToast('Visitor status updated', 'success');
+      } catch {
+        addToast('Failed to update visitor status', 'error');
+      }
+      return;
+    }
+
+    setVisitors(
+      visitors.map((v) => (v.id === visitorId ? { ...v, status } : v))
+    );
+    addToast('Visitor status updated (demo)', 'success');
+  };
+
   return (
     <div className="page-content" style={{ position: 'relative' }}>
       {/* Alert for watchlisted */}
@@ -236,13 +255,13 @@ export default function VisitorsPage() {
                     <div style={{ display: 'flex', gap: 6 }} onClick={e => e.stopPropagation()}>
                       {v.status !== 'WHITELISTED' && (
                         <button className="btn btn-sm" style={{ background: 'var(--green-dim)', color: 'var(--green-bright)', border: '1px solid var(--border-green)' }}
-                          onClick={() => addToast(`${v.fullname} status updated`, 'success')}>
+                          onClick={() => updateVisitorStatus(v.id, 'WHITELISTED')}>
                           <Check size={11} /> Clear
                         </button>
                       )}
                       {v.status !== 'BLACKLISTED' && (
                         <button className="btn btn-sm btn-danger"
-                          onClick={() => addToast(`${v.fullname} flagged`, 'error')}>
+                          onClick={() => updateVisitorStatus(v.id, 'BLACKLISTED')}>
                           <Flag size={11} /> Flag
                         </button>
                       )}

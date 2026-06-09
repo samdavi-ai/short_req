@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Settings, Shield, Bell, Database, Save, RefreshCw } from 'lucide-react';
+import { Shield, Bell, Database, Save, RefreshCw } from 'lucide-react';
 import { useStore } from '../stores/appStore';
 
 export default function SettingsPage() {
@@ -46,6 +46,8 @@ export default function SettingsPage() {
       </div>
       <button
         onClick={() => onChange(!value)}
+        aria-pressed={value}
+        aria-label={`${label}: ${value ? 'enabled' : 'disabled'}`}
         style={{
           width: 44, height: 24, borderRadius: 99, border: 'none', cursor: 'pointer',
           background: value ? 'var(--green)' : 'var(--surface-4)',
@@ -133,7 +135,7 @@ export default function SettingsPage() {
           <div style={{ marginTop: 12, padding: 12, background: 'var(--surface-2)', borderRadius: 8, border: '1px solid var(--border)' }}>
             <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap' }}>
               {[
-                { label: 'Backend API', value: 'http://localhost:8000', ok: true },
+                { label: 'Backend API', value: 'Configured via runtime', ok: true },
                 { label: 'Redis', value: 'localhost:6379', ok: true },
                 { label: 'PostgreSQL', value: 'localhost:5432', ok: true },
               ].map((s) => (

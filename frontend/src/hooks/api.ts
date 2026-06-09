@@ -1,5 +1,7 @@
 // API client — all backend calls
-const BASE = 'http://localhost:8000';
+import { getApiBaseUrl } from '../config/runtime';
+
+const BASE = getApiBaseUrl();
 
 function authHeaders(token: string | null) {
   return {
@@ -356,5 +358,69 @@ export const api = {
       headers: authHeaders(token),
     });
     if (!res.ok && res.status !== 404) await checkOk(res);
+  },
+
+  // Simulation
+  publishSimulationEvents: async (
+    token: string,
+    data: {
+      floor: number;
+      building_id?: number | null;
+      site_id?: number | null;
+      events: Record<string, unknown>[];
+    }
+  ) => {
+    const res = await fetch(`${BASE}/simulation/publish`, {
+      method: 'POST',
+      headers: authHeaders(token),
+      body: JSON.stringify(data),
+    });
+    await checkOk(res);
+    return res.json();
+  },
+
+  startSimulation: async (
+    token: string,
+    data: {
+      floor: number;
+      building_id?: number | null;
+      site_id?: number | null;
+      seed?: number;
+      speed?: number;
+    }
+  ) => {
+    const res = await fetch(`${BASE}/simulation/start`, {
+      method: 'POST',
+      headers: authHeaders(token),
+      body: JSON.stringify(data),
+    });
+    await checkOk(res);
+    return res.json();
+  },
+
+  stopSimulation: async (token: string, session_id: string) => {
+    const res = await fetch(`${BASE}/simulation/stop?session_id=${encodeURIComponent(session_id)}`, {
+      method: 'POST',
+      headers: authHeaders(token),
+    });
+    await checkOk(res);
+    return res.json();
+  },
+
+  tickSimulation: async (
+    token: string,
+    data: {
+      session_id: string;
+      tick: number;
+      events: Record<string, unknown>[];
+    }
+  ) => {
+    const res = await fetch(`${BASE}/simulation/tick`, {
+      method: 'POST',
+      headers: authHeaders(token),
+      body: JSON.stringify(data),
+    });
+    await checkOk(res);
+    return res.json();
   },
 };

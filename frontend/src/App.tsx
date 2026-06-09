@@ -20,6 +20,7 @@ import AnalyticsPage from './components/AnalyticsPage';
 import CameraManager from './components/CameraManager';
 import SettingsPage from './components/SettingsPage';
 import PersonLookupPage from './components/PersonLookupPage';
+import { getApiBaseUrl } from './config/runtime';
 
 function renderPage(page: string): React.ReactElement {
   switch (page) {
@@ -47,7 +48,7 @@ export default function App() {
       useStore.getState().initWebSocket();
       const { setCameras, setAlerts, setVisitors, setEmployees, setZones } = useStore.getState();
       const headers = { Authorization: `Bearer ${token}` };
-      const base = 'http://localhost:8000';
+      const base = getApiBaseUrl();
       Promise.all([
         fetch(`${base}/cameras/`,             { headers }).then(r => r.ok ? r.json() : []),
         fetch(`${base}/alerts/?limit=50`,     { headers }).then(r => r.ok ? r.json() : []),

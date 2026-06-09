@@ -9,8 +9,7 @@ services:
       - prometheus_data:/prometheus
     ports:
       - "${PROMETHEUS_PORT:-9090}:9090"
-    networks:
-      - airport-net
+
     restart: always
 
   grafana:
@@ -24,8 +23,7 @@ services:
       - "${GRAFANA_PORT:-3000}:3000"
     depends_on:
       - prometheus
-    networks:
-      - airport-net
+
     restart: always
 
 volumes:

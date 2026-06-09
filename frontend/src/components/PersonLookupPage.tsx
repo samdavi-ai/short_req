@@ -13,6 +13,7 @@ import {
   ChevronRight, AlertTriangle,
 } from 'lucide-react';
 import { useStore, Employee, Visitor } from '../stores/appStore';
+import { resolveAssetUrl } from '../config/runtime';
 
 /* ─── Types ─────────────────────────────────────────────── */
 type PersonType = 'employee' | 'visitor';
@@ -50,8 +51,7 @@ function statusBadge(authorized: boolean, label: string) {
 function getPhotoSrc(p: Employee | Visitor): string | undefined {
   const path = (p as any).photo_path;
   if (!path) return undefined;
-  if (path.startsWith('data:') || path.startsWith('http')) return path;
-  return `http://localhost:8000${path}`;
+  return resolveAssetUrl(path);
 }
 
 /* ─── Sub-components ────────────────────────────────────── */
@@ -588,7 +588,7 @@ export default function PersonLookupPage() {
   return (
     <div
       className="page-content"
-      style={{ padding: 0, display: 'flex', flexDirection: 'row', height: '100%', overflow: 'hidden' }}
+      style={{ padding: 0, display: 'flex', flexDirection: 'row', minHeight: 0, overflow: 'hidden' }}
     >
       {/* ══════════════════════════════════════════════════ */}
       {/* LEFT PANEL — Search + Results                      */}

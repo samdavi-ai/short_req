@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Camera, Grid, Maximize2, Wifi, WifiOff, Eye } from 'lucide-react';
+import { Camera, Grid, WifiOff } from 'lucide-react';
 import { useStore } from '../stores/appStore';
 
 const DEMO_CAMERAS = [
@@ -29,31 +29,36 @@ function CameraFeedCard({ cam, selected, onClick }: {
   const isOffline = cam.status === 'OFFLINE';
   const isMaint = cam.status === 'MAINTENANCE';
   const videoRef = React.useRef<HTMLVideoElement | null>(null);
-  const [stream, setStream] = React.useState<MediaStream | null>(null);
+  const streamRef = React.useRef<MediaStream | null>(null);
 
   React.useEffect(() => {
-    if (selected && !isOffline && !isMaint) {
-      navigator.mediaDevices.getUserMedia({ video: { width: 640, height: 360 } })
-        .then((s) => {
-          setStream(s);
-          if (videoRef.current) {
-            videoRef.current.srcObject = s;
-          }
-        })
-        .catch((err) => {
-          console.error("Webcam access error:", err);
-        });
-    } else {
-      if (stream) {
-        stream.getTracks().forEach((track) => track.stop());
-        setStream(null);
+    const stopCurrentStream = () => {
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach((track) => track.stop());
+        streamRef.current = null;
       }
+      if (videoRef.current) videoRef.current.srcObject = null;
+    };
+
+    if (!selected || isOffline || isMaint) {
+      stopCurrentStream();
+      return;
     }
 
+    navigator.mediaDevices.getUserMedia({ video: { width: 640, height: 360 } })
+      .then((s) => {
+        stopCurrentStream();
+        streamRef.current = s;
+        if (videoRef.current) {
+          videoRef.current.srcObject = s;
+        }
+      })
+      .catch((err) => {
+        console.error("Webcam access error:", err);
+      });
+
     return () => {
-      if (stream) {
-        stream.getTracks().forEach((track) => track.stop());
-      }
+      stopCurrentStream();
     };
   }, [selected, isOffline, isMaint]);
 
@@ -170,7 +175,7 @@ export default function LiveFeeds() {
   const offline = displayCams.filter((c) => c.status !== 'ACTIVE').length;
 
   return (
-    <div className="page-content" style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+    <div className="page-content" style={{ display: 'flex', flexDirection: 'column' }}>
       {/* Controls bar */}
       <div style={{
         padding: '12px 20px',
@@ -260,7 +265,7 @@ export default function LiveFeeds() {
         <span style={{ color: 'var(--green-bright)' }}>● {online} streaming</span>
         {offline > 0 && <><span>·</span><span style={{ color: 'var(--red-bright)' }}>● {offline} offline</span></>}
         <span style={{ marginLeft: 'auto' }}>
-          Click camera to select · Double-click to expand
+          Click camera to start/stop preview
         </span>
       </div>
     </div>

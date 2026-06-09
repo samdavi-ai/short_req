@@ -18,20 +18,15 @@ services:
 
   processing:
     build:
-      context: ./processing
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: processing/Dockerfile
     environment:
       - BACKEND_URL=http://backend:8000
       - REDIS_URL=redis://redis:6379/0
       # Enable GPU if available
       - USE_CUDA=true
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: 1
-              capabilities: [gpu]
+    volumes:
+      - ./:/app/data
     depends_on:
       - backend
       - redis
@@ -54,7 +49,7 @@ services:
       - POSTGRES_PASSWORD=password
       - POSTGRES_DB=airport_db
     ports:
-      - "5432:5432"
+      - "5433:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     restart: unless-stopped
@@ -64,6 +59,14 @@ services:
     ports:
       - "6379:6379"
     restart: unless-stopped
+
+  adminer:
+    image: adminer
+    restart: always
+    ports:
+      - 8080:8080
+    depends_on:
+      - db
 
 volumes:
   postgres_data:

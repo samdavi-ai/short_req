@@ -19,10 +19,10 @@ function BootTerminal() {
   const [visible, setVisible] = useState<number[]>([]);
 
   useEffect(() => {
-    BOOT_LINES.forEach((line, i) => {
-      const t = setTimeout(() => setVisible((v) => [...v, i]), line.delay);
-      return () => clearTimeout(t);
-    });
+    const timers = BOOT_LINES.map((line, i) =>
+      setTimeout(() => setVisible((v) => [...v, i]), line.delay)
+    );
+    return () => timers.forEach((t) => clearTimeout(t));
   }, []);
 
   const doneIdx = BOOT_LINES.length - 2; // last real "done" line
