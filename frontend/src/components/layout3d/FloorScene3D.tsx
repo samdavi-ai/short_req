@@ -72,6 +72,7 @@ export default function FloorScene3D({
             />
           ))}
 
+          {/* @ts-ignore */}
           <OrbitControls 
             makeDefault 
             maxPolarAngle={Math.PI / 2 - 0.05} // don't go below ground

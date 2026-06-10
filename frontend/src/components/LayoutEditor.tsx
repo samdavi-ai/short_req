@@ -97,47 +97,124 @@ const CAMERA_TYPES = [
   { label: 'Face Capture',    icon: '◈', type: 'face' },
 ];
 
-// ── Real airport: Kempegowda International Airport, Bangalore ─────────────────
-// Source: Site Acceptance Test, ATS Complex Alpha-1 (GEM/2024/B/4568766)
+const WALL_COLOR = '#ffffff';
+
+// ── Airport Authority of India — BIAL, ALPHA-2 Block ─────────────────────────
 const DEMO_SITES: Site[] = [
-  { id: -1, name: 'Kempegowda International Airport', address: 'ATS Complex, Alpha-1, Bangalore, Karnataka', latitude: 13.1986, longitude: 77.7066, is_active: true, created_at: '' },
+  { id: -1, name: 'Airport Authority of India — BIAL', address: 'Kempegowda International Airport, Devanahalli, Bangalore, Karnataka 560300', latitude: 13.1986, longitude: 77.7066, is_active: true, created_at: '' },
 ];
 
 const DEMO_BUILDINGS: Building[] = [
   {
-    id: -1, site_id: -1, name: 'Terminal 1 — ATS Complex', building_type: 'INDOOR', is_active: true, created_at: '',
-    x_position: 80, y_position: 60, map_width: 320, map_height: 240,
+    id: -1, site_id: -1, name: 'ALPHA-2', building_type: 'INDOOR', is_active: true, created_at: '',
+    x_position: 80, y_position: 60, map_width: 750, map_height: 535,
     floors: [
-      { id: -1, building_id: -1, level: 0,  label: 'Ground Floor',  sort_order: 0, created_at: '' },
-      { id: -2, building_id: -1, level: 1,  label: 'Departures',    sort_order: 1, created_at: '' },
-      { id: -3, building_id: -1, level: 2,  label: 'Boarding Gates',sort_order: 2, created_at: '' },
-    ],
-  },
-  {
-    id: -2, site_id: -1, name: 'Airside Operations', building_type: 'OUTDOOR', is_active: true, created_at: '',
-    x_position: 460, y_position: 60, map_width: 240, map_height: 180,
-    floors: [
-      { id: -4, building_id: -2, level: 0, label: 'Tarmac Level', sort_order: 0, created_at: '' },
-    ],
-  },
-  {
-    id: -3, site_id: -1, name: 'Baggage & Arrivals Hall', building_type: 'INDOOR', is_active: true, created_at: '',
-    x_position: 80, y_position: 360, map_width: 280, map_height: 180,
-    floors: [
-      { id: -5, building_id: -3, level: 0, label: 'Arrivals Ground', sort_order: 0, created_at: '' },
-      { id: -6, building_id: -3, level: 1, label: 'Baggage Claim',   sort_order: 1, created_at: '' },
-    ],
-  },
-  {
-    id: -4, site_id: -1, name: 'Parking Structure', building_type: 'MIXED', is_active: true, created_at: '',
-    x_position: 460, y_position: 320, map_width: 220, map_height: 200,
-    floors: [
-      { id: -7, building_id: -4, level: 0, label: 'P1 Ground',  sort_order: 0, created_at: '' },
-      { id: -8, building_id: -4, level: 1, label: 'P2 Level 1', sort_order: 1, created_at: '' },
-      { id: -9, building_id: -4, level: 2, label: 'P3 Level 2', sort_order: 2, created_at: '' },
+      { id: -1, building_id: -1, level: 0, label: 'Ground Floor', sort_order: 0, created_at: '', background_image: '/layouts/ground_floor.png' },
+      { id: -2, building_id: -1, level: 1, label: 'First Floor',  sort_order: 1, created_at: '', background_image: '/layouts/first_floor.png' },
+      { id: -3, building_id: -1, level: 2, label: 'Area AA',      sort_order: 2, created_at: '', background_image: '/layouts/area_aa.png' },
     ],
   },
 ];
+
+// ── ALPHA-2 per-floor demo canvas data ────────────────────────────────────────
+const ALPHA2_FLOOR_DATA: Record<number, {
+  cams: CamOnCanvas[];
+  zones: ZoneOnCanvas[];
+  walls: WallSegment[];
+  arches: ArchElement[];
+}> = {
+  // ── GROUND FLOOR (Matched to ground_floor.png) ────────────
+  0: {
+    cams: [
+      { id: 101, x: 282, y: 214, angle: 45,  fov: 90, name: 'CAM-G01', status: 'ACTIVE', location: 'Corridor West', rtsp_url: 'rtsp://10.10.0.101:554/stream1', is_overhead: true },
+      { id: 102, x: 524, y: 204, angle: 135, fov: 90, name: 'CAM-G02', status: 'ACTIVE', location: 'Reception',     rtsp_url: 'rtsp://10.10.0.102:554/stream1', is_overhead: true },
+      { id: 103, x: 542, y: 337, angle: 225, fov: 90, name: 'CAM-G03', status: 'ACTIVE', location: 'AD Offices',    rtsp_url: 'rtsp://10.10.0.103:554/stream1', is_overhead: true },
+    ],
+    zones: [],
+    walls: [
+      { id: 101, startX: 83, startY: 125, endX: 660, endY: 125, thickness: 5, color: WALL_COLOR, label: 'North Perimeter' },
+      { id: 102, startX: 83, startY: 418, endX: 660, endY: 418, thickness: 5, color: WALL_COLOR, label: 'South Perimeter' },
+      { id: 103, startX: 83, startY: 125, endX: 83, endY: 418, thickness: 5, color: WALL_COLOR, label: 'West Perimeter' },
+      { id: 104, startX: 660, startY: 125, endX: 660, endY: 418, thickness: 5, color: WALL_COLOR, label: 'East Perimeter' },
+      { id: 105, startX: 83, startY: 223, endX: 660, endY: 223, thickness: 3, color: WALL_COLOR, label: 'Grid Y 223' },
+      { id: 106, startX: 83, startY: 319, endX: 660, endY: 319, thickness: 3, color: WALL_COLOR, label: 'Grid Y 319' },
+      { id: 107, startX: 181, startY: 125, endX: 181, endY: 418, thickness: 3, color: WALL_COLOR, label: 'Grid X 181' },
+      { id: 108, startX: 277, startY: 125, endX: 277, endY: 418, thickness: 3, color: WALL_COLOR, label: 'Grid X 277' },
+      { id: 109, startX: 372, startY: 125, endX: 372, endY: 418, thickness: 3, color: WALL_COLOR, label: 'Grid X 372' },
+      { id: 110, startX: 468, startY: 125, endX: 468, endY: 418, thickness: 3, color: WALL_COLOR, label: 'Grid X 468' },
+      { id: 111, startX: 563, startY: 125, endX: 563, endY: 418, thickness: 3, color: WALL_COLOR, label: 'Grid X 563' },
+    ],
+    arches: [
+      { id: 1001, type: 'DOUBLE_DOOR', x: 372, y: 125, width: 40, rotation: 0, label: 'Main Entrance' },
+      { id: 1002, type: 'DOOR', x: 181, y: 223, width: 30, rotation: 90, label: 'Office Door 1', openDirection: 'RIGHT' },
+      { id: 1003, type: 'DOOR', x: 277, y: 319, width: 30, rotation: 0, label: 'Corridor Door', openDirection: 'LEFT' },
+      { id: 1004, type: 'COLUMN', x: 468, y: 223, width: 16, rotation: 0, label: 'Support Pillar' },
+    ],
+  },
+
+  // ── FIRST FLOOR (Matched to first_floor.png) ─────────────
+  1: {
+    cams: [
+      { id: 201, x: 125, y: 319, angle: 0,   fov: 90, name: 'CAM-F01', status: 'ACTIVE', location: 'ACC Workstation', rtsp_url: 'rtsp://10.10.1.101:554/stream1', is_overhead: true },
+      { id: 202, x: 169, y: 233, angle: 45,  fov: 90, name: 'CAM-F02', status: 'ACTIVE', location: 'Stairwell',       rtsp_url: 'rtsp://10.10.1.102:554/stream1', is_overhead: true },
+      { id: 203, x: 393, y: 227, angle: 45,  fov: 90, name: 'CAM-F03', status: 'ACTIVE', location: 'Corridor Center', rtsp_url: 'rtsp://10.10.1.103:554/stream1', is_overhead: true },
+      { id: 204, x: 524, y: 226, angle: 135, fov: 90, name: 'CAM-F04', status: 'ACTIVE', location: 'Recreation',      rtsp_url: 'rtsp://10.10.1.104:554/stream1', is_overhead: true },
+      { id: 205, x: 567, y: 351, angle: 225, fov: 90, name: 'CAM-F05', status: 'ACTIVE', location: 'APP Workstation', rtsp_url: 'rtsp://10.10.1.105:554/stream1', is_overhead: true },
+    ],
+    zones: [],
+    walls: [
+      { id: 201, startX: 102, startY: 142, endX: 618, endY: 142, thickness: 5, color: WALL_COLOR, label: 'North Perimeter' },
+      { id: 202, startX: 102, startY: 449, endX: 618, endY: 449, thickness: 5, color: WALL_COLOR, label: 'South Perimeter' },
+      { id: 203, startX: 102, startY: 142, endX: 102, endY: 449, thickness: 5, color: WALL_COLOR, label: 'West Perimeter' },
+      { id: 204, startX: 618, startY: 142, endX: 618, endY: 449, thickness: 5, color: WALL_COLOR, label: 'East Perimeter' },
+      { id: 205, startX: 102, startY: 245, endX: 618, endY: 245, thickness: 3, color: WALL_COLOR, label: 'Grid Y 245' },
+      { id: 206, startX: 102, startY: 347, endX: 618, endY: 347, thickness: 3, color: WALL_COLOR, label: 'Grid Y 347' },
+      { id: 207, startX: 203, startY: 142, endX: 203, endY: 449, thickness: 3, color: WALL_COLOR, label: 'Grid X 203' },
+      { id: 208, startX: 306, startY: 142, endX: 306, endY: 449, thickness: 3, color: WALL_COLOR, label: 'Grid X 306' },
+      { id: 209, startX: 407, startY: 142, endX: 407, endY: 449, thickness: 3, color: WALL_COLOR, label: 'Grid X 407' },
+      { id: 210, startX: 509, startY: 142, endX: 509, endY: 449, thickness: 3, color: WALL_COLOR, label: 'Grid X 509' },
+    ],
+    arches: [
+      { id: 2001, type: 'DOUBLE_DOOR', x: 306, y: 142, width: 40, rotation: 0, label: 'North Gate' },
+      { id: 2002, type: 'DOOR', x: 203, y: 245, width: 30, rotation: 90, label: 'Stairwell Access', openDirection: 'LEFT' },
+      { id: 2003, type: 'DOOR', x: 407, y: 347, width: 30, rotation: 0, label: 'Lounge Door', openDirection: 'RIGHT' },
+      { id: 2004, type: 'COLUMN', x: 509, y: 245, width: 16, rotation: 0, label: 'Load Pillar' },
+    ],
+  },
+
+  // ── AREA AA (Matched to area_aa.png) ───────────────
+  2: {
+    cams: [
+      { id: 301, x: 146, y: 215, angle: 45,  fov: 90, name: 'CAM-A01', status: 'ACTIVE', location: 'Far Left Maint',  rtsp_url: 'rtsp://10.10.2.101:554/stream1', is_overhead: true },
+      { id: 302, x: 336, y: 220, angle: 45,  fov: 90, name: 'CAM-A02', status: 'ACTIVE', location: 'Top Middle W',    rtsp_url: 'rtsp://10.10.2.102:554/stream1', is_overhead: true },
+      { id: 303, x: 349, y: 353, angle: 315, fov: 90, name: 'CAM-A03', status: 'ACTIVE', location: 'Bottom Middle',   rtsp_url: 'rtsp://10.10.2.103:554/stream1', is_overhead: true },
+      { id: 304, x: 502, y: 225, angle: 135, fov: 90, name: 'CAM-A04', status: 'ACTIVE', location: 'Top Middle E',    rtsp_url: 'rtsp://10.10.2.104:554/stream1', is_overhead: true },
+      { id: 305, x: 541, y: 220, angle: 135, fov: 90, name: 'CAM-A05', status: 'ACTIVE', location: 'Top Right',       rtsp_url: 'rtsp://10.10.2.105:554/stream1', is_overhead: true },
+      { id: 306, x: 523, y: 379, angle: 225, fov: 90, name: 'CAM-A06', status: 'ACTIVE', location: 'Bottom Right 1',  rtsp_url: 'rtsp://10.10.2.106:554/stream1', is_overhead: true },
+      { id: 307, x: 556, y: 362, angle: 225, fov: 90, name: 'CAM-A07', status: 'ACTIVE', location: 'Bottom Right 2',  rtsp_url: 'rtsp://10.10.2.107:554/stream1', is_overhead: true },
+    ],
+    zones: [],
+    walls: [
+      { id: 301, startX: 57, startY: 128, endX: 700, endY: 128, thickness: 5, color: WALL_COLOR, label: 'North Perimeter' },
+      { id: 302, startX: 57, startY: 454, endX: 700, endY: 454, thickness: 5, color: WALL_COLOR, label: 'South Perimeter' },
+      { id: 303, startX: 57, startY: 128, endX: 57, endY: 454, thickness: 5, color: WALL_COLOR, label: 'West Perimeter' },
+      { id: 304, startX: 700, startY: 128, endX: 700, endY: 454, thickness: 5, color: WALL_COLOR, label: 'East Perimeter' },
+      { id: 305, startX: 57, startY: 237, endX: 700, endY: 237, thickness: 3, color: WALL_COLOR, label: 'Grid Y 237' },
+      { id: 306, startX: 57, startY: 344, endX: 700, endY: 344, thickness: 3, color: WALL_COLOR, label: 'Grid Y 344' },
+      { id: 307, startX: 164, startY: 128, endX: 164, endY: 454, thickness: 3, color: WALL_COLOR, label: 'Grid X 164' },
+      { id: 308, startX: 272, startY: 128, endX: 272, endY: 454, thickness: 3, color: WALL_COLOR, label: 'Grid X 272' },
+      { id: 309, startX: 379, startY: 128, endX: 379, endY: 454, thickness: 3, color: WALL_COLOR, label: 'Grid X 379' },
+      { id: 310, startX: 485, startY: 128, endX: 485, endY: 454, thickness: 3, color: WALL_COLOR, label: 'Grid X 485' },
+      { id: 311, startX: 593, startY: 128, endX: 593, endY: 454, thickness: 3, color: WALL_COLOR, label: 'Grid X 593' },
+    ],
+    arches: [
+      { id: 3001, type: 'DOUBLE_DOOR', x: 379, y: 128, width: 40, rotation: 0, label: 'AA Secure Entrance' },
+      { id: 3002, type: 'DOOR', x: 164, y: 237, width: 30, rotation: 90, label: 'Maint Door', openDirection: 'RIGHT' },
+      { id: 3003, type: 'DOOR', x: 485, y: 344, width: 30, rotation: 0, label: 'Server Room', openDirection: 'LEFT' },
+      { id: 3004, type: 'COLUMN', x: 272, y: 237, width: 16, rotation: 0, label: 'Central Column' },
+    ],
+  },
+};
 
 
 const ARCH_ELEMENT_TYPES: { type: ArchElementType; label: string; icon: string }[] = [
@@ -149,7 +226,7 @@ const ARCH_ELEMENT_TYPES: { type: ArchElementType; label: string; icon: string }
   { type: 'ELEVATOR',    label: 'Elevator',     icon: '⬆' },
 ];
 
-const WALL_COLOR = '#ffffff';
+// WALL_COLOR definition moved above
 
 // ─── Utility Functions ────────────────────────────────────────────────────────
 
@@ -202,7 +279,8 @@ export default function LayoutEditor() {
   const currentBuildingId = isDemo ? (activeBuildingId ?? -1) : activeBuildingId;
   const activeBuilding = currentBuildings.find(b => b.id === currentBuildingId);
   const activeFloors = activeBuilding?.floors ?? [];
-  const activeFloorLabel = activeFloors.find(f => f.level === activeFloor)?.label ?? `Floor ${activeFloor}`;
+  const activeFloorDef = activeFloors.find(f => f.level === activeFloor);
+  const activeFloorLabel = activeFloorDef?.label ?? `Floor ${activeFloor}`;
 
   // Add Floor / Building modals
   const [showAddFloor, setShowAddFloor] = useState(false);
@@ -372,60 +450,13 @@ export default function LayoutEditor() {
       setDrawnZones(floorZones);
       setIsDirty(false);
     } else {
-      // Demo fallback — Kempegowda International Airport (ATS Complex Alpha-1)
-      // 14 × CP PLUS CP-UNC-TB21ZL65-VMDS-V2-27135 cameras as per SAT document
-      setPlacedCams(KEMPEGOWDA_CAMERAS.map(c => ({
-        id: c.id, x: c.x, y: c.y, angle: c.angle, fov: c.fov,
-        name: c.name, status: c.status,
-        rtsp_url: `rtsp://192.168.1.${c.id - 9000}:554/stream1`,
-        location: c.location, is_overhead: c.is_overhead,
-      })));
-      setDrawnZones([
-        { id: 1, name: 'Security Check Alpha', type: 'RESTRICTED', color: ZONE_COLORS.RESTRICTED, dwell_alert_seconds: 0, is_active: true,
-          points: [{ x: 380, y: 160 }, { x: 540, y: 160 }, { x: 540, y: 380 }, { x: 380, y: 380 }] },
-        { id: 2, name: 'Boarding Gate Lounge A', type: 'DWELL', color: ZONE_COLORS.DWELL, dwell_alert_seconds: 900, is_active: true,
-          points: [{ x: 600, y: 120 }, { x: 800, y: 120 }, { x: 800, y: 320 }, { x: 600, y: 320 }] },
-        { id: 3, name: 'Boarding Gate Lounge B', type: 'DWELL', color: ZONE_COLORS.DWELL, dwell_alert_seconds: 900, is_active: true,
-          points: [{ x: 600, y: 380 }, { x: 800, y: 380 }, { x: 800, y: 560 }, { x: 600, y: 560 }] },
-        { id: 4, name: 'Airside Restricted', type: 'RESTRICTED', color: ZONE_COLORS.RESTRICTED, dwell_alert_seconds: 0, is_active: true,
-          points: [{ x: 880, y: 100 }, { x: 1060, y: 100 }, { x: 1060, y: 620 }, { x: 880, y: 620 }] },
-        { id: 5, name: 'Duty-Free Retail', type: 'LOUNGE', color: ZONE_COLORS.LOUNGE, dwell_alert_seconds: 1800, is_active: true,
-          points: [{ x: 480, y: 100 }, { x: 600, y: 100 }, { x: 600, y: 280 }, { x: 480, y: 280 }] },
-        { id: 6, name: 'Entry Tripwire North', type: 'TRIPWIRE', color: ZONE_COLORS.TRIPWIRE, dwell_alert_seconds: 0, is_active: true,
-          points: [{ x: 95, y: 60 }, { x: 175, y: 60 }, { x: 175, y: 200 }, { x: 95, y: 200 }] },
-        { id: 7, name: 'Entry Tripwire South', type: 'TRIPWIRE', color: ZONE_COLORS.TRIPWIRE, dwell_alert_seconds: 0, is_active: true,
-          points: [{ x: 95, y: 480 }, { x: 175, y: 480 }, { x: 175, y: 660 }, { x: 95, y: 660 }] },
-        { id: 8, name: 'Baggage Claim', type: 'DWELL', color: ZONE_COLORS.DWELL, dwell_alert_seconds: 1200, is_active: true,
-          points: [{ x: 750, y: 280 }, { x: 900, y: 280 }, { x: 900, y: 440 }, { x: 750, y: 440 }] },
-      ]);
-      // Terminal walls — ATS Complex Alpha-1 layout
-      setWalls([
-        { id: 101, startX: 100, startY: 100, endX: 1080, endY: 100, thickness: 7, color: WALL_COLOR, label: 'North Perimeter' },
-        { id: 102, startX: 100, startY: 100, endX: 100,  endY: 660, thickness: 7, color: WALL_COLOR, label: 'West Perimeter' },
-        { id: 103, startX: 1080, startY: 100, endX: 1080, endY: 660, thickness: 7, color: WALL_COLOR, label: 'East Perimeter' },
-        { id: 104, startX: 100, startY: 660, endX: 1080, endY: 660, thickness: 7, color: WALL_COLOR, label: 'South Perimeter' },
-        // Security division wall
-        { id: 105, startX: 380, startY: 100, endX: 380, endY: 380, thickness: 5, color: WALL_COLOR, label: 'Security Wall N' },
-        { id: 106, startX: 380, startY: 460, endX: 380, endY: 660, thickness: 5, color: WALL_COLOR, label: 'Security Wall S' },
-        // Airside partition
-        { id: 107, startX: 870, startY: 100, endX: 870, endY: 660, thickness: 5, color: WALL_COLOR, label: 'Airside Wall' },
-        // NVR/Switch room
-        { id: 108, startX: 100, startY: 100, endX: 200, endY: 100, thickness: 4, color: WALL_COLOR, label: 'Server Room N' },
-        { id: 109, startX: 200, startY: 100, endX: 200, endY: 180, thickness: 4, color: WALL_COLOR, label: 'Server Room E' },
-        { id: 110, startX: 100, startY: 180, endX: 200, endY: 180, thickness: 4, color: WALL_COLOR, label: 'Server Room S' },
-      ]);
-      setArchElements([
-        { id: 201, type: 'DOOR', x: 380, y: 425, width: 44, rotation: 0, label: 'Security Gate', openDirection: 'RIGHT' },
-        { id: 202, type: 'DOOR', x: 150, y: 100, width: 44, rotation: 90, label: 'Entry North', openDirection: 'RIGHT' },
-        { id: 203, type: 'DOOR', x: 150, y: 660, width: 44, rotation: 90, label: 'Entry South', openDirection: 'LEFT' },
-        { id: 204, type: 'DOOR', x: 870, y: 360, width: 44, rotation: 0, label: 'Airside Gate', openDirection: 'RIGHT' },
-        { id: 205, type: 'ELEVATOR', x: 140, y: 155, width: 30, rotation: 0, label: 'Elev A' },
-        { id: 206, type: 'STAIRS', x: 1040, y: 620, width: 40, rotation: 0, label: 'Emergency Exit' },
-        { id: 207, type: 'COLUMN', x: 550, y: 380, width: 18, rotation: 0, label: 'Col-1' },
-        { id: 208, type: 'COLUMN', x: 780, y: 380, width: 18, rotation: 0, label: 'Col-2' },
-        { id: 209, type: 'WINDOW', x: 590, y: 100, width: 80, rotation: 0, label: 'Window A' },
-        { id: 210, type: 'WINDOW', x: 730, y: 100, width: 80, rotation: 0, label: 'Window B' },
-      ]);
+      // Demo fallback — Airport Authority of India, ALPHA-2 Block
+      const floorKey = activeFloor as 0 | 1 | 2;
+      const floorData = ALPHA2_FLOOR_DATA[floorKey] ?? ALPHA2_FLOOR_DATA[0];
+      setPlacedCams(floorData.cams);
+      setDrawnZones(floorData.zones);
+      setWalls(floorData.walls);
+      setArchElements(floorData.arches);
       setIsDirty(false);
     }
     clearSelections();
@@ -1387,21 +1418,6 @@ export default function LayoutEditor() {
         ctx.fillText(`● ${unknownCount} Unknown`, 118, 700);
         ctx.fillStyle = '#ffffff';
         ctx.fillText(`${activeTracks.length} Total`, 220, 693);
-      } else {
-        // Fallback to simulated passenger flow
-        for (let i = 0; i < 18; i++) {
-          const seed = (i * 137 + activeFloor * 31) % 1000;
-          const x = (seed % 900) + 150;
-          const y = ((seed * 3) % 500) + 150;
-          const isAlert = i % 11 === 0;
-          ctx.beginPath();
-          ctx.arc(x, y, 4, 0, Math.PI * 2);
-          ctx.fillStyle = isAlert ? 'var(--red)' : 'var(--cyan)';
-          ctx.fill();
-          ctx.strokeStyle = 'rgba(0,0,0,0.5)';
-          ctx.lineWidth = 1;
-          ctx.stroke();
-        }
       }
     }
 
@@ -2624,8 +2640,6 @@ export default function LayoutEditor() {
             }}>
               {activeFloorLabel} Blueprint
             </div>
-
-
 
             <canvas
               ref={canvasRef}
