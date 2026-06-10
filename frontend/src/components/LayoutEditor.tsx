@@ -283,6 +283,11 @@ export default function LayoutEditor() {
   const [pxPerFoot, setPxPerFoot] = useState(20);
   const [snapToGrid, setSnapToGrid] = useState(true);
   const [showDimensions, setShowDimensions] = useState(true);
+  const [floorPlanOpacity, setFloorPlanOpacity] = useState(0.35);
+  const [showFloorPlan, setShowFloorPlan] = useState(true);
+  const [floorPlanVersion, setFloorPlanVersion] = useState(0);
+  const floorPlanImgRef = useRef<HTMLImageElement | null>(null);
+  const floorPlanLoadedRef = useRef<string>('');
 
   // Camera Drag State
   const [draggedCamId, setDraggedCamId] = useState<number | null>(null);
@@ -1094,6 +1099,34 @@ export default function LayoutEditor() {
     ctx.translate(panX, panY);
     ctx.scale(zoom, zoom);
 
+    // 0. Floor Plan Background Image
+    const floorPlanSrc = activeFloor === 0
+      ? '/floorplans/alpha2-1.png'
+      : activeFloor === 1
+      ? '/floorplans/alpha2-2.png'
+      : '/floorplans/alpha2-3.png';
+
+    const drawFloorPlan = (img: HTMLImageElement) => {
+      if (!showFloorPlan) return;
+      // Fit the plan into the building perimeter: x=80..1120, y=80..720 (1040×640)
+      const destX = 80, destY = 80, destW = 1040, destH = 640;
+      ctx.globalAlpha = floorPlanOpacity;
+      ctx.drawImage(img, destX, destY, destW, destH);
+      ctx.globalAlpha = 1;
+    };
+
+    if (floorPlanLoadedRef.current === floorPlanSrc && floorPlanImgRef.current) {
+      drawFloorPlan(floorPlanImgRef.current);
+    } else {
+      const img = new Image();
+      img.onload = () => {
+        floorPlanImgRef.current = img;
+        floorPlanLoadedRef.current = floorPlanSrc;
+        setFloorPlanVersion(v => v + 1); // triggers re-render with image ready
+      };
+      img.src = floorPlanSrc;
+    }
+
     // 1. Professional Blueprint Grid
     ctx.strokeStyle = 'rgba(0, 240, 255, 0.05)';
     ctx.lineWidth = 1;
@@ -1599,7 +1632,7 @@ export default function LayoutEditor() {
     }
 
     ctx.restore();
-  }, [placedCams, drawnZones, selectedCam, selectedZone, selectedWall, selectedArch, zoom, panX, panY, drawingZone, zoneType, tool, activeFloor, liveTracks, walls, archElements, drawingWall, wallPreviewEnd, pxPerFoot, measureUnit, showDimensions, getFloorBounds, isSimulatorActive, simulatorAgents]);
+  }, [placedCams, drawnZones, selectedCam, selectedZone, selectedWall, selectedArch, zoom, panX, panY, drawingZone, zoneType, tool, activeFloor, liveTracks, walls, archElements, drawingWall, wallPreviewEnd, pxPerFoot, measureUnit, showDimensions, getFloorBounds, isSimulatorActive, simulatorAgents, floorPlanOpacity, showFloorPlan, floorPlanVersion]);
 
 
 
@@ -2750,6 +2783,27 @@ export default function LayoutEditor() {
                   <span className="toggle-slider" />
                 </label>
               </div>
+              <div className="scale-config-row" style={{ borderTop: '1px solid rgba(0,240,255,0.1)', paddingTop: 8, marginTop: 4 }}>
+                <span className="scale-config-label">Floor Plan</span>
+                <label className="toggle-switch">
+                  <input type="checkbox" checked={showFloorPlan} onChange={(e) => setShowFloorPlan(e.target.checked)} />
+                  <span className="toggle-slider" />
+                </label>
+              </div>
+              {showFloorPlan && (
+                <div className="scale-config-row" style={{ flexDirection: 'column', alignItems: 'stretch', gap: 4 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span className="scale-config-label" style={{ fontSize: 10, opacity: 0.7 }}>Opacity</span>
+                    <span style={{ fontSize: 10, color: '#00f0ff', fontWeight: 700 }}>{Math.round(floorPlanOpacity * 100)}%</span>
+                  </div>
+                  <input
+                    type="range" min="0" max="1" step="0.05"
+                    value={floorPlanOpacity}
+                    onChange={(e) => setFloorPlanOpacity(parseFloat(e.target.value))}
+                    style={{ width: '100%', accentColor: '#00f0ff', cursor: 'pointer' }}
+                  />
+                </div>
+              )}
             </div>
           </div>
           </>)}
