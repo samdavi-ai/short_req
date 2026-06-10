@@ -433,6 +433,9 @@ export default function LayoutEditor() {
           activeSiteId, activeBuildingId,
           setSites, setBuildings, setActiveSite, setActiveBuilding } = useStore();
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const floorPlanImgRef = useRef<HTMLImageElement | null>(null);
+  const floorPlanLoadedRef = useRef<string>('');
+  const [floorPlanVersion, setFloorPlanVersion] = useState(0);
   const campusCanvasRef = useRef<HTMLCanvasElement>(null);
   const canvasAreaRef = useRef<HTMLDivElement>(null);
   const [canvasSize, setCanvasSize] = useState({ width: 1200, height: 800 });
@@ -639,9 +642,9 @@ export default function LayoutEditor() {
   }, []);
 
   const clampToFloorBounds = useCallback((x: number, y: number, radius = 12) => {
-    const b = getFloorBounds(canvasSize.width, canvasSize.height);
+    const b = getFloorBounds(1200, 800);
     return clampToFloorBoundsShared(x, y, b, radius);
-  }, [canvasSize.width, canvasSize.height, getFloorBounds]);
+  }, [getFloorBounds]);
 
   // Apply grid snapping
   const snapPos = useCallback((x: number, y: number): { x: number; y: number } => {
@@ -1285,12 +1288,40 @@ export default function LayoutEditor() {
     if (!ctx) return;
 
     ctx.setTransform(1, 0, 0, 1, 0, 0);
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
     ctx.save();
     ctx.translate(panX, panY);
     ctx.scale(zoom, zoom);
 
-    // 0. Coverage Heatmap (Blind Spot Detection)
+    // 0. Floor Plan Background Image
+    const floorPlanSrc = activeFloor === 0
+      ? '/floorplans/alpha2-1.png'
+      : activeFloor === 1
+      ? '/floorplans/alpha2-2.png'
+      : '/floorplans/alpha2-3.png';
+
+    const drawFloorPlan = (img: HTMLImageElement) => {
+      const destX = 80, destY = 80, destW = 1040, destH = 640;
+      ctx.save();
+      ctx.globalAlpha = 0.95;
+      ctx.drawImage(img, destX, destY, destW, destH);
+      ctx.restore();
+    };
+
+    if (floorPlanLoadedRef.current === floorPlanSrc && floorPlanImgRef.current) {
+      drawFloorPlan(floorPlanImgRef.current);
+    } else {
+      const img = new Image();
+      img.onload = () => {
+        floorPlanImgRef.current = img;
+        floorPlanLoadedRef.current = floorPlanSrc;
+        setFloorPlanVersion(v => v + 1);
+      };
+      img.src = floorPlanSrc;
+    }
+
+    // 0.5. Coverage Heatmap (Blind Spot Detection)
     if (showCoverageHeatmap) {
       // Draw semi-transparent red over the entire building footprint (representing blind spots by default)
       ctx.fillStyle = 'rgba(239, 68, 68, 0.08)'; // nice soft red for blind spots
@@ -1320,7 +1351,7 @@ export default function LayoutEditor() {
     }
 
     // 1. Professional Blueprint Grid
-    ctx.strokeStyle = 'rgba(0, 240, 255, 0.05)';
+    ctx.strokeStyle = 'rgba(0, 0, 0, 0.04)';
     ctx.lineWidth = 1;
     for (let x = 0; x < canvas.width; x += 50) {
       ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, canvas.height); ctx.stroke();
@@ -1329,7 +1360,7 @@ export default function LayoutEditor() {
       ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(canvas.width, y); ctx.stroke();
     }
     // Major grid lines
-    ctx.strokeStyle = 'rgba(0, 240, 255, 0.1)';
+    ctx.strokeStyle = 'rgba(0, 0, 0, 0.08)';
     for (let x = 0; x < canvas.width; x += 250) {
       ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, canvas.height); ctx.stroke();
     }
@@ -1350,19 +1381,19 @@ export default function LayoutEditor() {
 
     // Security Gates / Scanners label (if demo security walls exist)
     if (walls.some(w => w.label === 'Security Wall N') && walls.some(w => w.label === 'Security Wall S')) {
-      ctx.fillStyle = 'rgba(0, 240, 255, 0.05)';
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.03)';
       const gateW = Math.max(24, Math.floor(floorWidth * 0.04));
       const gateH = Math.max(80, Math.floor(floorHeight * 0.26));
       const gateX = floorBounds.left + floorWidth * 0.3;
       const gateY = floorCenterY - gateH / 2;
       ctx.fillRect(gateX, gateY, gateW, gateH);
-      ctx.fillStyle = 'rgba(255, 255, 255, 0.2)';
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.35)';
       ctx.font = '8px Outfit'; ctx.textAlign = 'center';
       ctx.fillText('X-RAY SCANNERS', gateX + gateW / 2, gateY + gateH / 2);
     }
 
     // Architectural Labels
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.15)';
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.08)';
     const titleSize = Math.max(18, Math.min(32, Math.floor(floorWidth * 0.04)));
     ctx.font = `bold ${titleSize}px Outfit`;
     ctx.textAlign = 'center';
@@ -1388,19 +1419,19 @@ export default function LayoutEditor() {
       ctx.fill();
 
       const isSelected = selectedZone === zone.id;
-      ctx.strokeStyle = isSelected ? '#ffffff' : (zone.color + 'aa');
+      ctx.strokeStyle = isSelected ? '#f59e0b' : (zone.color + 'aa');
       ctx.lineWidth = isSelected ? 4 : 2;
       ctx.setLineDash([]);
       ctx.stroke();
 
       const cx = zone.points.reduce((s, p) => s + p.x, 0) / zone.points.length;
       const cy = zone.points.reduce((s, p) => s + p.y, 0) / zone.points.length;
-      ctx.fillStyle = isSelected ? '#ffffff' : zone.color;
+      ctx.fillStyle = isSelected ? '#000000' : zone.color;
       ctx.font = 'bold 11px Outfit, sans-serif';
       ctx.textAlign = 'center';
       ctx.fillText(zone.name, cx, cy - 6);
       ctx.font = '10px Inter, sans-serif';
-      ctx.fillStyle = isSelected ? 'rgba(255,255,255,0.7)' : (zone.color + 'aa');
+      ctx.fillStyle = isSelected ? 'rgba(0,0,0,0.6)' : (zone.color + 'aa');
       ctx.fillText(zone.type, cx, cy + 8);
     });
 
@@ -1823,7 +1854,7 @@ export default function LayoutEditor() {
       }
     }
 
-  }, [placedCams, drawnZones, selectedCam, selectedZone, selectedWall, selectedArch, zoom, panX, panY, drawingZone, zoneType, tool, activeFloor, liveTracks, walls, archElements, drawingWall, wallPreviewEnd, pxPerFoot, measureUnit, showDimensions, getFloorBounds, isSimulatorActive, simulatorAgents, showCoverageHeatmap]);
+  }, [placedCams, drawnZones, selectedCam, selectedZone, selectedWall, selectedArch, zoom, panX, panY, drawingZone, zoneType, tool, activeFloor, liveTracks, walls, archElements, drawingWall, wallPreviewEnd, pxPerFoot, measureUnit, showDimensions, getFloorBounds, isSimulatorActive, simulatorAgents, showCoverageHeatmap, floorPlanVersion]);
 
 
 
@@ -3028,11 +3059,9 @@ export default function LayoutEditor() {
           <div style={{ 
             width: '100%', height: '100%', 
             position: 'relative', 
-            background: 'rgba(10, 10, 15, 0.4)', 
-            backdropFilter: 'blur(24px)', 
-            WebkitBackdropFilter: 'blur(24px)',
+            background: '#ffffff', 
             borderRadius: 'var(--radius-xl)', 
-            border: '1px solid var(--border)',
+            border: '1px solid #e2e8f0',
             overflow: 'hidden',
             boxShadow: 'var(--shadow-lg)'
           }}>
@@ -3080,7 +3109,7 @@ export default function LayoutEditor() {
             <div style={{
               position: 'absolute', top: 20, left: 24, zIndex: 10,
               fontFamily: 'Outfit, sans-serif', fontSize: 24, fontWeight: 800, 
-              color: 'var(--white)', textShadow: '0 2px 10px rgba(0,0,0,0.8)'
+              color: '#0f172a'
             }}>
               {activeFloorLabel} Blueprint
             </div>

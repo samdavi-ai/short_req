@@ -24,9 +24,9 @@ export function drawWallOnCanvas(
   ctx.lineTo(endX - nx * halfT, endY - ny * halfT);
   ctx.lineTo(startX - nx * halfT, startY - ny * halfT);
   ctx.closePath();
-  ctx.fillStyle = isSelected ? 'rgba(0, 240, 255, 0.25)' : 'rgba(30, 41, 59, 0.7)';
+  ctx.fillStyle = isSelected ? 'rgba(245, 158, 11, 0.15)' : 'rgba(30, 41, 59, 0.05)';
   ctx.fill();
-  ctx.strokeStyle = isSelected ? '#f59e0b' : 'rgba(0, 240, 255, 0.6)';
+  ctx.strokeStyle = isSelected ? '#f59e0b' : '#000000';
   ctx.lineWidth = isSelected ? 2.5 : 2;
   ctx.stroke();
 
@@ -69,12 +69,12 @@ export function drawWallOnCanvas(
     ctx.textAlign = 'center';
     ctx.textBaseline = 'bottom';
     const tw = ctx.measureText(label).width + 12;
-    ctx.fillStyle = 'rgba(0,0,0,0.75)';
+    ctx.fillStyle = 'rgba(0,0,0,0.85)';
     ctx.fillRect(-tw / 2, -22, tw, 16);
-    ctx.strokeStyle = isSelected ? '#f59e0b44' : 'rgba(255,255,255,0.15)';
+    ctx.strokeStyle = isSelected ? '#f59e0b44' : 'rgba(0,0,0,0.15)';
     ctx.lineWidth = 1;
     ctx.strokeRect(-tw / 2, -22, tw, 16);
-    ctx.fillStyle = isSelected ? '#f59e0b' : 'rgba(255,255,255,0.8)';
+    ctx.fillStyle = isSelected ? '#f59e0b' : 'rgba(255,255,255,0.95)';
     ctx.fillText(label, 0, -9);
     ctx.restore();
   }
@@ -90,8 +90,8 @@ export function drawArchElement(
   ctx.rotate((el.rotation * Math.PI) / 180);
 
   const w = el.width;
-  const accent = isSelected ? '#f59e0b' : '#00f0ff';
-  const fillA = isSelected ? 'rgba(245,158,11,0.25)' : 'rgba(0,240,255,0.12)';
+  const accent = isSelected ? '#f59e0b' : '#1e293b';
+  const fillA = isSelected ? 'rgba(245,158,11,0.2)' : 'rgba(30,41,59,0.05)';
 
   switch (el.type) {
     case 'DOOR': {
