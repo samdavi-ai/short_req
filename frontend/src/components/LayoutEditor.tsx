@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import {
   Camera, Trash2, Plus, Save, RotateCcw, ZoomIn, ZoomOut, MapPin,
   Info, X, Ruler, Move, Maximize2
@@ -119,33 +119,33 @@ const DEMO_BUILDINGS: Building[] = [
 // ── Alpha-2 Area A (Intermediate Floor) Cameras ──────────────────────────────
 // CMS Room, CHS Executives, Radio Interface, Automation Servers, Cyber TAC, etc.
 const ALPHA2_AREA_A_CAMERAS = [
-  { id: 9101, name: 'CAM-AA-01 · CMS Room A',          location: 'CMS Room — Server Rack A',            x: 155, y: 310, angle:  90, fov:  60, status: 'ACTIVE' as const, is_overhead: false },
-  { id: 9102, name: 'CAM-AA-02 · CMS Room B',          location: 'CMS Room — Server Rack B',            x: 275, y: 310, angle: 270, fov:  60, status: 'ACTIVE' as const, is_overhead: false },
-  { id: 9103, name: 'CAM-AA-03 · Commercial Entry',    location: 'Commercial Zone — Entry',             x: 120, y: 100, angle: 135, fov:  80, status: 'ACTIVE' as const, is_overhead: false },
-  { id: 9104, name: 'CAM-AA-04 · CHS Exec Corridor',   location: 'CHS Executive Room — Corridor',       x: 720, y: 200, angle: 180, fov:  90, status: 'ACTIVE' as const, is_overhead: true  },
-  { id: 9105, name: 'CAM-AA-05 · CHS Exec Interior',   location: 'CHS Executive — Interior',            x: 730, y: 390, angle: 180, fov: 100, status: 'ACTIVE' as const, is_overhead: true  },
-  { id: 9106, name: 'CAM-AA-06 · Radio Interface',     location: 'Radio/ACO Interface Room',            x: 500, y: 390, angle: 270, fov:  80, status: 'ACTIVE' as const, is_overhead: false },
-  { id: 9107, name: 'CAM-AA-07 · Automation Svr W',    location: 'Automation Server Room (AMS) — West', x: 200, y: 595, angle: 270, fov: 110, status: 'ACTIVE' as const, is_overhead: true  },
-  { id: 9108, name: 'CAM-AA-08 · Automation Svr E',    location: 'Automation Server Room (AMS) — East', x: 520, y: 595, angle: 270, fov: 110, status: 'ACTIVE' as const, is_overhead: true  },
-  { id: 9109, name: 'CAM-AA-09 · Cyber Security TAC',  location: 'Cyber Security & AMS TAC Room',       x: 350, y: 610, angle: 270, fov:  90, status: 'ACTIVE' as const, is_overhead: false },
-  { id: 9110, name: 'CAM-AA-10 · UHF/VCS Room',        location: 'UHF/VCS/Data/GTR Room',               x: 660, y: 595, angle: 270, fov:  80, status: 'ACTIVE' as const, is_overhead: false },
-  { id: 9111, name: 'CAM-AA-11 · Battery Room',        location: 'UPS Battery Room (Area A)',           x: 810, y: 595, angle: 270, fov:  80, status: 'ACTIVE' as const, is_overhead: false },
-  { id: 9112, name: 'CAM-AA-12 · Fallback Servers',    location: 'Fallback Servers Room',               x: 990, y: 595, angle: 180, fov:  70, status: 'ACTIVE' as const, is_overhead: false },
+  { id: 9101, name: 'CAM-AA-01 · CMS Room A',          location: 'CMS Room — Server Rack A',            x:  90, y: 310, angle:  45, fov: 120, status: 'ACTIVE' as const, is_overhead: false },
+  { id: 9102, name: 'CAM-AA-02 · CMS Room B',          location: 'CMS Room — Server Rack B',            x: 330, y: 480, angle: 225, fov: 120, status: 'ACTIVE' as const, is_overhead: false },
+  { id: 9103, name: 'CAM-AA-03 · Commercial Entry',    location: 'Commercial Zone — Entry',             x:  90, y:  90, angle:  45, fov: 120, status: 'ACTIVE' as const, is_overhead: false },
+  { id: 9104, name: 'CAM-AA-04 · CHS Exec Corridor',   location: 'CHS Executive Room — Corridor',       x: 630, y:  90, angle:  45, fov: 120, status: 'ACTIVE' as const, is_overhead: true  },
+  { id: 9105, name: 'CAM-AA-05 · CHS Exec Interior',   location: 'CHS Executive — Interior',            x: 850, y: 290, angle: 225, fov: 120, status: 'ACTIVE' as const, is_overhead: true  },
+  { id: 9106, name: 'CAM-AA-06 · Radio Interface',     location: 'Radio/ACO Interface Room',            x: 350, y: 310, angle:  45, fov: 120, status: 'ACTIVE' as const, is_overhead: false },
+  { id: 9107, name: 'CAM-AA-07 · Automation Svr W',    location: 'Automation Server Room (AMS) — West', x:  90, y: 710, angle:  45, fov: 120, status: 'ACTIVE' as const, is_overhead: true  },
+  { id: 9108, name: 'CAM-AA-08 · Automation Svr E',    location: 'Automation Server Room (AMS) — East', x: 580, y: 710, angle: 315, fov: 120, status: 'ACTIVE' as const, is_overhead: true  },
+  { id: 9109, name: 'CAM-AA-09 · Cyber Security TAC',  location: 'Cyber Security & AMS TAC Room',       x: 260, y: 500, angle:  90, fov: 120, status: 'ACTIVE' as const, is_overhead: false },
+  { id: 9110, name: 'CAM-AA-10 · UHF/VCS Room',        location: 'UHF/VCS/Data/GTR Room',               x: 580, y: 500, angle:  90, fov: 120, status: 'ACTIVE' as const, is_overhead: false },
+  { id: 9111, name: 'CAM-AA-11 · Battery Room',        location: 'UPS Battery Room (Area A)',           x: 730, y: 710, angle: 315, fov: 120, status: 'ACTIVE' as const, is_overhead: false },
+  { id: 9112, name: 'CAM-AA-12 · Fallback Servers',    location: 'Fallback Servers Room',               x: 1110, y: 710, angle: 135, fov: 120, status: 'ACTIVE' as const, is_overhead: false },
 ];
 
 // ── Alpha-2 First Floor Cameras ──────────────────────────────────────────────
 // ACC Rooms (4 bays), STM Room, WSO, APP Room, Training, Recreation
 const ALPHA2_FF_CAMERAS = [
-  { id: 9201, name: 'CAM-FF-01 · ACC Bay 1',         location: 'Access Control Center — Bay 1',  x: 280, y: 550, angle: 270, fov: 110, status: 'ACTIVE' as const, is_overhead: true  },
-  { id: 9202, name: 'CAM-FF-02 · ACC Bay 2',         location: 'Access Control Center — Bay 2',  x: 460, y: 550, angle: 270, fov: 110, status: 'ACTIVE' as const, is_overhead: true  },
-  { id: 9203, name: 'CAM-FF-03 · ACC Bay 3',         location: 'Access Control Center — Bay 3',  x: 640, y: 550, angle: 270, fov: 110, status: 'ACTIVE' as const, is_overhead: true  },
-  { id: 9204, name: 'CAM-FF-04 · ACC Bay 4 (WSO)',   location: 'Access Control Center — Bay 4',  x: 810, y: 550, angle: 270, fov: 110, status: 'ACTIVE' as const, is_overhead: true  },
-  { id: 9205, name: 'CAM-FF-05 · STM Room',          location: 'STM Telecom Room',               x: 135, y: 550, angle: 270, fov:  80, status: 'ACTIVE' as const, is_overhead: false },
-  { id: 9206, name: 'CAM-FF-06 · APP Room',          location: 'APP / WSO Operations Room',      x: 990, y: 550, angle: 180, fov:  70, status: 'ACTIVE' as const, is_overhead: false },
-  { id: 9207, name: 'CAM-FF-07 · Training Corridor', location: 'Training Room Corridor',         x: 360, y: 200, angle: 180, fov:  90, status: 'ACTIVE' as const, is_overhead: true  },
-  { id: 9208, name: 'CAM-FF-08 · Staircase',         location: 'First Floor — Staircase',        x: 165, y: 210, angle: 135, fov:  70, status: 'ACTIVE' as const, is_overhead: false },
-  { id: 9209, name: 'CAM-FF-09 · Recreation Room',   location: 'Recreation Room',                x: 835, y: 200, angle: 180, fov:  90, status: 'ACTIVE' as const, is_overhead: true  },
-  { id: 9210, name: 'CAM-FF-10 · First Floor Entry', location: 'First Floor — Main Entry',       x: 120, y:  95, angle: 135, fov:  80, status: 'ACTIVE' as const, is_overhead: false },
+  { id: 9201, name: 'CAM-FF-01 · ACC Bay 1',         location: 'Access Control Center — Bay 1',  x: 195, y: 710, angle:  45, fov: 120, status: 'ACTIVE' as const, is_overhead: true  },
+  { id: 9202, name: 'CAM-FF-02 · ACC Bay 2',         location: 'Access Control Center — Bay 2',  x: 375, y: 710, angle:  45, fov: 120, status: 'ACTIVE' as const, is_overhead: true  },
+  { id: 9203, name: 'CAM-FF-03 · ACC Bay 3',         location: 'Access Control Center — Bay 3',  x: 555, y: 710, angle:  45, fov: 120, status: 'ACTIVE' as const, is_overhead: true  },
+  { id: 9204, name: 'CAM-FF-04 · ACC Bay 4 (WSO)',   location: 'Access Control Center — Bay 4',  x: 735, y: 710, angle:  45, fov: 120, status: 'ACTIVE' as const, is_overhead: true  },
+  { id: 9205, name: 'CAM-FF-05 · STM Room',          location: 'STM Telecom Room',               x:  90, y: 710, angle:  45, fov: 120, status: 'ACTIVE' as const, is_overhead: false },
+  { id: 9206, name: 'CAM-FF-06 · APP Room',          location: 'APP / WSO Operations Room',      x: 1110, y: 710, angle: 135, fov: 120, status: 'ACTIVE' as const, is_overhead: false },
+  { id: 9207, name: 'CAM-FF-07 · Training Corridor', location: 'Training Room Corridor',         x: 450, y: 370, angle: 225, fov: 120, status: 'ACTIVE' as const, is_overhead: true  },
+  { id: 9208, name: 'CAM-FF-08 · Staircase',         location: 'First Floor — Staircase',        x:  90, y:  90, angle:  45, fov: 120, status: 'ACTIVE' as const, is_overhead: false },
+  { id: 9209, name: 'CAM-FF-09 · Recreation Room',   location: 'Recreation Room',                x: 915, y: 370, angle: 225, fov: 120, status: 'ACTIVE' as const, is_overhead: true  },
+  { id: 9210, name: 'CAM-FF-10 · First Floor Entry', location: 'First Floor — Main Entry',       x: 270, y:  90, angle: 135, fov: 120, status: 'ACTIVE' as const, is_overhead: false },
 ];
 
 
@@ -173,6 +173,132 @@ const distToSegment = distToSegmentShared;
 const drawWallOnCanvas = drawWallOnCanvasShared;
 const drawArchElement = drawArchElementShared;
 
+const CAMERA_RANGE = 200;
+
+interface SurveillanceStreamProps {
+  cameraId: number;
+  cameraName: string;
+  location: string;
+  width?: number;
+  height?: number;
+}
+
+export function SurveillanceCCTVStream({ cameraId, cameraName, location, width = 640, height = 360 }: SurveillanceStreamProps) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    let animId: number;
+    let frameCount = 0;
+
+    const targets = [
+      { id: Math.floor(Math.random() * 50) + 10, x: 50 + Math.random() * 50, y: 50 + Math.random() * 50, vx: 1.0 + Math.random() * 0.5, vy: 0.8 + Math.random() * 0.5, w: 40, h: 90, name: 'PERSON', conf: 0.95 + Math.random() * 0.04 },
+      { id: Math.floor(Math.random() * 50) + 60, x: 180 + Math.random() * 50, y: 70 + Math.random() * 50, vx: -0.8 - Math.random() * 0.5, vy: 1.0 + Math.random() * 0.5, w: 45, h: 95, name: 'PERSON', conf: 0.94 + Math.random() * 0.05 }
+    ];
+
+    const draw = () => {
+      frameCount++;
+      ctx.fillStyle = '#05070a';
+      ctx.fillRect(0, 0, width, height);
+
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.015)';
+      ctx.lineWidth = 1;
+      for (let y = 0; y < height; y += 4) {
+        ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(width, y); ctx.stroke();
+      }
+
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.025)';
+      for (let i = 0; i < 15; i++) {
+        const nx = Math.random() * width;
+        const ny = Math.random() * height;
+        const nw = Math.random() * 60 + 10;
+        ctx.fillRect(nx, ny, nw, 1);
+      }
+
+      targets.forEach(t => {
+        t.x += t.vx;
+        t.y += t.vy;
+        if (t.x < 10 || t.x + t.w > width - 10) t.vx *= -1;
+        if (t.y < 15 || t.y + t.h > height - 10) t.vy *= -1;
+
+        ctx.strokeStyle = '#22c55e';
+        ctx.lineWidth = 1.5;
+        ctx.strokeRect(t.x, t.y, t.w, t.h);
+
+        ctx.fillStyle = 'rgba(34, 197, 94, 0.9)';
+        ctx.fillRect(t.x, t.y - 14, t.w, 14);
+
+        ctx.fillStyle = '#ffffff';
+        ctx.font = 'bold 8px monospace';
+        ctx.textAlign = 'left';
+        ctx.fillText(`ID:${t.id} ${Math.round(t.conf * 100)}%`, t.x + 2, t.y - 4);
+      });
+
+      const isRedBlink = Math.floor(frameCount / 30) % 2 === 0;
+      ctx.fillStyle = isRedBlink ? '#ef4444' : 'rgba(239, 68, 68, 0.2)';
+      ctx.beginPath(); ctx.arc(20, 20, 5, 0, Math.PI * 2); ctx.fill();
+
+      ctx.fillStyle = '#ffffff';
+      ctx.font = 'bold 11px monospace';
+      ctx.textAlign = 'left';
+      ctx.fillText('REC', 32, 24);
+
+      ctx.font = '10px monospace';
+      ctx.fillStyle = 'rgba(0, 240, 255, 0.9)';
+      ctx.fillText(cameraName, 20, 42);
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
+      ctx.fillText(location, 20, 56);
+
+      const now = new Date();
+      const yr = now.getFullYear();
+      const mo = String(now.getMonth() + 1).padStart(2, '0');
+      const dy = String(now.getDate()).padStart(2, '0');
+      const hr = String(now.getHours()).padStart(2, '0');
+      const mn = String(now.getMinutes()).padStart(2, '0');
+      const sc = String(now.getSeconds()).padStart(2, '0');
+      const ms = String(now.getMilliseconds()).padStart(3, '0');
+      
+      ctx.font = '11px monospace';
+      ctx.fillStyle = '#ffffff';
+      ctx.textAlign = 'right';
+      ctx.fillText(`${yr}-${mo}-${dy} ${hr}:${mn}:${sc}.${ms}`, width - 20, 24);
+
+      ctx.font = '8px monospace';
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
+      ctx.fillText(`CCTV_ANALYTICS_V2`, width - 20, height - 10);
+
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.08)';
+      ctx.lineWidth = 1;
+      const cx = width / 2;
+      const cy = height / 2;
+      ctx.beginPath();
+      ctx.moveTo(cx - 15, cy); ctx.lineTo(cx + 15, cy);
+      ctx.moveTo(cx, cy - 15); ctx.lineTo(cx, cy + 15);
+      ctx.stroke();
+
+      animId = requestAnimationFrame(draw);
+    };
+
+    draw();
+
+    return () => {
+      cancelAnimationFrame(animId);
+    };
+  }, [cameraId, cameraName, location, width, height]);
+
+  return (
+    <canvas 
+      ref={canvasRef} 
+      width={width} 
+      height={height} 
+      style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+    />
+  );
+}
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 
@@ -283,11 +409,68 @@ export default function LayoutEditor() {
   const [pxPerFoot, setPxPerFoot] = useState(20);
   const [snapToGrid, setSnapToGrid] = useState(true);
   const [showDimensions, setShowDimensions] = useState(true);
-  const [floorPlanOpacity, setFloorPlanOpacity] = useState(0.35);
-  const [showFloorPlan, setShowFloorPlan] = useState(true);
-  const [floorPlanVersion, setFloorPlanVersion] = useState(0);
-  const floorPlanImgRef = useRef<HTMLImageElement | null>(null);
-  const floorPlanLoadedRef = useRef<string>('');
+  const [showCoverageHeatmap, setShowCoverageHeatmap] = useState(true);
+  const [hoveredCamId, setHoveredCamId] = useState<number | null>(null);
+
+  const coveragePercentage = useMemo(() => {
+    if (placedCams.length === 0) return 0;
+    const activeCams = placedCams.filter(c => c.status !== 'OFFLINE');
+    if (activeCams.length === 0) return 0;
+
+    const startX = 80;
+    const endX = 1120;
+    const startY = 80;
+    const endY = 720;
+    const stepX = 26; // 40 steps across 1040px
+    const stepY = 25.6; // 25 steps across 640px
+
+    let totalPoints = 0;
+    let coveredPoints = 0;
+
+    const cams = activeCams.map(cam => {
+      const angleRad = (cam.angle * Math.PI) / 180;
+      const fovRad = (cam.fov * Math.PI) / 180;
+      return {
+        x: cam.x,
+        y: cam.y,
+        angle: angleRad,
+        halfFov: fovRad / 2,
+        rangeSq: CAMERA_RANGE * CAMERA_RANGE
+      };
+    });
+
+    for (let x = startX + stepX / 2; x < endX; x += stepX) {
+      for (let y = startY + stepY / 2; y < endY; y += stepY) {
+        totalPoints++;
+        let covered = false;
+
+        for (let i = 0; i < cams.length; i++) {
+          const c = cams[i];
+          const dx = x - c.x;
+          const dy = y - c.y;
+          const distSq = dx * dx + dy * dy;
+
+          if (distSq <= c.rangeSq) {
+            let angleToPoint = Math.atan2(dy, dx);
+            let diff = angleToPoint - c.angle;
+            while (diff < -Math.PI) diff += Math.PI * 2;
+            while (diff > Math.PI) diff -= Math.PI * 2;
+
+            if (Math.abs(diff) <= c.halfFov) {
+              covered = true;
+              break;
+            }
+          }
+        }
+
+        if (covered) {
+          coveredPoints++;
+        }
+      }
+    }
+
+    return totalPoints > 0 ? (coveredPoints / totalPoints) * 100 : 0;
+  }, [placedCams]);
 
   // Camera Drag State
   const [draggedCamId, setDraggedCamId] = useState<number | null>(null);
@@ -411,14 +594,22 @@ export default function LayoutEditor() {
             points: [{ x: 635, y:  80 }, { x: 855, y:  80 }, { x: 855, y: 280 }, { x: 635, y: 280 }] },
           { id: 104, name: 'Storage / Legal Room', type: 'RESTRICTED', color: ZONE_COLORS.RESTRICTED, dwell_alert_seconds: 0, is_active: true,
             points: [{ x: 635, y: 440 }, { x: 760, y: 440 }, { x: 760, y: 560 }, { x: 635, y: 560 }] },
-          { id: 105, name: 'Airport Director Offices', type: 'RESTRICTED', color: ZONE_COLORS.RESTRICTED, dwell_alert_seconds: 0, is_active: true,
-            points: [{ x: 890, y:  80 }, { x: 1120, y:  80 }, { x: 1120, y: 720 }, { x: 890, y: 720 }] },
+          { id: 105, name: 'Data Office', type: 'RESTRICTED', color: ZONE_COLORS.RESTRICTED, dwell_alert_seconds: 0, is_active: true,
+            points: [{ x: 890, y:  80 }, { x: 1010, y:  80 }, { x: 1010, y: 400 }, { x: 890, y: 400 }] },
           { id: 106, name: 'Area of Stay — Waiting', type: 'DWELL', color: ZONE_COLORS.DWELL, dwell_alert_seconds: 1800, is_active: true,
             points: [{ x: 555, y: 280 }, { x: 635, y: 280 }, { x: 635, y: 440 }, { x: 555, y: 440 }] },
           { id: 107, name: 'Main Entry Tripwire', type: 'TRIPWIRE', color: ZONE_COLORS.TRIPWIRE, dwell_alert_seconds: 0, is_active: true,
             points: [{ x:  80, y:  80 }, { x: 200, y:  80 }, { x: 200, y: 140 }, { x:  80, y: 140 }] },
           { id: 108, name: 'South Exit Tripwire', type: 'TRIPWIRE', color: ZONE_COLORS.TRIPWIRE, dwell_alert_seconds: 0, is_active: true,
             points: [{ x:  80, y: 660 }, { x: 200, y: 660 }, { x: 200, y: 720 }, { x:  80, y: 720 }] },
+          { id: 109, name: 'Airport Director Offices', type: 'RESTRICTED', color: ZONE_COLORS.RESTRICTED, dwell_alert_seconds: 0, is_active: true,
+            points: [{ x: 1010, y:  80 }, { x: 1120, y:  80 }, { x: 1120, y: 400 }, { x: 1010, y: 400 }] },
+          { id: 110, name: 'AFSB Misc Office', type: 'RESTRICTED', color: ZONE_COLORS.RESTRICTED, dwell_alert_seconds: 0, is_active: true,
+            points: [{ x: 890, y: 400 }, { x: 1010, y: 400 }, { x: 1010, y: 560 }, { x: 890, y: 560 }] },
+          { id: 111, name: 'Right Toilets block', type: 'DWELL', color: ZONE_COLORS.DWELL, dwell_alert_seconds: 600, is_active: true,
+            points: [{ x: 1010, y: 400 }, { x: 1120, y: 400 }, { x: 1120, y: 560 }, { x: 1010, y: 560 }] },
+          { id: 112, name: 'Director Entry & Corridor', type: 'DWELL', color: ZONE_COLORS.DWELL, dwell_alert_seconds: 900, is_active: true,
+            points: [{ x: 890, y: 560 }, { x: 1120, y: 560 }, { x: 1120, y: 720 }, { x: 890, y: 720 }] }
         ]);
         setWalls([
           // ── Outer perimeter (41 m × 25 m @ 25 px/m, offset 80,80)
@@ -456,6 +647,8 @@ export default function LayoutEditor() {
           { id: 124, startX: 890, startY:  80, endX:  890, endY: 720, thickness: 6, color: WALL_COLOR, label: 'Director Offices West Wall'       },
           { id: 125, startX: 890, startY: 400, endX: 1120, endY: 400, thickness: 4, color: WALL_COLOR, label: 'Director Office Internal Division' },
           { id: 126, startX: 1010, startY: 80, endX: 1010, endY: 400, thickness: 4, color: WALL_COLOR, label: 'Data Office West Wall'            },
+          { id: 127, startX: 890, startY: 560, endX: 1120, endY: 560, thickness: 4, color: WALL_COLOR, label: 'Right Toilet Block divider'       },
+          { id: 128, startX: 1010, startY: 400, endX: 1010, endY: 560, thickness: 4, color: WALL_COLOR, label: 'AFSB / Toilet Divider'          },
         ]);
         setArchElements([
           { id: 201, type: 'DOOR',        x: 600, y:  80, width: 50, rotation:  90, label: 'Main Entry Gate',       openDirection: 'RIGHT' },
@@ -472,6 +665,9 @@ export default function LayoutEditor() {
           { id: 212, type: 'WINDOW',      x: 420, y:  80, width: 80, rotation:   0, label: 'Window North A'                                },
           { id: 213, type: 'WINDOW',      x: 770, y:  80, width: 80, rotation:   0, label: 'Window North B'                                },
           { id: 214, type: 'WINDOW',      x: 960, y:  80, width: 80, rotation:   0, label: 'Window North C'                                },
+          { id: 215, type: 'DOOR',        x: 890, y: 460, width: 44, rotation:   0, label: 'AFSB Office Door',      openDirection: 'RIGHT' },
+          { id: 216, type: 'DOOR',        x: 1010, y: 460, width: 44, rotation:   0, label: 'Right Restrooms Door',  openDirection: 'LEFT'  },
+          { id: 217, type: 'DOOR',        x: 890, y: 220, width: 44, rotation:   0, label: 'Data Office Door',      openDirection: 'RIGHT' },
         ]);
 
       } else if (activeFloor === 1) {
@@ -1099,32 +1295,33 @@ export default function LayoutEditor() {
     ctx.translate(panX, panY);
     ctx.scale(zoom, zoom);
 
-    // 0. Floor Plan Background Image
-    const floorPlanSrc = activeFloor === 0
-      ? '/floorplans/alpha2-1.png'
-      : activeFloor === 1
-      ? '/floorplans/alpha2-2.png'
-      : '/floorplans/alpha2-3.png';
+    // 0. Coverage Heatmap (Blind Spot Detection)
+    if (showCoverageHeatmap) {
+      // Draw semi-transparent red over the entire building footprint (representing blind spots by default)
+      ctx.fillStyle = 'rgba(239, 68, 68, 0.08)'; // nice soft red for blind spots
+      ctx.fillRect(80, 80, 1040, 640);
 
-    const drawFloorPlan = (img: HTMLImageElement) => {
-      if (!showFloorPlan) return;
-      // Fit the plan into the building perimeter: x=80..1120, y=80..720 (1040×640)
-      const destX = 80, destY = 80, destW = 1040, destH = 640;
-      ctx.globalAlpha = floorPlanOpacity;
-      ctx.drawImage(img, destX, destY, destW, destH);
-      ctx.globalAlpha = 1;
-    };
+      // Draw semi-transparent green cones for each active camera's FOV
+      placedCams.forEach((cam) => {
+        if (cam.status === 'OFFLINE') return;
+        const fovRad = (cam.fov * Math.PI) / 180;
+        ctx.save();
+        ctx.translate(cam.x, cam.y);
+        ctx.rotate((cam.angle * Math.PI) / 180);
 
-    if (floorPlanLoadedRef.current === floorPlanSrc && floorPlanImgRef.current) {
-      drawFloorPlan(floorPlanImgRef.current);
-    } else {
-      const img = new Image();
-      img.onload = () => {
-        floorPlanImgRef.current = img;
-        floorPlanLoadedRef.current = floorPlanSrc;
-        setFloorPlanVersion(v => v + 1); // triggers re-render with image ready
-      };
-      img.src = floorPlanSrc;
+        ctx.beginPath();
+        ctx.moveTo(0, 0);
+        ctx.arc(0, 0, CAMERA_RANGE, -fovRad / 2, fovRad / 2);
+        ctx.closePath();
+
+        const grad = ctx.createRadialGradient(0, 0, 0, 0, 0, CAMERA_RANGE);
+        grad.addColorStop(0, 'rgba(34, 197, 94, 0.28)'); // bright green near camera
+        grad.addColorStop(1, 'rgba(34, 197, 94, 0.02)'); // fades out
+        ctx.fillStyle = grad;
+        ctx.fill();
+
+        ctx.restore();
+      });
     }
 
     // 1. Professional Blueprint Grid
@@ -1282,10 +1479,10 @@ export default function LayoutEditor() {
       ctx.rotate((cam.angle * Math.PI) / 180);
       ctx.beginPath();
       ctx.moveTo(0, 0);
-      ctx.arc(0, 0, 120, -fovRad / 2, fovRad / 2);
+      ctx.arc(0, 0, CAMERA_RANGE, -fovRad / 2, fovRad / 2);
       ctx.closePath();
       
-      const grad = ctx.createRadialGradient(0, 0, 0, 0, 0, 120);
+      const grad = ctx.createRadialGradient(0, 0, 0, 0, 0, CAMERA_RANGE);
       grad.addColorStop(0, color + '44');
       grad.addColorStop(1, color + '00');
       ctx.fillStyle = grad;
@@ -1295,9 +1492,9 @@ export default function LayoutEditor() {
       ctx.lineWidth = 1;
       ctx.beginPath();
       ctx.moveTo(0, 0);
-      ctx.lineTo(Math.cos(-fovRad/2)*120, Math.sin(-fovRad/2)*120);
+      ctx.lineTo(Math.cos(-fovRad/2)*CAMERA_RANGE, Math.sin(-fovRad/2)*CAMERA_RANGE);
       ctx.moveTo(0, 0);
-      ctx.lineTo(Math.cos(fovRad/2)*120, Math.sin(fovRad/2)*120);
+      ctx.lineTo(Math.cos(fovRad/2)*CAMERA_RANGE, Math.sin(fovRad/2)*CAMERA_RANGE);
       ctx.stroke();
       ctx.restore();
 
@@ -1632,7 +1829,7 @@ export default function LayoutEditor() {
     }
 
     ctx.restore();
-  }, [placedCams, drawnZones, selectedCam, selectedZone, selectedWall, selectedArch, zoom, panX, panY, drawingZone, zoneType, tool, activeFloor, liveTracks, walls, archElements, drawingWall, wallPreviewEnd, pxPerFoot, measureUnit, showDimensions, getFloorBounds, isSimulatorActive, simulatorAgents, floorPlanOpacity, showFloorPlan, floorPlanVersion]);
+  }, [placedCams, drawnZones, selectedCam, selectedZone, selectedWall, selectedArch, zoom, panX, panY, drawingZone, zoneType, tool, activeFloor, liveTracks, walls, archElements, drawingWall, wallPreviewEnd, pxPerFoot, measureUnit, showDimensions, getFloorBounds, isSimulatorActive, simulatorAgents, showCoverageHeatmap]);
 
 
 
@@ -1771,6 +1968,20 @@ export default function LayoutEditor() {
         prev.map((c) => (c.id === draggedCamId ? { ...c, x: nextPos.x, y: nextPos.y } : c))
       );
       setIsDirty(true);
+    } else {
+      // Hover check for floating preview
+      const hoveredCam = placedCams.find(
+        (c) => Math.sqrt((c.x - x) ** 2 + (c.y - y) ** 2) < 16
+      );
+      if (hoveredCam) {
+        if (hoveredCamId !== hoveredCam.id) {
+          setHoveredCamId(hoveredCam.id);
+        }
+      } else {
+        if (hoveredCamId !== null) {
+          setHoveredCamId(null);
+        }
+      }
     }
   };
 
@@ -1780,6 +1991,7 @@ export default function LayoutEditor() {
     setDraggedCamId(null);
     setDraggedArchId(null);
     setDraggingWallEndpoint(null);
+    setHoveredCamId(null);
   };
 
   const handleDoubleClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
@@ -2784,24 +2996,30 @@ export default function LayoutEditor() {
                 </label>
               </div>
               <div className="scale-config-row" style={{ borderTop: '1px solid rgba(0,240,255,0.1)', paddingTop: 8, marginTop: 4 }}>
-                <span className="scale-config-label">Floor Plan</span>
+                <span className="scale-config-label">Coverage Heatmap</span>
                 <label className="toggle-switch">
-                  <input type="checkbox" checked={showFloorPlan} onChange={(e) => setShowFloorPlan(e.target.checked)} />
+                  <input type="checkbox" checked={showCoverageHeatmap} onChange={(e) => setShowCoverageHeatmap(e.target.checked)} />
                   <span className="toggle-slider" />
                 </label>
               </div>
-              {showFloorPlan && (
-                <div className="scale-config-row" style={{ flexDirection: 'column', alignItems: 'stretch', gap: 4 }}>
+              {showCoverageHeatmap && (
+                <div className="scale-config-row" style={{ flexDirection: 'column', alignItems: 'stretch', gap: 6, borderTop: '1px solid rgba(0,240,255,0.05)', paddingTop: 6, marginTop: 4 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span className="scale-config-label" style={{ fontSize: 10, opacity: 0.7 }}>Opacity</span>
-                    <span style={{ fontSize: 10, color: '#00f0ff', fontWeight: 700 }}>{Math.round(floorPlanOpacity * 100)}%</span>
+                    <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>Status</span>
+                    <span className={`badge ${coveragePercentage >= 99 ? 'badge-green' : 'badge-red'}`} style={{ fontSize: 9, padding: '1px 6px' }}>
+                      <span className="badge-dot" style={{ background: coveragePercentage >= 99 ? 'var(--green-bright)' : 'var(--red-bright)', width: 5, height: 5 }} />
+                      {coveragePercentage >= 99 ? 'NO BLIND SPOTS' : 'BLIND SPOTS DETECTED'}
+                    </span>
                   </div>
-                  <input
-                    type="range" min="0" max="1" step="0.05"
-                    value={floorPlanOpacity}
-                    onChange={(e) => setFloorPlanOpacity(parseFloat(e.target.value))}
-                    style={{ width: '100%', accentColor: '#00f0ff', cursor: 'pointer' }}
-                  />
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 2 }}>
+                    <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>Total Coverage</span>
+                    <span style={{ fontSize: 12, color: '#00f0ff', fontWeight: 'bold', fontFamily: 'monospace' }}>
+                      {coveragePercentage.toFixed(1)}%
+                    </span>
+                  </div>
+                  <div style={{ width: '100%', height: 4, background: 'rgba(255,255,255,0.05)', borderRadius: 2, overflow: 'hidden', marginTop: 2 }}>
+                    <div style={{ width: `${coveragePercentage}%`, height: '100%', background: coveragePercentage >= 99 ? 'var(--green-bright)' : 'var(--amber-bright)', borderRadius: 2, transition: 'width 0.3s ease' }} />
+                  </div>
                 </div>
               )}
             </div>
@@ -3700,34 +3918,13 @@ export default function LayoutEditor() {
               </div>
               <div className="modal-body" style={{ padding: 0 }}>
                 <div style={{ width: '100%', height: 360, background: '#000', position: 'relative', overflow: 'hidden' }}>
-                  {/* Scan line effect */}
-                  <div style={{
-                    position: 'absolute', inset: 0,
-                    backgroundImage: 'repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.15) 2px, rgba(0,0,0,0.15) 4px)',
-                    pointerEvents: 'none',
-                    zIndex: 2,
-                  }} />
-                  <div style={{
-                    position: 'absolute', top: 12, left: 16, zIndex: 3,
-                    background: 'rgba(0,0,0,0.6)', padding: '4px 8px', borderRadius: 4,
-                    display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, fontFamily: 'monospace'
-                  }}>
-                    <span style={{ width: 6, height: 6, borderRadius: '50%', background: cam.status === 'ACTIVE' ? 'var(--green-bright)' : 'var(--red)', display: 'inline-block' }} />
-                    {cam.status === 'ACTIVE' ? 'LIVE' : cam.status}
-                  </div>
-                  <div style={{
-                    position: 'absolute', top: 12, right: 16, zIndex: 3,
-                    background: 'rgba(0,0,0,0.6)', padding: '4px 8px', borderRadius: 4,
-                    fontSize: 10, fontFamily: 'monospace', color: 'var(--text-muted)',
-                    maxWidth: '60%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'
-                  }}>
-                    {cam.rtsp_url}
-                  </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', width: '100%', height: '100%', gap: 8 }}>
-                    <Camera size={48} color="rgba(0, 240, 255, 0.3)" />
-                    <span style={{ fontSize: 13, color: 'var(--text-secondary)' }}>RTSP Stream Connection Initializing...</span>
-                    <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>{cam.location || 'No location set'}</span>
-                  </div>
+                  <SurveillanceCCTVStream 
+                    cameraId={cam.id}
+                    cameraName={cam.name}
+                    location={cam.location || ''}
+                    width={640}
+                    height={360}
+                  />
                 </div>
               </div>
               <div className="modal-footer" style={{ padding: '12px 16px' }}>
