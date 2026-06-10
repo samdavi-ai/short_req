@@ -1,5 +1,5 @@
 import React from 'react';
-import * as THREE from 'three';
+import { Shape, DoubleSide, ShapeGeometry, EdgesGeometry } from 'three';
 import { Html } from '@react-three/drei';
 
 interface Zone3DProps {
@@ -16,7 +16,7 @@ export default function Zone3D({ id, points, color, name, pxPerFoot, isSelected,
   if (points.length < 3) return null;
 
   // Convert points to 2D shape
-  const shape = new THREE.Shape();
+  const shape = new Shape();
   points.forEach((p, i) => {
     const wx = p.x / pxPerFoot;
     const wz = p.y / pxPerFoot;
@@ -43,10 +43,10 @@ export default function Zone3D({ id, points, color, name, pxPerFoot, isSelected,
     >
       <mesh>
         <shapeGeometry args={[shape]} />
-        <meshBasicMaterial color={color} transparent opacity={isSelected ? 0.6 : 0.3} side={THREE.DoubleSide} />
+        <meshBasicMaterial color={color} transparent opacity={isSelected ? 0.6 : 0.3} side={DoubleSide} />
       </mesh>
       <mesh>
-        <edgesGeometry args={[new THREE.ShapeGeometry(shape)]} />
+        <edgesGeometry args={[new ShapeGeometry(shape)]} />
         <lineBasicMaterial color={isSelected ? '#ffffff' : color} linewidth={isSelected ? 3 : 1} />
       </mesh>
       <Html position={[cx / pxPerFoot, cy / pxPerFoot, 0]} center style={{ pointerEvents: 'none' }}>

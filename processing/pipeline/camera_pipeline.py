@@ -412,8 +412,13 @@ class CameraPipeline:
             from app.models.models import ActiveTrack
             from datetime import datetime, timezone
 
+            # Deduplicate buffer, keeping only the latest update for each unique track_id
+            unique_tracks = {}
             for t in self._track_buffer:
                 track_id = f"cam_{t['camera_id']}_track_{t['track_id']}"
+                unique_tracks[track_id] = t
+
+            for track_id, t in unique_tracks.items():
                 existing = db.query(ActiveTrack).filter(ActiveTrack.id == track_id).first()
 
                 if existing:
@@ -441,7 +446,7 @@ class CameraPipeline:
                     db.add(new_track)
 
             db.commit()
-            logger.debug("Persisted %d track updates to DB.", len(self._track_buffer))
+            logger.debug("Persisted %d track updates to DB.", len(unique_tracks))
         except Exception as e:
             logger.error("Failed to persist tracks: %s", e)
             db.rollback()

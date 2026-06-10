@@ -95,6 +95,7 @@ export interface FloorDef {
   label: string;
   sort_order: number;
   created_at: string;
+  background_image?: string;
 }
 
 export interface Building {
