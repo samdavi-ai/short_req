@@ -97,46 +97,55 @@ const CAMERA_TYPES = [
   { label: 'Face Capture',    icon: '◈', type: 'face' },
 ];
 
-// ── Real airport: Kempegowda International Airport, Bangalore ─────────────────
-// Source: Site Acceptance Test, ATS Complex Alpha-1 (GEM/2024/B/4568766)
+// ── BIAL Alpha-2 Building — Kempegowda International Airport, Bangalore ──────
+// Based on actual floor plans: Ground Floor Alpha-2, Area A (Intermediate), First Floor Alpha-2
+// Building dimensions: 41 m wide × 25 m deep  |  Canvas scale: ~25 px/m
 const DEMO_SITES: Site[] = [
-  { id: -1, name: 'Kempegowda International Airport', address: 'ATS Complex, Alpha-1, Bangalore, Karnataka', latitude: 13.1986, longitude: 77.7066, is_active: true, created_at: '' },
+  { id: -1, name: 'Kempegowda International Airport', address: 'Alpha-2 ATS Complex, Devanahalli, Bengaluru — BIAL', latitude: 13.1986, longitude: 77.7066, is_active: true, created_at: '' },
 ];
 
 const DEMO_BUILDINGS: Building[] = [
   {
-    id: -1, site_id: -1, name: 'Terminal 1 — ATS Complex', building_type: 'INDOOR', is_active: true, created_at: '',
-    x_position: 80, y_position: 60, map_width: 320, map_height: 240,
+    id: -1, site_id: -1, name: 'Alpha-2 — ATS Complex', building_type: 'INDOOR', is_active: true, created_at: '',
+    x_position: 80, y_position: 60, map_width: 820, map_height: 500,
     floors: [
-      { id: -1, building_id: -1, level: 0,  label: 'Ground Floor',  sort_order: 0, created_at: '' },
-      { id: -2, building_id: -1, level: 1,  label: 'Departures',    sort_order: 1, created_at: '' },
-      { id: -3, building_id: -1, level: 2,  label: 'Boarding Gates',sort_order: 2, created_at: '' },
+      { id: -1, building_id: -1, level: 0, label: 'Ground Floor',          sort_order: 0, created_at: '' },
+      { id: -2, building_id: -1, level: 1, label: 'Area A (Intermediate)', sort_order: 1, created_at: '' },
+      { id: -3, building_id: -1, level: 2, label: 'First Floor',           sort_order: 2, created_at: '' },
     ],
   },
-  {
-    id: -2, site_id: -1, name: 'Airside Operations', building_type: 'OUTDOOR', is_active: true, created_at: '',
-    x_position: 460, y_position: 60, map_width: 240, map_height: 180,
-    floors: [
-      { id: -4, building_id: -2, level: 0, label: 'Tarmac Level', sort_order: 0, created_at: '' },
-    ],
-  },
-  {
-    id: -3, site_id: -1, name: 'Baggage & Arrivals Hall', building_type: 'INDOOR', is_active: true, created_at: '',
-    x_position: 80, y_position: 360, map_width: 280, map_height: 180,
-    floors: [
-      { id: -5, building_id: -3, level: 0, label: 'Arrivals Ground', sort_order: 0, created_at: '' },
-      { id: -6, building_id: -3, level: 1, label: 'Baggage Claim',   sort_order: 1, created_at: '' },
-    ],
-  },
-  {
-    id: -4, site_id: -1, name: 'Parking Structure', building_type: 'MIXED', is_active: true, created_at: '',
-    x_position: 460, y_position: 320, map_width: 220, map_height: 200,
-    floors: [
-      { id: -7, building_id: -4, level: 0, label: 'P1 Ground',  sort_order: 0, created_at: '' },
-      { id: -8, building_id: -4, level: 1, label: 'P2 Level 1', sort_order: 1, created_at: '' },
-      { id: -9, building_id: -4, level: 2, label: 'P3 Level 2', sort_order: 2, created_at: '' },
-    ],
-  },
+];
+
+// ── Alpha-2 Area A (Intermediate Floor) Cameras ──────────────────────────────
+// CMS Room, CHS Executives, Radio Interface, Automation Servers, Cyber TAC, etc.
+const ALPHA2_AREA_A_CAMERAS = [
+  { id: 9101, name: 'CAM-AA-01 · CMS Room A',          location: 'CMS Room — Server Rack A',            x: 155, y: 310, angle:  90, fov:  60, status: 'ACTIVE' as const, is_overhead: false },
+  { id: 9102, name: 'CAM-AA-02 · CMS Room B',          location: 'CMS Room — Server Rack B',            x: 275, y: 310, angle: 270, fov:  60, status: 'ACTIVE' as const, is_overhead: false },
+  { id: 9103, name: 'CAM-AA-03 · Commercial Entry',    location: 'Commercial Zone — Entry',             x: 120, y: 100, angle: 135, fov:  80, status: 'ACTIVE' as const, is_overhead: false },
+  { id: 9104, name: 'CAM-AA-04 · CHS Exec Corridor',   location: 'CHS Executive Room — Corridor',       x: 720, y: 200, angle: 180, fov:  90, status: 'ACTIVE' as const, is_overhead: true  },
+  { id: 9105, name: 'CAM-AA-05 · CHS Exec Interior',   location: 'CHS Executive — Interior',            x: 730, y: 390, angle: 180, fov: 100, status: 'ACTIVE' as const, is_overhead: true  },
+  { id: 9106, name: 'CAM-AA-06 · Radio Interface',     location: 'Radio/ACO Interface Room',            x: 500, y: 390, angle: 270, fov:  80, status: 'ACTIVE' as const, is_overhead: false },
+  { id: 9107, name: 'CAM-AA-07 · Automation Svr W',    location: 'Automation Server Room (AMS) — West', x: 200, y: 595, angle: 270, fov: 110, status: 'ACTIVE' as const, is_overhead: true  },
+  { id: 9108, name: 'CAM-AA-08 · Automation Svr E',    location: 'Automation Server Room (AMS) — East', x: 520, y: 595, angle: 270, fov: 110, status: 'ACTIVE' as const, is_overhead: true  },
+  { id: 9109, name: 'CAM-AA-09 · Cyber Security TAC',  location: 'Cyber Security & AMS TAC Room',       x: 350, y: 610, angle: 270, fov:  90, status: 'ACTIVE' as const, is_overhead: false },
+  { id: 9110, name: 'CAM-AA-10 · UHF/VCS Room',        location: 'UHF/VCS/Data/GTR Room',               x: 660, y: 595, angle: 270, fov:  80, status: 'ACTIVE' as const, is_overhead: false },
+  { id: 9111, name: 'CAM-AA-11 · Battery Room',        location: 'UPS Battery Room (Area A)',           x: 810, y: 595, angle: 270, fov:  80, status: 'ACTIVE' as const, is_overhead: false },
+  { id: 9112, name: 'CAM-AA-12 · Fallback Servers',    location: 'Fallback Servers Room',               x: 990, y: 595, angle: 180, fov:  70, status: 'ACTIVE' as const, is_overhead: false },
+];
+
+// ── Alpha-2 First Floor Cameras ──────────────────────────────────────────────
+// ACC Rooms (4 bays), STM Room, WSO, APP Room, Training, Recreation
+const ALPHA2_FF_CAMERAS = [
+  { id: 9201, name: 'CAM-FF-01 · ACC Bay 1',         location: 'Access Control Center — Bay 1',  x: 280, y: 550, angle: 270, fov: 110, status: 'ACTIVE' as const, is_overhead: true  },
+  { id: 9202, name: 'CAM-FF-02 · ACC Bay 2',         location: 'Access Control Center — Bay 2',  x: 460, y: 550, angle: 270, fov: 110, status: 'ACTIVE' as const, is_overhead: true  },
+  { id: 9203, name: 'CAM-FF-03 · ACC Bay 3',         location: 'Access Control Center — Bay 3',  x: 640, y: 550, angle: 270, fov: 110, status: 'ACTIVE' as const, is_overhead: true  },
+  { id: 9204, name: 'CAM-FF-04 · ACC Bay 4 (WSO)',   location: 'Access Control Center — Bay 4',  x: 810, y: 550, angle: 270, fov: 110, status: 'ACTIVE' as const, is_overhead: true  },
+  { id: 9205, name: 'CAM-FF-05 · STM Room',          location: 'STM Telecom Room',               x: 135, y: 550, angle: 270, fov:  80, status: 'ACTIVE' as const, is_overhead: false },
+  { id: 9206, name: 'CAM-FF-06 · APP Room',          location: 'APP / WSO Operations Room',      x: 990, y: 550, angle: 180, fov:  70, status: 'ACTIVE' as const, is_overhead: false },
+  { id: 9207, name: 'CAM-FF-07 · Training Corridor', location: 'Training Room Corridor',         x: 360, y: 200, angle: 180, fov:  90, status: 'ACTIVE' as const, is_overhead: true  },
+  { id: 9208, name: 'CAM-FF-08 · Staircase',         location: 'First Floor — Staircase',        x: 165, y: 210, angle: 135, fov:  70, status: 'ACTIVE' as const, is_overhead: false },
+  { id: 9209, name: 'CAM-FF-09 · Recreation Room',   location: 'Recreation Room',                x: 835, y: 200, angle: 180, fov:  90, status: 'ACTIVE' as const, is_overhead: true  },
+  { id: 9210, name: 'CAM-FF-10 · First Floor Entry', location: 'First Floor — Main Entry',       x: 120, y:  95, angle: 135, fov:  80, status: 'ACTIVE' as const, is_overhead: false },
 ];
 
 
@@ -372,60 +381,244 @@ export default function LayoutEditor() {
       setDrawnZones(floorZones);
       setIsDirty(false);
     } else {
-      // Demo fallback — Kempegowda International Airport (ATS Complex Alpha-1)
-      // 14 × CP PLUS CP-UNC-TB21ZL65-VMDS-V2-27135 cameras as per SAT document
-      setPlacedCams(KEMPEGOWDA_CAMERAS.map(c => ({
-        id: c.id, x: c.x, y: c.y, angle: c.angle, fov: c.fov,
-        name: c.name, status: c.status,
-        rtsp_url: `rtsp://192.168.1.${c.id - 9000}:554/stream1`,
-        location: c.location, is_overhead: c.is_overhead,
-      })));
-      setDrawnZones([
-        { id: 1, name: 'Security Check Alpha', type: 'RESTRICTED', color: ZONE_COLORS.RESTRICTED, dwell_alert_seconds: 0, is_active: true,
-          points: [{ x: 380, y: 160 }, { x: 540, y: 160 }, { x: 540, y: 380 }, { x: 380, y: 380 }] },
-        { id: 2, name: 'Boarding Gate Lounge A', type: 'DWELL', color: ZONE_COLORS.DWELL, dwell_alert_seconds: 900, is_active: true,
-          points: [{ x: 600, y: 120 }, { x: 800, y: 120 }, { x: 800, y: 320 }, { x: 600, y: 320 }] },
-        { id: 3, name: 'Boarding Gate Lounge B', type: 'DWELL', color: ZONE_COLORS.DWELL, dwell_alert_seconds: 900, is_active: true,
-          points: [{ x: 600, y: 380 }, { x: 800, y: 380 }, { x: 800, y: 560 }, { x: 600, y: 560 }] },
-        { id: 4, name: 'Airside Restricted', type: 'RESTRICTED', color: ZONE_COLORS.RESTRICTED, dwell_alert_seconds: 0, is_active: true,
-          points: [{ x: 880, y: 100 }, { x: 1060, y: 100 }, { x: 1060, y: 620 }, { x: 880, y: 620 }] },
-        { id: 5, name: 'Duty-Free Retail', type: 'LOUNGE', color: ZONE_COLORS.LOUNGE, dwell_alert_seconds: 1800, is_active: true,
-          points: [{ x: 480, y: 100 }, { x: 600, y: 100 }, { x: 600, y: 280 }, { x: 480, y: 280 }] },
-        { id: 6, name: 'Entry Tripwire North', type: 'TRIPWIRE', color: ZONE_COLORS.TRIPWIRE, dwell_alert_seconds: 0, is_active: true,
-          points: [{ x: 95, y: 60 }, { x: 175, y: 60 }, { x: 175, y: 200 }, { x: 95, y: 200 }] },
-        { id: 7, name: 'Entry Tripwire South', type: 'TRIPWIRE', color: ZONE_COLORS.TRIPWIRE, dwell_alert_seconds: 0, is_active: true,
-          points: [{ x: 95, y: 480 }, { x: 175, y: 480 }, { x: 175, y: 660 }, { x: 95, y: 660 }] },
-        { id: 8, name: 'Baggage Claim', type: 'DWELL', color: ZONE_COLORS.DWELL, dwell_alert_seconds: 1200, is_active: true,
-          points: [{ x: 750, y: 280 }, { x: 900, y: 280 }, { x: 900, y: 440 }, { x: 750, y: 440 }] },
-      ]);
-      // Terminal walls — ATS Complex Alpha-1 layout
-      setWalls([
-        { id: 101, startX: 100, startY: 100, endX: 1080, endY: 100, thickness: 7, color: WALL_COLOR, label: 'North Perimeter' },
-        { id: 102, startX: 100, startY: 100, endX: 100,  endY: 660, thickness: 7, color: WALL_COLOR, label: 'West Perimeter' },
-        { id: 103, startX: 1080, startY: 100, endX: 1080, endY: 660, thickness: 7, color: WALL_COLOR, label: 'East Perimeter' },
-        { id: 104, startX: 100, startY: 660, endX: 1080, endY: 660, thickness: 7, color: WALL_COLOR, label: 'South Perimeter' },
-        // Security division wall
-        { id: 105, startX: 380, startY: 100, endX: 380, endY: 380, thickness: 5, color: WALL_COLOR, label: 'Security Wall N' },
-        { id: 106, startX: 380, startY: 460, endX: 380, endY: 660, thickness: 5, color: WALL_COLOR, label: 'Security Wall S' },
-        // Airside partition
-        { id: 107, startX: 870, startY: 100, endX: 870, endY: 660, thickness: 5, color: WALL_COLOR, label: 'Airside Wall' },
-        // NVR/Switch room
-        { id: 108, startX: 100, startY: 100, endX: 200, endY: 100, thickness: 4, color: WALL_COLOR, label: 'Server Room N' },
-        { id: 109, startX: 200, startY: 100, endX: 200, endY: 180, thickness: 4, color: WALL_COLOR, label: 'Server Room E' },
-        { id: 110, startX: 100, startY: 180, endX: 200, endY: 180, thickness: 4, color: WALL_COLOR, label: 'Server Room S' },
-      ]);
-      setArchElements([
-        { id: 201, type: 'DOOR', x: 380, y: 425, width: 44, rotation: 0, label: 'Security Gate', openDirection: 'RIGHT' },
-        { id: 202, type: 'DOOR', x: 150, y: 100, width: 44, rotation: 90, label: 'Entry North', openDirection: 'RIGHT' },
-        { id: 203, type: 'DOOR', x: 150, y: 660, width: 44, rotation: 90, label: 'Entry South', openDirection: 'LEFT' },
-        { id: 204, type: 'DOOR', x: 870, y: 360, width: 44, rotation: 0, label: 'Airside Gate', openDirection: 'RIGHT' },
-        { id: 205, type: 'ELEVATOR', x: 140, y: 155, width: 30, rotation: 0, label: 'Elev A' },
-        { id: 206, type: 'STAIRS', x: 1040, y: 620, width: 40, rotation: 0, label: 'Emergency Exit' },
-        { id: 207, type: 'COLUMN', x: 550, y: 380, width: 18, rotation: 0, label: 'Col-1' },
-        { id: 208, type: 'COLUMN', x: 780, y: 380, width: 18, rotation: 0, label: 'Col-2' },
-        { id: 209, type: 'WINDOW', x: 590, y: 100, width: 80, rotation: 0, label: 'Window A' },
-        { id: 210, type: 'WINDOW', x: 730, y: 100, width: 80, rotation: 0, label: 'Window B' },
-      ]);
+      // ── Demo fallback: Alpha-2 ATS Complex, Kempegowda International Airport (BIAL) ────
+      // Floor plan source: Location Maps.pdf  |  Scale: 41 m × 25 m → ~25 px/m
+      // Canvas origin (80,80), right edge 1120, bottom edge 720
+
+      if (activeFloor === 0) {
+        // ════════════════════════════════════════════════════════════════
+        //  GROUND FLOOR ALPHA-2
+        //  Key areas: Canteen, Lobby/Lift, Electrical Room, Toilets,
+        //  Reception, Area of Stay, Storage/Legal, Monitor Room, Director Offices
+        // ════════════════════════════════════════════════════════════════
+        setPlacedCams(KEMPEGOWDA_CAMERAS.map(c => ({
+          id: c.id, x: c.x, y: c.y, angle: c.angle, fov: c.fov,
+          name: c.name, status: c.status,
+          rtsp_url: `rtsp://10.0.1.${c.id - 9000}:554/stream1`,
+          location: c.location, is_overhead: c.is_overhead,
+        })));
+        setDrawnZones([
+          { id: 101, name: 'LT MCC HV Electrical Room', type: 'RESTRICTED', color: ZONE_COLORS.RESTRICTED, dwell_alert_seconds: 0, is_active: true,
+            points: [{ x: 340, y:  80 }, { x: 555, y:  80 }, { x: 555, y: 280 }, { x: 340, y: 280 }] },
+          { id: 102, name: 'BIAL Canteen — Dining Area', type: 'DWELL', color: ZONE_COLORS.DWELL, dwell_alert_seconds: 3600, is_active: true,
+            points: [{ x:  80, y: 340 }, { x: 340, y: 340 }, { x: 340, y: 720 }, { x:  80, y: 720 }] },
+          { id: 103, name: 'Reception Lobby', type: 'LOUNGE', color: ZONE_COLORS.LOUNGE, dwell_alert_seconds: 900, is_active: true,
+            points: [{ x: 635, y:  80 }, { x: 855, y:  80 }, { x: 855, y: 280 }, { x: 635, y: 280 }] },
+          { id: 104, name: 'Storage / Legal Room', type: 'RESTRICTED', color: ZONE_COLORS.RESTRICTED, dwell_alert_seconds: 0, is_active: true,
+            points: [{ x: 635, y: 440 }, { x: 760, y: 440 }, { x: 760, y: 560 }, { x: 635, y: 560 }] },
+          { id: 105, name: 'Airport Director Offices', type: 'RESTRICTED', color: ZONE_COLORS.RESTRICTED, dwell_alert_seconds: 0, is_active: true,
+            points: [{ x: 890, y:  80 }, { x: 1120, y:  80 }, { x: 1120, y: 720 }, { x: 890, y: 720 }] },
+          { id: 106, name: 'Area of Stay — Waiting', type: 'DWELL', color: ZONE_COLORS.DWELL, dwell_alert_seconds: 1800, is_active: true,
+            points: [{ x: 555, y: 280 }, { x: 635, y: 280 }, { x: 635, y: 440 }, { x: 555, y: 440 }] },
+          { id: 107, name: 'Main Entry Tripwire', type: 'TRIPWIRE', color: ZONE_COLORS.TRIPWIRE, dwell_alert_seconds: 0, is_active: true,
+            points: [{ x:  80, y:  80 }, { x: 200, y:  80 }, { x: 200, y: 140 }, { x:  80, y: 140 }] },
+          { id: 108, name: 'South Exit Tripwire', type: 'TRIPWIRE', color: ZONE_COLORS.TRIPWIRE, dwell_alert_seconds: 0, is_active: true,
+            points: [{ x:  80, y: 660 }, { x: 200, y: 660 }, { x: 200, y: 720 }, { x:  80, y: 720 }] },
+        ]);
+        setWalls([
+          // ── Outer perimeter (41 m × 25 m @ 25 px/m, offset 80,80)
+          { id: 101, startX:   80, startY:  80, endX: 1120, endY:  80, thickness: 8, color: WALL_COLOR, label: 'North Perimeter Wall' },
+          { id: 102, startX:   80, startY:  80, endX:   80, endY: 720, thickness: 8, color: WALL_COLOR, label: 'West Perimeter Wall'  },
+          { id: 103, startX: 1120, startY:  80, endX: 1120, endY: 720, thickness: 8, color: WALL_COLOR, label: 'East Perimeter Wall'  },
+          { id: 104, startX:   80, startY: 720, endX: 1120, endY: 720, thickness: 8, color: WALL_COLOR, label: 'South Perimeter Wall' },
+          // ── Canteen east partition (~10.4 m from west)
+          { id: 105, startX: 340, startY:  80, endX: 340, endY: 720, thickness: 6, color: WALL_COLOR, label: 'Canteen East Wall' },
+          // ── Canteen internal — upper locker/rest rooms above dining
+          { id: 106, startX:  80, startY: 340, endX: 340, endY: 340, thickness: 5, color: WALL_COLOR, label: 'Canteen Upper Divider' },
+          { id: 107, startX: 175, startY:  80, endX: 175, endY: 340, thickness: 4, color: WALL_COLOR, label: 'Locker Room Wall'      },
+          { id: 108, startX: 175, startY: 200, endX: 340, endY: 200, thickness: 4, color: WALL_COLOR, label: 'Rest Room Divider'    },
+          // ── LT MCC HV Electrical Room
+          { id: 109, startX: 340, startY: 280, endX: 555, endY: 280, thickness: 5, color: WALL_COLOR, label: 'Electrical Room South Wall' },
+          { id: 110, startX: 555, startY:  80, endX: 555, endY: 280, thickness: 5, color: WALL_COLOR, label: 'Electrical Room East Wall'  },
+          // ── Toilet block (Gents + Ladies back-to-back)
+          { id: 111, startX: 340, startY: 440, endX: 635, endY: 440, thickness: 5, color: WALL_COLOR, label: 'Toilet Block North Wall'   },
+          { id: 112, startX: 340, startY: 560, endX: 635, endY: 560, thickness: 5, color: WALL_COLOR, label: 'Toilet Block South Wall'   },
+          { id: 113, startX: 480, startY: 280, endX: 480, endY: 440, thickness: 4, color: WALL_COLOR, label: 'Gents/Ladies Divider'      },
+          { id: 114, startX: 635, startY: 280, endX: 635, endY: 440, thickness: 4, color: WALL_COLOR, label: 'Toilet Block East Wall'    },
+          // ── Reception area
+          { id: 115, startX: 635, startY:  80, endX: 635, endY: 280, thickness: 5, color: WALL_COLOR, label: 'Reception West Wall'  },
+          { id: 116, startX: 635, startY: 280, endX: 855, endY: 280, thickness: 4, color: WALL_COLOR, label: 'Reception South Wall' },
+          { id: 117, startX: 855, startY:  80, endX: 855, endY: 280, thickness: 4, color: WALL_COLOR, label: 'Reception East Wall'  },
+          // ── Area of Stay / Storage / Legal
+          { id: 118, startX: 635, startY: 440, endX: 760, endY: 440, thickness: 4, color: WALL_COLOR, label: 'Area of Stay North Wall'  },
+          { id: 119, startX: 635, startY: 560, endX: 760, endY: 560, thickness: 4, color: WALL_COLOR, label: 'Storage Room South Wall'  },
+          { id: 120, startX: 760, startY: 280, endX: 760, endY: 560, thickness: 4, color: WALL_COLOR, label: 'Storage/Stay East Wall'   },
+          // ── Monitor / Policy Room
+          { id: 121, startX: 855, startY: 280, endX: 890, endY: 280, thickness: 4, color: WALL_COLOR, label: 'Monitor Room North Wall' },
+          { id: 122, startX: 890, startY:  80, endX: 890, endY: 560, thickness: 4, color: WALL_COLOR, label: 'Monitor Room East Wall'  },
+          { id: 123, startX: 855, startY: 560, endX: 890, endY: 560, thickness: 4, color: WALL_COLOR, label: 'Monitor Room South Wall' },
+          // ── Director Offices west partition
+          { id: 124, startX: 890, startY:  80, endX:  890, endY: 720, thickness: 6, color: WALL_COLOR, label: 'Director Offices West Wall'       },
+          { id: 125, startX: 890, startY: 400, endX: 1120, endY: 400, thickness: 4, color: WALL_COLOR, label: 'Director Office Internal Division' },
+          { id: 126, startX: 1010, startY: 80, endX: 1010, endY: 400, thickness: 4, color: WALL_COLOR, label: 'Data Office West Wall'            },
+        ]);
+        setArchElements([
+          { id: 201, type: 'DOOR',        x: 600, y:  80, width: 50, rotation:  90, label: 'Main Entry Gate',       openDirection: 'RIGHT' },
+          { id: 202, type: 'DOOR',        x: 120, y: 340, width: 44, rotation:   0, label: 'Canteen Side Entry',    openDirection: 'RIGHT' },
+          { id: 203, type: 'DOOR',        x: 340, y: 200, width: 44, rotation:   0, label: 'Canteen-Lobby Door',    openDirection: 'LEFT'  },
+          { id: 204, type: 'DOOR',        x: 430, y: 280, width: 44, rotation:  90, label: 'Electrical Room Door',  openDirection: 'RIGHT' },
+          { id: 205, type: 'DOOR',        x: 635, y: 160, width: 44, rotation:   0, label: 'Reception Entry Door',  openDirection: 'RIGHT' },
+          { id: 206, type: 'DOOR',        x: 855, y: 400, width: 44, rotation:   0, label: 'Monitor Room Door',     openDirection: 'LEFT'  },
+          { id: 207, type: 'DOUBLE_DOOR', x: 890, y: 400, width: 60, rotation:   0, label: 'Director Entry Gate',   openDirection: 'RIGHT' },
+          { id: 208, type: 'ELEVATOR',    x: 130, y: 150, width: 32, rotation:   0, label: 'Lift A'                                        },
+          { id: 209, type: 'STAIRS',      x: 130, y: 240, width: 40, rotation:   0, label: 'Staircase GF'                                  },
+          { id: 210, type: 'COLUMN',      x: 480, y:  80, width: 16, rotation:   0, label: 'Column-GF-1'                                   },
+          { id: 211, type: 'COLUMN',      x: 760, y:  80, width: 16, rotation:   0, label: 'Column-GF-2'                                   },
+          { id: 212, type: 'WINDOW',      x: 420, y:  80, width: 80, rotation:   0, label: 'Window North A'                                },
+          { id: 213, type: 'WINDOW',      x: 770, y:  80, width: 80, rotation:   0, label: 'Window North B'                                },
+          { id: 214, type: 'WINDOW',      x: 960, y:  80, width: 80, rotation:   0, label: 'Window North C'                                },
+        ]);
+
+      } else if (activeFloor === 1) {
+        // ════════════════════════════════════════════════════════════════
+        //  AREA A — INTERMEDIATE FLOOR
+        //  Key areas: CMS Room, CMS Maintenance, CHS Executives, Radio
+        //  Interface, Automation Servers, Cyber TAC, UHF/VCS, Battery,
+        //  Fallback Servers, Commercial
+        // ════════════════════════════════════════════════════════════════
+        setPlacedCams(ALPHA2_AREA_A_CAMERAS.map(c => ({
+          id: c.id, x: c.x, y: c.y, angle: c.angle, fov: c.fov,
+          name: c.name, status: c.status,
+          rtsp_url: `rtsp://10.0.2.${c.id - 9100}:554/stream1`,
+          location: c.location, is_overhead: c.is_overhead,
+        })));
+        setDrawnZones([
+          { id: 301, name: 'CMS Server Room', type: 'RESTRICTED', color: ZONE_COLORS.RESTRICTED, dwell_alert_seconds: 0, is_active: true,
+            points: [{ x:  80, y: 300 }, { x: 340, y: 300 }, { x: 340, y: 490 }, { x:  80, y: 490 }] },
+          { id: 302, name: 'Automation Server Room (AMS)', type: 'RESTRICTED', color: ZONE_COLORS.RESTRICTED, dwell_alert_seconds: 0, is_active: true,
+            points: [{ x:  80, y: 490 }, { x: 255, y: 490 }, { x: 255, y: 720 }, { x:  80, y: 720 }] },
+          { id: 303, name: 'Cyber Security & AMS TAC Room', type: 'RESTRICTED', color: ZONE_COLORS.RESTRICTED, dwell_alert_seconds: 0, is_active: true,
+            points: [{ x: 255, y: 490 }, { x: 440, y: 490 }, { x: 440, y: 720 }, { x: 255, y: 720 }] },
+          { id: 304, name: 'UHF/VCS/Data/GTR Room', type: 'RESTRICTED', color: ZONE_COLORS.RESTRICTED, dwell_alert_seconds: 0, is_active: true,
+            points: [{ x: 440, y: 490 }, { x: 590, y: 490 }, { x: 590, y: 720 }, { x: 440, y: 720 }] },
+          { id: 305, name: 'Battery Room', type: 'RESTRICTED', color: ZONE_COLORS.RESTRICTED, dwell_alert_seconds: 0, is_active: true,
+            points: [{ x: 590, y: 490 }, { x: 740, y: 490 }, { x: 740, y: 720 }, { x: 590, y: 720 }] },
+          { id: 306, name: 'Fallback Servers Room', type: 'RESTRICTED', color: ZONE_COLORS.RESTRICTED, dwell_alert_seconds: 0, is_active: true,
+            points: [{ x: 890, y: 490 }, { x: 1120, y: 490 }, { x: 1120, y: 720 }, { x: 890, y: 720 }] },
+          { id: 307, name: 'CHS Executives Room', type: 'RESTRICTED', color: ZONE_COLORS.RESTRICTED, dwell_alert_seconds: 0, is_active: true,
+            points: [{ x: 620, y:  80 }, { x: 860, y:  80 }, { x: 860, y: 300 }, { x: 620, y: 300 }] },
+          { id: 308, name: 'Commercial Zone', type: 'LOUNGE', color: ZONE_COLORS.LOUNGE, dwell_alert_seconds: 1200, is_active: true,
+            points: [{ x:  80, y:  80 }, { x: 340, y:  80 }, { x: 340, y: 170 }, { x:  80, y: 170 }] },
+          { id: 309, name: 'Area A Entry Tripwire', type: 'TRIPWIRE', color: ZONE_COLORS.TRIPWIRE, dwell_alert_seconds: 0, is_active: true,
+            points: [{ x:  80, y:  80 }, { x: 200, y:  80 }, { x: 200, y: 140 }, { x:  80, y: 140 }] },
+        ]);
+        setWalls([
+          // ── Outer perimeter
+          { id: 401, startX:   80, startY:  80, endX: 1120, endY:  80, thickness: 8, color: WALL_COLOR, label: 'North Perimeter Wall' },
+          { id: 402, startX:   80, startY:  80, endX:   80, endY: 720, thickness: 8, color: WALL_COLOR, label: 'West Perimeter Wall'  },
+          { id: 403, startX: 1120, startY:  80, endX: 1120, endY: 720, thickness: 8, color: WALL_COLOR, label: 'East Perimeter Wall'  },
+          { id: 404, startX:   80, startY: 720, endX: 1120, endY: 720, thickness: 8, color: WALL_COLOR, label: 'South Perimeter Wall' },
+          // ── Server room row partition (lower third)
+          { id: 405, startX:   80, startY: 490, endX: 1120, endY: 490, thickness: 6, color: WALL_COLOR, label: 'Server Room North Wall'      },
+          // ── CMS Room block
+          { id: 406, startX:   80, startY: 300, endX:  340, endY: 300, thickness: 5, color: WALL_COLOR, label: 'CMS Room South Wall'         },
+          { id: 407, startX:  340, startY:  80, endX:  340, endY: 490, thickness: 5, color: WALL_COLOR, label: 'CMS Block East Wall'         },
+          { id: 408, startX:  210, startY: 300, endX:  210, endY: 490, thickness: 4, color: WALL_COLOR, label: 'CMS Server Rack Divider'     },
+          // ── CMS Maintenance Room (upper left)
+          { id: 409, startX:   80, startY: 170, endX:  340, endY: 170, thickness: 4, color: WALL_COLOR, label: 'CMS Maintenance South Wall'  },
+          // ── Central comms / radio / locker area
+          { id: 410, startX:  340, startY: 300, endX:  620, endY: 300, thickness: 5, color: WALL_COLOR, label: 'Comms Room South Wall'       },
+          { id: 411, startX:  480, startY: 300, endX:  480, endY: 490, thickness: 4, color: WALL_COLOR, label: 'Radio Room East Wall'        },
+          // ── CHS Executive zone
+          { id: 412, startX:  620, startY:  80, endX:  620, endY: 490, thickness: 5, color: WALL_COLOR, label: 'CHS Executive West Wall'     },
+          { id: 413, startX:  620, startY: 300, endX:  860, endY: 300, thickness: 4, color: WALL_COLOR, label: 'Executive Room South Wall'   },
+          { id: 414, startX:  860, startY:  80, endX:  860, endY: 490, thickness: 5, color: WALL_COLOR, label: 'Director East Partition'     },
+          { id: 415, startX:  860, startY: 300, endX:  940, endY: 300, thickness: 4, color: WALL_COLOR, label: 'Director Office South Wall'  },
+          { id: 416, startX:  940, startY:  80, endX:  940, endY: 490, thickness: 4, color: WALL_COLOR, label: 'Inner Office East Wall'      },
+          // ── Server sub-partitions (lower section)
+          { id: 417, startX:  255, startY: 490, endX:  255, endY: 720, thickness: 4, color: WALL_COLOR, label: 'Server Divider 1'            },
+          { id: 418, startX:  440, startY: 490, endX:  440, endY: 720, thickness: 4, color: WALL_COLOR, label: 'Cyber TAC East Wall'         },
+          { id: 419, startX:  590, startY: 490, endX:  590, endY: 720, thickness: 4, color: WALL_COLOR, label: 'UHF Room East Wall'          },
+          { id: 420, startX:  740, startY: 490, endX:  740, endY: 720, thickness: 4, color: WALL_COLOR, label: 'Battery Room East Wall'      },
+          { id: 421, startX:  890, startY: 490, endX:  890, endY: 720, thickness: 4, color: WALL_COLOR, label: 'Fallback Server Room W Wall' },
+        ]);
+        setArchElements([
+          { id: 501, type: 'DOOR',     x: 210, y: 300, width: 44, rotation:  0, label: 'CMS Room Entry',          openDirection: 'RIGHT' },
+          { id: 502, type: 'DOOR',     x: 340, y: 200, width: 44, rotation:  0, label: 'CMS Maintenance Entry',   openDirection: 'LEFT'  },
+          { id: 503, type: 'DOOR',     x: 480, y: 390, width: 44, rotation:  0, label: 'Radio Room Entry',        openDirection: 'RIGHT' },
+          { id: 504, type: 'DOOR',     x: 720, y: 390, width: 44, rotation:  0, label: 'Executive Room Entry',    openDirection: 'LEFT'  },
+          { id: 505, type: 'DOOR',     x: 860, y: 200, width: 44, rotation:  0, label: 'Director Area Entry',     openDirection: 'RIGHT' },
+          { id: 506, type: 'DOOR',     x: 350, y: 560, width: 44, rotation:  0, label: 'Cyber TAC Room Entry',    openDirection: 'RIGHT' },
+          { id: 507, type: 'ELEVATOR', x: 130, y: 150, width: 32, rotation:  0, label: 'Lift A (Area A)'                                  },
+          { id: 508, type: 'STAIRS',   x: 130, y: 240, width: 40, rotation:  0, label: 'Staircase Area A'                                 },
+          { id: 509, type: 'COLUMN',   x: 480, y:  80, width: 16, rotation:  0, label: 'Column-AA-1'                                      },
+          { id: 510, type: 'COLUMN',   x: 760, y:  80, width: 16, rotation:  0, label: 'Column-AA-2'                                      },
+        ]);
+
+      } else if (activeFloor === 2) {
+        // ════════════════════════════════════════════════════════════════
+        //  FIRST FLOOR ALPHA-2
+        //  Key areas: ACC Rooms (4 bays), STM Room, WSO, APP Room,
+        //  Training In-Charge, Training Support, Gents Rest Rooms (×3),
+        //  Recreation Room, UPS Battery Room, Shower Cubicles
+        // ════════════════════════════════════════════════════════════════
+        setPlacedCams(ALPHA2_FF_CAMERAS.map(c => ({
+          id: c.id, x: c.x, y: c.y, angle: c.angle, fov: c.fov,
+          name: c.name, status: c.status,
+          rtsp_url: `rtsp://10.0.3.${c.id - 9200}:554/stream1`,
+          location: c.location, is_overhead: c.is_overhead,
+        })));
+        setDrawnZones([
+          { id: 401, name: 'ACC Room — Bay 1', type: 'RESTRICTED', color: ZONE_COLORS.RESTRICTED, dwell_alert_seconds: 0, is_active: true,
+            points: [{ x: 190, y: 380 }, { x: 370, y: 380 }, { x: 370, y: 720 }, { x: 190, y: 720 }] },
+          { id: 402, name: 'ACC Room — Bay 2', type: 'RESTRICTED', color: ZONE_COLORS.RESTRICTED, dwell_alert_seconds: 0, is_active: true,
+            points: [{ x: 370, y: 380 }, { x: 550, y: 380 }, { x: 550, y: 720 }, { x: 370, y: 720 }] },
+          { id: 403, name: 'ACC Room — Bay 3', type: 'RESTRICTED', color: ZONE_COLORS.RESTRICTED, dwell_alert_seconds: 0, is_active: true,
+            points: [{ x: 550, y: 380 }, { x: 730, y: 380 }, { x: 730, y: 720 }, { x: 550, y: 720 }] },
+          { id: 404, name: 'ACC Room — Bay 4 (WSO)', type: 'RESTRICTED', color: ZONE_COLORS.RESTRICTED, dwell_alert_seconds: 0, is_active: true,
+            points: [{ x: 730, y: 380 }, { x: 890, y: 380 }, { x: 890, y: 720 }, { x: 730, y: 720 }] },
+          { id: 405, name: 'STM Telecom Room', type: 'RESTRICTED', color: ZONE_COLORS.RESTRICTED, dwell_alert_seconds: 0, is_active: true,
+            points: [{ x:  80, y: 380 }, { x: 190, y: 380 }, { x: 190, y: 720 }, { x:  80, y: 720 }] },
+          { id: 406, name: 'APP Room', type: 'RESTRICTED', color: ZONE_COLORS.RESTRICTED, dwell_alert_seconds: 0, is_active: true,
+            points: [{ x: 890, y: 380 }, { x: 1120, y: 380 }, { x: 1120, y: 720 }, { x: 890, y: 720 }] },
+          { id: 407, name: 'Training Area', type: 'DWELL', color: ZONE_COLORS.DWELL, dwell_alert_seconds: 3600, is_active: true,
+            points: [{ x: 260, y:  80 }, { x: 460, y:  80 }, { x: 460, y: 380 }, { x: 260, y: 380 }] },
+          { id: 408, name: 'Recreation Room', type: 'LOUNGE', color: ZONE_COLORS.LOUNGE, dwell_alert_seconds: 1200, is_active: true,
+            points: [{ x: 750, y:  80 }, { x: 925, y:  80 }, { x: 925, y: 380 }, { x: 750, y: 380 }] },
+          { id: 409, name: 'First Floor Entry Tripwire', type: 'TRIPWIRE', color: ZONE_COLORS.TRIPWIRE, dwell_alert_seconds: 0, is_active: true,
+            points: [{ x:  80, y:  80 }, { x: 200, y:  80 }, { x: 200, y: 140 }, { x:  80, y: 140 }] },
+        ]);
+        setWalls([
+          // ── Outer perimeter
+          { id: 601, startX:   80, startY:  80, endX: 1120, endY:  80, thickness: 8, color: WALL_COLOR, label: 'North Perimeter Wall' },
+          { id: 602, startX:   80, startY:  80, endX:   80, endY: 720, thickness: 8, color: WALL_COLOR, label: 'West Perimeter Wall'  },
+          { id: 603, startX: 1120, startY:  80, endX: 1120, endY: 720, thickness: 8, color: WALL_COLOR, label: 'East Perimeter Wall'  },
+          { id: 604, startX:   80, startY: 720, endX: 1120, endY: 720, thickness: 8, color: WALL_COLOR, label: 'South Perimeter Wall' },
+          // ── Upper/Lower split — ACC rooms occupy lower section
+          { id: 605, startX:   80, startY: 380, endX: 1120, endY: 380, thickness: 6, color: WALL_COLOR, label: 'ACC Room North Wall'          },
+          // ── Upper section (training, rest rooms, recreation)
+          { id: 606, startX:   80, startY: 250, endX:  260, endY: 250, thickness: 4, color: WALL_COLOR, label: 'Shower Room South Wall'       },
+          { id: 607, startX:  260, startY:  80, endX:  260, endY: 380, thickness: 5, color: WALL_COLOR, label: 'Shower/Staircase East Wall'   },
+          { id: 608, startX:  260, startY: 180, endX:  460, endY: 180, thickness: 4, color: WALL_COLOR, label: 'Training In-Charge South Wall'},
+          { id: 609, startX:  460, startY:  80, endX:  460, endY: 380, thickness: 5, color: WALL_COLOR, label: 'Training Room East Wall'      },
+          { id: 610, startX:  550, startY:  80, endX:  550, endY: 380, thickness: 4, color: WALL_COLOR, label: 'Gents Rest Room 1 East Wall'  },
+          { id: 611, startX:  650, startY:  80, endX:  650, endY: 380, thickness: 4, color: WALL_COLOR, label: 'Gents Rest Room 2 East Wall'  },
+          { id: 612, startX:  750, startY:  80, endX:  750, endY: 380, thickness: 4, color: WALL_COLOR, label: 'Gents Rest Room 3 East Wall'  },
+          { id: 613, startX:  925, startY:  80, endX:  925, endY: 380, thickness: 5, color: WALL_COLOR, label: 'Recreation Room East Wall'    },
+          { id: 614, startX:  925, startY: 200, endX: 1120, endY: 200, thickness: 4, color: WALL_COLOR, label: 'UPS Battery Room South Wall'  },
+          // ── ACC Room dividers (lower section)
+          { id: 615, startX:  190, startY: 380, endX:  190, endY: 720, thickness: 5, color: WALL_COLOR, label: 'STM Room East Wall'            },
+          { id: 616, startX:  370, startY: 380, endX:  370, endY: 720, thickness: 5, color: WALL_COLOR, label: 'ACC Bay 1 East Wall'           },
+          { id: 617, startX:  550, startY: 380, endX:  550, endY: 720, thickness: 5, color: WALL_COLOR, label: 'ACC Bay 2 East Wall'           },
+          { id: 618, startX:  730, startY: 380, endX:  730, endY: 720, thickness: 5, color: WALL_COLOR, label: 'ACC Bay 3 East Wall'           },
+          { id: 619, startX:  890, startY: 380, endX:  890, endY: 720, thickness: 5, color: WALL_COLOR, label: 'APP/WSO Room West Wall'        },
+        ]);
+        setArchElements([
+          { id: 701, type: 'DOOR',        x: 260, y: 155, width: 44, rotation:  0, label: 'Shower Room Entry',        openDirection: 'RIGHT' },
+          { id: 702, type: 'DOOR',        x: 360, y: 180, width: 44, rotation: 90, label: 'Training In-Charge Entry', openDirection: 'LEFT'  },
+          { id: 703, type: 'DOOR',        x: 460, y: 220, width: 44, rotation:  0, label: 'Training Support Entry',   openDirection: 'RIGHT' },
+          { id: 704, type: 'DOUBLE_DOOR', x: 280, y: 380, width: 60, rotation: 90, label: 'ACC Bay 1 Entry',          openDirection: 'RIGHT' },
+          { id: 705, type: 'DOOR',        x: 460, y: 380, width: 44, rotation: 90, label: 'ACC Bay 2 Entry',          openDirection: 'LEFT'  },
+          { id: 706, type: 'DOOR',        x: 640, y: 380, width: 44, rotation: 90, label: 'ACC Bay 3 Entry',          openDirection: 'RIGHT' },
+          { id: 707, type: 'DOOR',        x: 810, y: 380, width: 44, rotation: 90, label: 'ACC Bay 4/WSO Entry',      openDirection: 'LEFT'  },
+          { id: 708, type: 'DOOR',        x: 135, y: 380, width: 44, rotation: 90, label: 'STM Room Entry',           openDirection: 'RIGHT' },
+          { id: 709, type: 'DOOR',        x: 990, y: 380, width: 44, rotation: 90, label: 'APP Room Entry',           openDirection: 'LEFT'  },
+          { id: 710, type: 'ELEVATOR',    x: 130, y: 200, width: 32, rotation:  0, label: 'Lift A (First Floor)'                             },
+          { id: 711, type: 'STAIRS',      x: 130, y: 300, width: 40, rotation:  0, label: 'Staircase First Floor'                            },
+          { id: 712, type: 'COLUMN',      x: 460, y:  80, width: 16, rotation:  0, label: 'Column-FF-1'                                      },
+          { id: 713, type: 'COLUMN',      x: 750, y:  80, width: 16, rotation:  0, label: 'Column-FF-2'                                      },
+        ]);
+      }
       setIsDirty(false);
     }
     clearSelections();

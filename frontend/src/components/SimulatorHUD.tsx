@@ -4,23 +4,24 @@ import { useSimulatorStore } from '../stores/simulatorStore';
 import type { AgentBehavior, SimulatorAgent } from '../features/simulator/types';
 import { useStore } from '../stores/appStore';
 
-// ── Real airport data from Kempegowda International Airport, Bangalore ────────
-// Source: Site Acceptance Test Procedure — ATS Complex, Alpha-1 (GEM/2024/B/4568766)
+// ── Alpha-2 Ground Floor — Kempegowda International Airport (BIAL) ────────────
+// Source: Location Maps.pdf — Ground Floor Alpha-2 plan
+// Scale: 41 m × 25 m building → ~25 px/m on 1040×640 canvas (offset 80,80)
 export const KEMPEGOWDA_CAMERAS = [
-  { id: 9001, name: 'CAM-01 · Entry Gate North', location: 'North Entry Gate', x: 120, y: 80, angle: 135, fov: 90, status: 'ACTIVE' as const, model: 'CP-UNC-TB21ZL65-VMDS-V2-27135', make: 'CP PLUS', is_overhead: false },
-  { id: 9002, name: 'CAM-02 · Entry Gate South', location: 'South Entry Gate', x: 120, y: 620, angle: 45, fov: 90, status: 'ACTIVE' as const, model: 'CP-UNC-TB21ZL65-VMDS-V2-27135', make: 'CP PLUS', is_overhead: false },
-  { id: 9003, name: 'CAM-03 · Terminal Lobby A', location: 'Terminal Lobby', x: 280, y: 180, angle: 180, fov: 100, status: 'ACTIVE' as const, model: 'CP-UNC-TB21ZL65-VMDS-V2-27135', make: 'CP PLUS', is_overhead: true },
-  { id: 9004, name: 'CAM-04 · Terminal Lobby B', location: 'Terminal Lobby', x: 280, y: 500, angle: 180, fov: 100, status: 'ACTIVE' as const, model: 'CP-UNC-TB21ZL65-VMDS-V2-27135', make: 'CP PLUS', is_overhead: true },
-  { id: 9005, name: 'CAM-05 · Security Check 1', location: 'Security Checkpoint Alpha', x: 450, y: 240, angle: 90, fov: 75, status: 'ACTIVE' as const, model: 'CP-UNC-TB21ZL65-VMDS-V2-27135', make: 'CP PLUS', is_overhead: false },
-  { id: 9006, name: 'CAM-06 · Security Check 2', location: 'Security Checkpoint Beta', x: 450, y: 450, angle: 90, fov: 75, status: 'ACTIVE' as const, model: 'CP-UNC-TB21ZL65-VMDS-V2-27135', make: 'CP PLUS', is_overhead: false },
-  { id: 9007, name: 'CAM-07 · Boarding Gate 1', location: 'Boarding Gate Wing A', x: 680, y: 160, angle: 270, fov: 80, status: 'ACTIVE' as const, model: 'CP-UNC-TB21ZL65-VMDS-V2-27135', make: 'CP PLUS', is_overhead: true },
-  { id: 9008, name: 'CAM-08 · Boarding Gate 2', location: 'Boarding Gate Wing A', x: 680, y: 310, angle: 270, fov: 80, status: 'ACTIVE' as const, model: 'CP-UNC-TB21ZL65-VMDS-V2-27135', make: 'CP PLUS', is_overhead: true },
-  { id: 9009, name: 'CAM-09 · Boarding Gate 3', location: 'Boarding Gate Wing B', x: 680, y: 460, angle: 270, fov: 80, status: 'ACTIVE' as const, model: 'CP-UNC-TB21ZL65-VMDS-V2-27135', make: 'CP PLUS', is_overhead: true },
-  { id: 9010, name: 'CAM-10 · Baggage Claim', location: 'Baggage Claim Hall', x: 850, y: 350, angle: 200, fov: 110, status: 'ACTIVE' as const, model: 'CP-UNC-TB21ZL65-VMDS-V2-27135', make: 'CP PLUS', is_overhead: true },
-  { id: 9011, name: 'CAM-11 · Restricted Ops', location: 'Airside Operations', x: 950, y: 200, angle: 225, fov: 60, status: 'ACTIVE' as const, model: 'CP-UNC-TB21ZL65-VMDS-V2-27135', make: 'CP PLUS', is_overhead: false },
-  { id: 9012, name: 'CAM-12 · Restricted Ops B', location: 'Airside Operations', x: 950, y: 520, angle: 135, fov: 60, status: 'ACTIVE' as const, model: 'CP-UNC-TB21ZL65-VMDS-V2-27135', make: 'CP PLUS', is_overhead: false },
-  { id: 9013, name: 'CAM-13 · Retail Zone', location: 'Duty-Free Retail Area', x: 560, y: 160, angle: 0, fov: 90, status: 'ACTIVE' as const, model: 'CP-UNC-TB21ZL65-VMDS-V2-27135', make: 'CP PLUS', is_overhead: true },
-  { id: 9014, name: 'CAM-14 · Exit Corridor', location: 'Exit Corridor', x: 1060, y: 360, angle: 0, fov: 70, status: 'MAINTENANCE' as const, model: 'CP-UNC-TB21ZL65-VMDS-V2-27135', make: 'CP PLUS', is_overhead: false },
+  { id: 9001, name: 'CAM-GF-01 · Main Entry',           location: 'Main Entry Gate (North)',        x: 600, y:  95, angle: 180, fov:  90, status: 'ACTIVE'      as const, model: 'CP-UNC-TB21ZL65-VMDS-V2', make: 'CP PLUS', is_overhead: false },
+  { id: 9002, name: 'CAM-GF-02 · Canteen Hall',         location: 'BIAL Canteen — Dining',          x: 200, y: 400, angle: 270, fov: 110, status: 'ACTIVE'      as const, model: 'CP-UNC-TB21ZL65-VMDS-V2', make: 'CP PLUS', is_overhead: true  },
+  { id: 9003, name: 'CAM-GF-03 · Canteen Kitchen',      location: 'BIAL Canteen — Kitchen',         x: 200, y: 580, angle:   0, fov:  90, status: 'ACTIVE'      as const, model: 'CP-UNC-TB21ZL65-VMDS-V2', make: 'CP PLUS', is_overhead: true  },
+  { id: 9004, name: 'CAM-GF-04 · Lobby/Lift Area',      location: 'Building Lobby — Lift Area',     x: 230, y: 230, angle:  90, fov:  80, status: 'ACTIVE'      as const, model: 'CP-UNC-TB21ZL65-VMDS-V2', make: 'CP PLUS', is_overhead: false },
+  { id: 9005, name: 'CAM-GF-05 · Electrical Room',      location: 'LT MCC HV Electrical Room',     x: 400, y: 160, angle: 180, fov:  60, status: 'ACTIVE'      as const, model: 'CP-UNC-TB21ZL65-VMDS-V2', make: 'CP PLUS', is_overhead: false },
+  { id: 9006, name: 'CAM-GF-06 · Gents Toilet',         location: 'Gents Toilet Corridor',         x: 445, y: 360, angle:   0, fov:  70, status: 'ACTIVE'      as const, model: 'CP-UNC-TB21ZL65-VMDS-V2', make: 'CP PLUS', is_overhead: false },
+  { id: 9007, name: 'CAM-GF-07 · Ladies Toilet',        location: 'Ladies Toilet Corridor',        x: 580, y: 360, angle: 180, fov:  70, status: 'ACTIVE'      as const, model: 'CP-UNC-TB21ZL65-VMDS-V2', make: 'CP PLUS', is_overhead: false },
+  { id: 9008, name: 'CAM-GF-08 · Area of Stay',         location: 'Area of Stay — Waiting',        x: 595, y: 440, angle: 270, fov: 100, status: 'ACTIVE'      as const, model: 'CP-UNC-TB21ZL65-VMDS-V2', make: 'CP PLUS', is_overhead: true  },
+  { id: 9009, name: 'CAM-GF-09 · Reception Desk',       location: 'Main Reception Counter',        x: 730, y: 160, angle: 180, fov: 100, status: 'ACTIVE'      as const, model: 'CP-UNC-TB21ZL65-VMDS-V2', make: 'CP PLUS', is_overhead: false },
+  { id: 9010, name: 'CAM-GF-10 · Reception Entry',      location: 'Reception — North Entry',       x: 688, y:  95, angle: 180, fov:  80, status: 'ACTIVE'      as const, model: 'CP-UNC-TB21ZL65-VMDS-V2', make: 'CP PLUS', is_overhead: false },
+  { id: 9011, name: 'CAM-GF-11 · Storage/Legal',        location: 'Storage / Legal Room',          x: 680, y: 490, angle:   0, fov:  60, status: 'ACTIVE'      as const, model: 'CP-UNC-TB21ZL65-VMDS-V2', make: 'CP PLUS', is_overhead: false },
+  { id: 9012, name: 'CAM-GF-12 · Monitor Room',         location: 'Monitor / Policy Room',         x: 842, y: 390, angle:  90, fov:  70, status: 'ACTIVE'      as const, model: 'CP-UNC-TB21ZL65-VMDS-V2', make: 'CP PLUS', is_overhead: false },
+  { id: 9013, name: 'CAM-GF-13 · Director Entry',       location: 'Airport Director — Entry',      x: 950, y:  95, angle: 180, fov:  80, status: 'ACTIVE'      as const, model: 'CP-UNC-TB21ZL65-VMDS-V2', make: 'CP PLUS', is_overhead: false },
+  { id: 9014, name: 'CAM-GF-14 · Director Corridor',    location: 'Director Offices — Corridor',   x: 990, y: 400, angle: 270, fov:  90, status: 'MAINTENANCE' as const, model: 'CP-UNC-TB21ZL65-VMDS-V2', make: 'CP PLUS', is_overhead: true  },
 ];
 
 // Preset agent names (synthetic airport personas)
