@@ -24,10 +24,10 @@ export function drawWallOnCanvas(
   ctx.lineTo(endX - nx * halfT, endY - ny * halfT);
   ctx.lineTo(startX - nx * halfT, startY - ny * halfT);
   ctx.closePath();
-  ctx.fillStyle = isSelected ? color + 'dd' : color + '55';
+  ctx.fillStyle = isSelected ? 'rgba(0, 240, 255, 0.25)' : 'rgba(30, 41, 59, 0.7)';
   ctx.fill();
-  ctx.strokeStyle = isSelected ? '#f59e0b' : color + '88';
-  ctx.lineWidth = isSelected ? 2 : 1;
+  ctx.strokeStyle = isSelected ? '#f59e0b' : 'rgba(0, 240, 255, 0.6)';
+  ctx.lineWidth = isSelected ? 2.5 : 2;
   ctx.stroke();
 
   if (isSelected) {
