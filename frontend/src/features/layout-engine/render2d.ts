@@ -219,6 +219,27 @@ export function drawArchElement(
       ctx.stroke();
       break;
     }
+    case 'ACCESS_DOOR': {
+      const size = 16;
+      ctx.fillStyle = 'rgba(34, 197, 94, 0.15)';
+      ctx.beginPath();
+      if (ctx.roundRect) {
+        ctx.roundRect(-size / 2, -size / 2, size, size, 3);
+      } else {
+        ctx.rect(-size / 2, -size / 2, size, size);
+      }
+      ctx.fill();
+      ctx.strokeStyle = '#22c55e';
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+
+      // Draw RFID symbol or lock slot
+      ctx.fillStyle = '#22c55e';
+      ctx.fillRect(-size / 4, -size / 4, size / 2, size / 2);
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(-size / 6, -size / 8, size / 3, size / 12);
+      break;
+    }
   }
 
   if (isSelected) {

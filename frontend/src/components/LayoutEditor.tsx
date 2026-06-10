@@ -66,7 +66,8 @@ interface WallSegment {
   label: string;
 }
 
-type ArchElementType = 'DOOR' | 'DOUBLE_DOOR' | 'WINDOW' | 'COLUMN' | 'STAIRS' | 'ELEVATOR';
+type ArchElementType = 'DOOR' | 'DOUBLE_DOOR' | 'WINDOW' | 'COLUMN' | 'STAIRS' | 'ELEVATOR' | 'ACCESS_DOOR';
+
 
 interface ArchElement {
   id: number;
@@ -134,20 +135,145 @@ const ALPHA2_AREA_A_CAMERAS = [
 ];
 
 // ── Alpha-2 First Floor Cameras ──────────────────────────────────────────────
-// ACC Rooms (4 bays), STM Room, WSO, APP Room, Training, Recreation
+// Aligned with the symmetric 11-room grid
 const ALPHA2_FF_CAMERAS = [
-  { id: 9201, name: 'CAM-FF-01 · ACC Bay 1',         location: 'Access Control Center — Bay 1',  x: 195, y: 710, angle:  45, fov: 120, status: 'ACTIVE' as const, is_overhead: true  },
-  { id: 9202, name: 'CAM-FF-02 · ACC Bay 2',         location: 'Access Control Center — Bay 2',  x: 375, y: 710, angle:  45, fov: 120, status: 'ACTIVE' as const, is_overhead: true  },
-  { id: 9203, name: 'CAM-FF-03 · ACC Bay 3',         location: 'Access Control Center — Bay 3',  x: 555, y: 710, angle:  45, fov: 120, status: 'ACTIVE' as const, is_overhead: true  },
-  { id: 9204, name: 'CAM-FF-04 · ACC Bay 4 (WSO)',   location: 'Access Control Center — Bay 4',  x: 735, y: 710, angle:  45, fov: 120, status: 'ACTIVE' as const, is_overhead: true  },
-  { id: 9205, name: 'CAM-FF-05 · STM Room',          location: 'STM Telecom Room',               x:  90, y: 710, angle:  45, fov: 120, status: 'ACTIVE' as const, is_overhead: false },
-  { id: 9206, name: 'CAM-FF-06 · APP Room',          location: 'APP / WSO Operations Room',      x: 1110, y: 710, angle: 135, fov: 120, status: 'ACTIVE' as const, is_overhead: false },
-  { id: 9207, name: 'CAM-FF-07 · Training Corridor', location: 'Training Room Corridor',         x: 450, y: 370, angle: 225, fov: 120, status: 'ACTIVE' as const, is_overhead: true  },
-  { id: 9208, name: 'CAM-FF-08 · Staircase',         location: 'First Floor — Staircase',        x:  90, y:  90, angle:  45, fov: 120, status: 'ACTIVE' as const, is_overhead: false },
-  { id: 9209, name: 'CAM-FF-09 · Recreation Room',   location: 'Recreation Room',                x: 915, y: 370, angle: 225, fov: 120, status: 'ACTIVE' as const, is_overhead: true  },
-  { id: 9210, name: 'CAM-FF-10 · First Floor Entry', location: 'First Floor — Main Entry',       x: 270, y:  90, angle: 135, fov: 120, status: 'ACTIVE' as const, is_overhead: false },
+  { id: 9201, name: 'CAM-FF-01 · Security NW',      location: 'Security Check Area — Northwest Corner', x: 240, y: 240, angle: 45,  fov: 110, status: 'ACTIVE' as const, is_overhead: true  },
+  { id: 9202, name: 'CAM-FF-02 · Corridor West',     location: 'Central Corridor — West End',          x: 240, y: 400, angle: 0,   fov: 100, status: 'ACTIVE' as const, is_overhead: true  },
+  { id: 9203, name: 'CAM-FF-03 · Telecom SW',        location: 'STM Telecom Room — Southwest Corner',   x: 240, y: 560, angle: 315, fov: 110, status: 'ACTIVE' as const, is_overhead: true  },
+  { id: 9204, name: 'CAM-FF-04 · Recreation NE',     location: 'Recreation Room — Northeast Corner',    x: 816, y: 240, angle: 135, fov: 110, status: 'ACTIVE' as const, is_overhead: true  },
+  { id: 9205, name: 'CAM-FF-05 · Corridor East',     location: 'Central Corridor — East End',          x: 960, y: 400, angle: 180, fov: 100, status: 'ACTIVE' as const, is_overhead: true  },
+  { id: 9206, name: 'CAM-FF-06 · APP SE',            location: 'APP Room — Southeast Corner',           x: 960, y: 560, angle: 225, fov: 110, status: 'ACTIVE' as const, is_overhead: true  },
+  { id: 9207, name: 'CAM-FF-07 · Training Center',   location: 'Training Area — Center Desk',          x: 456, y: 240, angle: 90,  fov: 120, status: 'ACTIVE' as const, is_overhead: true  },
+  { id: 9208, name: 'CAM-FF-08 · Control Desk',      location: 'Control Office — Console Area',        x: 600, y: 240, angle: 90,  fov: 120, status: 'ACTIVE' as const, is_overhead: true  },
+  { id: 9209, name: 'CAM-FF-09 · Utility Room',      location: 'Utility Room — Main Rack',             x: 888, y: 240, angle: 90,  fov: 120, status: 'ACTIVE' as const, is_overhead: true  },
+  { id: 9210, name: 'CAM-FF-10 · ACC Bay 1-2',       location: 'ACC Rooms — Bay 1 & 2 Corridor',       x: 420, y: 560, angle: 270, fov: 120, status: 'ACTIVE' as const, is_overhead: true  },
+  { id: 9211, name: 'CAM-FF-11 · ACC Bay 3-4',       location: 'ACC Rooms — Bay 3 & 4 Corridor',       x: 660, y: 560, angle: 270, fov: 120, status: 'ACTIVE' as const, is_overhead: true  },
+  { id: 9212, name: 'CAM-FF-12 · ACC WSO Desk',      location: 'ACC Room — Bay 4 (WSO) Interior',       x: 780, y: 560, angle: 270, fov: 120, status: 'ACTIVE' as const, is_overhead: true  },
 ];
 
+const WALL_COLOR = '#ffffff';
+
+const GF_WALLS: WallSegment[] = [
+  { id: 101, startX:   80, startY:  80, endX: 1120, endY:  80, thickness: 8, color: WALL_COLOR, label: 'North Perimeter Wall' },
+  { id: 102, startX:   80, startY:  80, endX:   80, endY: 720, thickness: 8, color: WALL_COLOR, label: 'West Perimeter Wall'  },
+  { id: 103, startX: 1120, startY:  80, endX: 1120, endY: 720, thickness: 8, color: WALL_COLOR, label: 'East Perimeter Wall'  },
+  { id: 104, startX:   80, startY: 720, endX: 1120, endY: 720, thickness: 8, color: WALL_COLOR, label: 'South Perimeter Wall' },
+  { id: 105, startX: 340, startY:  80, endX: 340, endY: 720, thickness: 6, color: WALL_COLOR, label: 'Canteen East Wall' },
+  { id: 106, startX:  80, startY: 340, endX: 340, endY: 340, thickness: 5, color: WALL_COLOR, label: 'Canteen Upper Divider' },
+  { id: 107, startX: 175, startY:  80, endX: 175, endY: 340, thickness: 4, color: WALL_COLOR, label: 'Locker Room Wall'      },
+  { id: 108, startX: 175, startY: 200, endX: 340, endY: 200, thickness: 4, color: WALL_COLOR, label: 'Rest Room Divider'    },
+  { id: 109, startX: 340, startY: 280, endX: 555, endY: 280, thickness: 5, color: WALL_COLOR, label: 'Electrical Room South Wall' },
+  { id: 110, startX: 555, startY:  80, endX: 555, endY: 280, thickness: 5, color: WALL_COLOR, label: 'Electrical Room East Wall'  },
+  { id: 111, startX: 340, startY: 440, endX: 635, endY: 440, thickness: 5, color: WALL_COLOR, label: 'Toilet Block North Wall'   },
+  { id: 112, startX: 340, startY: 560, endX: 635, endY: 560, thickness: 5, color: WALL_COLOR, label: 'Toilet Block South Wall'   },
+  { id: 113, startX: 480, startY: 280, endX: 480, endY: 440, thickness: 4, color: WALL_COLOR, label: 'Gents/Ladies Divider'      },
+  { id: 114, startX: 635, startY: 280, endX: 635, endY: 440, thickness: 4, color: WALL_COLOR, label: 'Toilet Block East Wall'    },
+  { id: 115, startX: 635, startY:  80, endX: 635, endY: 280, thickness: 5, color: WALL_COLOR, label: 'Reception West Wall'  },
+  { id: 116, startX: 635, startY: 280, endX: 855, endY: 280, thickness: 4, color: WALL_COLOR, label: 'Reception South Wall' },
+  { id: 117, startX: 855, startY:  80, endX: 855, endY: 280, thickness: 4, color: WALL_COLOR, label: 'Reception East Wall'  },
+  { id: 118, startX: 635, startY: 440, endX: 760, endY: 440, thickness: 4, color: WALL_COLOR, label: 'Area of Stay North Wall'  },
+  { id: 119, startX: 635, startY: 560, endX: 760, endY: 560, thickness: 4, color: WALL_COLOR, label: 'Storage Room South Wall'  },
+  { id: 120, startX: 760, startY: 280, endX: 760, endY: 560, thickness: 4, color: WALL_COLOR, label: 'Storage/Stay East Wall'   },
+  { id: 121, startX: 855, startY: 280, endX: 890, endY: 280, thickness: 4, color: WALL_COLOR, label: 'Monitor Room North Wall' },
+  { id: 122, startX: 890, startY:  80, endX: 890, endY: 560, thickness: 4, color: WALL_COLOR, label: 'Monitor Room East Wall'  },
+  { id: 123, startX: 855, startY: 560, endX: 890, endY: 560, thickness: 4, color: WALL_COLOR, label: 'Monitor Room South Wall' },
+  { id: 124, startX: 890, startY:  80, endX:  890, endY: 720, thickness: 6, color: WALL_COLOR, label: 'Director Offices West Wall'       },
+  { id: 125, startX: 890, startY: 400, endX: 1120, endY: 400, thickness: 4, color: WALL_COLOR, label: 'Director Office Internal Division' },
+  { id: 126, startX: 1010, startY: 80, endX: 1010, endY: 400, thickness: 4, color: WALL_COLOR, label: 'Data Office West Wall'            },
+  { id: 127, startX: 890, startY: 560, endX: 1120, endY: 560, thickness: 4, color: WALL_COLOR, label: 'Right Toilet Block divider'       },
+  { id: 128, startX: 1010, startY: 400, endX: 1010, endY: 560, thickness: 4, color: WALL_COLOR, label: 'AFSB / Toilet Divider'          },
+];
+
+const GF_ARCH_ELEMENTS: ArchElement[] = [
+  { id: 201, type: 'DOOR',        x: 600, y:  80, width: 50, rotation:  90, label: 'Main Entry Gate',       openDirection: 'RIGHT' },
+  { id: 202, type: 'DOOR',        x: 120, y: 340, width: 44, rotation:   0, label: 'Canteen Side Entry',    openDirection: 'RIGHT' },
+  { id: 203, type: 'DOOR',        x: 340, y: 200, width: 44, rotation:   0, label: 'Canteen-Lobby Door',    openDirection: 'LEFT'  },
+  { id: 204, type: 'DOOR',        x: 430, y: 280, width: 44, rotation:  90, label: 'Electrical Room Door',  openDirection: 'RIGHT' },
+  { id: 205, type: 'DOOR',        x: 635, y: 160, width: 44, rotation:   0, label: 'Reception Entry Door',  openDirection: 'RIGHT' },
+  { id: 206, type: 'DOOR',        x: 855, y: 400, width: 44, rotation:   0, label: 'Monitor Room Door',     openDirection: 'LEFT'  },
+  { id: 207, type: 'DOUBLE_DOOR', x: 890, y: 400, width: 60, rotation:   0, label: 'Director Entry Gate',   openDirection: 'RIGHT' },
+  { id: 208, type: 'ELEVATOR',    x: 130, y: 150, width: 32, rotation:   0, label: 'Lift A'                                        },
+  { id: 209, type: 'STAIRS',      x: 130, y: 240, width: 40, rotation:   0, label: 'Staircase GF'                                  },
+  { id: 210, type: 'COLUMN',      x: 480, y:  80, width: 16, rotation:   0, label: 'Column-GF-1'                                   },
+  { id: 211, type: 'COLUMN',      x: 760, y:  80, width: 16, rotation:   0, label: 'Column-GF-2'                                   },
+  { id: 212, type: 'WINDOW',      x: 420, y:  80, width: 80, rotation:   0, label: 'Window North A'                                },
+  { id: 213, type: 'WINDOW',      x: 770, y:  80, width: 80, rotation:   0, label: 'Window North B'                                },
+  { id: 214, type: 'WINDOW',      x: 960, y:  80, width: 80, rotation:   0, label: 'Window North C'                                },
+  { id: 215, type: 'DOOR',        x: 890, y: 460, width: 44, rotation:   0, label: 'AFSB Office Door',      openDirection: 'RIGHT' },
+  { id: 216, type: 'DOOR',        x: 1010, y: 460, width: 44, rotation:   0, label: 'Right Restrooms Door',  openDirection: 'LEFT'  },
+  { id: 217, type: 'DOOR',        x: 890, y: 220, width: 44, rotation:   0, label: 'Data Office Door',      openDirection: 'RIGHT' },
+];
+
+const AA_WALLS: WallSegment[] = [
+  { id: 401, startX:   80, startY:  80, endX: 1120, endY:  80, thickness: 8, color: WALL_COLOR, label: 'North Perimeter Wall' },
+  { id: 402, startX:   80, startY:  80, endX:   80, endY: 720, thickness: 8, color: WALL_COLOR, label: 'West Perimeter Wall'  },
+  { id: 403, startX: 1120, startY:  80, endX: 1120, endY: 720, thickness: 8, color: WALL_COLOR, label: 'East Perimeter Wall'  },
+  { id: 404, startX:   80, startY: 720, endX: 1120, endY: 720, thickness: 8, color: WALL_COLOR, label: 'South Perimeter Wall' },
+  { id: 405, startX:   80, startY: 490, endX: 1120, endY: 490, thickness: 6, color: WALL_COLOR, label: 'Server Room North Wall'      },
+  { id: 406, startX:   80, startY: 300, endX:  340, endY: 300, thickness: 5, color: WALL_COLOR, label: 'CMS Room South Wall'         },
+  { id: 407, startX:  340, startY:  80, endX:  340, endY: 490, thickness: 5, color: WALL_COLOR, label: 'CMS Block East Wall'         },
+  { id: 408, startX:  210, startY: 300, endX:  210, endY: 490, thickness: 4, color: WALL_COLOR, label: 'CMS Server Rack Divider'     },
+  { id: 409, startX:   80, startY: 170, endX:  340, endY: 170, thickness: 4, color: WALL_COLOR, label: 'CMS Maintenance South Wall'  },
+  { id: 410, startX:  340, startY: 300, endX:  620, endY: 300, thickness: 5, color: WALL_COLOR, label: 'Comms Room South Wall'       },
+  { id: 411, startX:  480, startY: 300, endX:  480, endY: 490, thickness: 4, color: WALL_COLOR, label: 'Radio Room East Wall'        },
+  { id: 412, startX:  620, startY:  80, endX:  620, endY: 490, thickness: 5, color: WALL_COLOR, label: 'CHS Executive West Wall'     },
+  { id: 413, startX:  620, startY: 300, endX:  860, endY: 300, thickness: 4, color: WALL_COLOR, label: 'Executive Room South Wall'   },
+  { id: 414, startX:  860, startY:  80, endX:  860, endY: 490, thickness: 5, color: WALL_COLOR, label: 'Director East Partition'     },
+  { id: 415, startX:  860, startY: 300, endX:  940, endY: 300, thickness: 4, color: WALL_COLOR, label: 'Director Office South Wall'  },
+  { id: 416, startX:  940, startY:  80, endX:  940, endY: 490, thickness: 4, color: WALL_COLOR, label: 'Inner Office East Wall'      },
+  { id: 417, startX:  255, startY: 490, endX:  255, endY: 720, thickness: 4, color: WALL_COLOR, label: 'Server Divider 1'            },
+  { id: 418, startX:  440, startY: 490, endX:  440, endY: 720, thickness: 4, color: WALL_COLOR, label: 'Cyber TAC East Wall'         },
+  { id: 419, startX:  590, startY: 490, endX:  590, endY: 720, thickness: 4, color: WALL_COLOR, label: 'UHF Room East Wall'          },
+  { id: 420, startX:  740, startY: 490, endX:  740, endY: 720, thickness: 4, color: WALL_COLOR, label: 'Battery Room East Wall'      },
+  { id: 421, startX:  890, startY: 490, endX:  890, endY: 720, thickness: 4, color: WALL_COLOR, label: 'Fallback Server Room W Wall' },
+];
+
+const AA_ARCH_ELEMENTS: ArchElement[] = [
+  { id: 501, type: 'DOOR',     x: 210, y: 300, width: 44, rotation:  0, label: 'CMS Room Entry',          openDirection: 'RIGHT' },
+  { id: 502, type: 'DOOR',     x: 340, y: 200, width: 44, rotation:  0, label: 'CMS Maintenance Entry',   openDirection: 'LEFT'  },
+  { id: 503, type: 'DOOR',     x: 480, y: 390, width: 44, rotation:  0, label: 'Radio Room Entry',        openDirection: 'RIGHT' },
+  { id: 504, type: 'DOOR',     x: 720, y: 390, width: 44, rotation:  0, label: 'Executive Room Entry',    openDirection: 'LEFT'  },
+  { id: 505, type: 'DOOR',     x: 860, y: 200, width: 44, rotation:  0, label: 'Director Area Entry',     openDirection: 'RIGHT' },
+  { id: 506, type: 'DOOR',     x: 350, y: 560, width: 44, rotation:  0, label: 'Cyber TAC Room Entry',    openDirection: 'RIGHT' },
+  { id: 507, type: 'ELEVATOR', x: 130, y: 150, width: 32, rotation:  0, label: 'Lift A (Area A)'                                  },
+  { id: 508, type: 'STAIRS',   x: 130, y: 240, width: 40, rotation:  0, label: 'Staircase Area A'                                 },
+  { id: 509, type: 'COLUMN',   x: 480, y:  80, width: 16, rotation:  0, label: 'Column-AA-1'                                      },
+  { id: 510, type: 'COLUMN',   x: 760, y:  80, width: 16, rotation:  0, label: 'Column-AA-2'                                      },
+];
+
+const FF_WALLS: WallSegment[] = [
+  { id: 601, startX: 240, startY: 240, endX: 960, endY: 240, thickness: 8, color: WALL_COLOR, label: 'North Perimeter Wall' },
+  { id: 602, startX: 240, startY: 240, endX: 240, endY: 560, thickness: 8, color: WALL_COLOR, label: 'West Perimeter Wall'  },
+  { id: 603, startX: 960, startY: 240, endX: 960, endY: 560, thickness: 8, color: WALL_COLOR, label: 'East Perimeter Wall'  },
+  { id: 604, startX: 240, startY: 560, endX: 960, endY: 560, thickness: 8, color: WALL_COLOR, label: 'South Perimeter Wall' },
+  { id: 605, startX: 240, startY: 380, endX: 960, endY: 380, thickness: 6, color: WALL_COLOR, label: 'Corridor North Wall'     },
+  { id: 606, startX: 240, startY: 420, endX: 960, endY: 420, thickness: 6, color: WALL_COLOR, label: 'Corridor South Wall'     },
+  { id: 607, startX: 384, startY: 240, endX: 384, endY: 380, thickness: 4, color: WALL_COLOR, label: 'Security Check / Training Partition' },
+  { id: 608, startX: 528, startY: 240, endX: 528, endY: 380, thickness: 4, color: WALL_COLOR, label: 'Training / Control Office Partition' },
+  { id: 609, startX: 672, startY: 240, endX: 672, endY: 380, thickness: 4, color: WALL_COLOR, label: 'Control Office / Recreation Partition' },
+  { id: 610, startX: 816, startY: 240, endX: 816, endY: 380, thickness: 4, color: WALL_COLOR, label: 'Recreation / Utility Partition' },
+  { id: 611, startX: 360, startY: 420, endX: 360, endY: 560, thickness: 4, color: WALL_COLOR, label: 'STM Telecom / ACC Bay 1 Partition' },
+  { id: 612, startX: 480, startY: 420, endX: 480, endY: 560, thickness: 4, color: WALL_COLOR, label: 'ACC Bay 1 / ACC Bay 2 Partition' },
+  { id: 613, startX: 600, startY: 420, endX: 600, endY: 560, thickness: 4, color: WALL_COLOR, label: 'ACC Bay 2 / ACC Bay 3 Partition' },
+  { id: 614, startX: 720, startY: 420, endX: 720, endY: 560, thickness: 4, color: WALL_COLOR, label: 'ACC Bay 3 / ACC Bay 4 Partition' },
+  { id: 615, startX: 840, startY: 420, endX: 840, endY: 560, thickness: 4, color: WALL_COLOR, label: 'ACC Bay 4 / APP Room Partition' },
+];
+
+const FF_ARCH_ELEMENTS: ArchElement[] = [
+  { id: 701, type: 'DOOR',        x: 350, y: 380, width: 36, rotation: 0, label: 'Security Check Door', openDirection: 'RIGHT' },
+  { id: 702, type: 'DOOR',        x: 494, y: 380, width: 36, rotation: 0, label: 'Training Area Door', openDirection: 'RIGHT' },
+  { id: 703, type: 'DOOR',        x: 638, y: 380, width: 36, rotation: 0, label: 'Control Office Door', openDirection: 'RIGHT' },
+  { id: 704, type: 'DOOR',        x: 782, y: 380, width: 36, rotation: 0, label: 'Recreation Room Door', openDirection: 'RIGHT' },
+  { id: 705, type: 'DOOR',        x: 846, y: 380, width: 36, rotation: 0, label: 'Utility Room Door', openDirection: 'LEFT' },
+  { id: 706, type: 'DOOR',        x: 330, y: 420, width: 36, rotation: 0, label: 'STM Telecom Door', openDirection: 'RIGHT' },
+  { id: 707, type: 'DOOR',        x: 390, y: 420, width: 36, rotation: 0, label: 'ACC Bay 1 Door', openDirection: 'LEFT' },
+  { id: 708, type: 'DOOR',        x: 510, y: 420, width: 36, rotation: 0, label: 'ACC Bay 2 Door', openDirection: 'LEFT' },
+  { id: 709, type: 'DOOR',        x: 630, y: 420, width: 36, rotation: 0, label: 'ACC Bay 3 Door', openDirection: 'LEFT' },
+  { id: 710, type: 'DOOR',        x: 750, y: 420, width: 36, rotation: 0, label: 'ACC Bay 4 Door', openDirection: 'LEFT' },
+  { id: 711, type: 'DOOR',        x: 870, y: 420, width: 36, rotation: 0, label: 'APP Room Door', openDirection: 'LEFT' },
+  { id: 712, type: 'ACCESS_DOOR', x: 320, y: 400, width: 16, rotation: 0, label: 'Corridor Access Point A' },
+  { id: 713, type: 'ACCESS_DOOR', x: 640, y: 400, width: 16, rotation: 0, label: 'Corridor Access Point B' },
+];
 
 const ARCH_ELEMENT_TYPES: { type: ArchElementType; label: string; icon: string }[] = [
   { type: 'DOOR',        label: 'Single Door',  icon: '🚪' },
@@ -156,9 +282,8 @@ const ARCH_ELEMENT_TYPES: { type: ArchElementType; label: string; icon: string }
   { type: 'COLUMN',      label: 'Column',       icon: '◼' },
   { type: 'STAIRS',      label: 'Stairs',       icon: '📐' },
   { type: 'ELEVATOR',    label: 'Elevator',     icon: '⬆' },
+  { type: 'ACCESS_DOOR',  label: 'Access Door',  icon: '🟢' },
 ];
-
-const WALL_COLOR = '#ffffff';
 
 // ─── Utility Functions ────────────────────────────────────────────────────────
 
@@ -509,14 +634,6 @@ export default function LayoutEditor() {
   const [simSessionId, setSimSessionId] = useState<string | null>(null);
   const isSimulatorActive = simulatorEnabled && simulatorMode === 'simulator';
 
-  // Helper to clear all selections
-  const clearSelections = useCallback(() => {
-    setSelectedCam(null);
-    setSelectedZone(null);
-    setSelectedWall(null);
-    setSelectedArch(null);
-  }, []);
-
   const getFloorBounds = useCallback((width: number, height: number): FloorBounds => {
     return getFloorBoundsShared(width, height);
   }, []);
@@ -536,8 +653,28 @@ export default function LayoutEditor() {
     };
   }, [snapToGrid, pxPerFoot]);
 
+  // Helper to clear all selections
+  const clearSelections = useCallback(() => {
+    setSelectedCam(null);
+    setSelectedZone(null);
+    setSelectedWall(null);
+    setSelectedArch(null);
+  }, []);
+
   // Sync with store cameras/zones on floor change or initial loading
   useEffect(() => {
+    // Populate walls and archElements regardless of token
+    if (activeFloor === 0) {
+      setWalls(GF_WALLS);
+      setArchElements(GF_ARCH_ELEMENTS);
+    } else if (activeFloor === 1) {
+      setWalls(AA_WALLS);
+      setArchElements(AA_ARCH_ELEMENTS);
+    } else if (activeFloor === 2) {
+      setWalls(FF_WALLS);
+      setArchElements(FF_ARCH_ELEMENTS);
+    }
+
     if (token && token !== 'demo-token') {
       const floorCams = cameras
         .filter(c => c.floor === activeFloor && ((c as any).building_id ?? null) === (currentBuildingId ?? null))
@@ -611,71 +748,9 @@ export default function LayoutEditor() {
           { id: 112, name: 'Director Entry & Corridor', type: 'DWELL', color: ZONE_COLORS.DWELL, dwell_alert_seconds: 900, is_active: true,
             points: [{ x: 890, y: 560 }, { x: 1120, y: 560 }, { x: 1120, y: 720 }, { x: 890, y: 720 }] }
         ]);
-        setWalls([
-          // ── Outer perimeter (41 m × 25 m @ 25 px/m, offset 80,80)
-          { id: 101, startX:   80, startY:  80, endX: 1120, endY:  80, thickness: 8, color: WALL_COLOR, label: 'North Perimeter Wall' },
-          { id: 102, startX:   80, startY:  80, endX:   80, endY: 720, thickness: 8, color: WALL_COLOR, label: 'West Perimeter Wall'  },
-          { id: 103, startX: 1120, startY:  80, endX: 1120, endY: 720, thickness: 8, color: WALL_COLOR, label: 'East Perimeter Wall'  },
-          { id: 104, startX:   80, startY: 720, endX: 1120, endY: 720, thickness: 8, color: WALL_COLOR, label: 'South Perimeter Wall' },
-          // ── Canteen east partition (~10.4 m from west)
-          { id: 105, startX: 340, startY:  80, endX: 340, endY: 720, thickness: 6, color: WALL_COLOR, label: 'Canteen East Wall' },
-          // ── Canteen internal — upper locker/rest rooms above dining
-          { id: 106, startX:  80, startY: 340, endX: 340, endY: 340, thickness: 5, color: WALL_COLOR, label: 'Canteen Upper Divider' },
-          { id: 107, startX: 175, startY:  80, endX: 175, endY: 340, thickness: 4, color: WALL_COLOR, label: 'Locker Room Wall'      },
-          { id: 108, startX: 175, startY: 200, endX: 340, endY: 200, thickness: 4, color: WALL_COLOR, label: 'Rest Room Divider'    },
-          // ── LT MCC HV Electrical Room
-          { id: 109, startX: 340, startY: 280, endX: 555, endY: 280, thickness: 5, color: WALL_COLOR, label: 'Electrical Room South Wall' },
-          { id: 110, startX: 555, startY:  80, endX: 555, endY: 280, thickness: 5, color: WALL_COLOR, label: 'Electrical Room East Wall'  },
-          // ── Toilet block (Gents + Ladies back-to-back)
-          { id: 111, startX: 340, startY: 440, endX: 635, endY: 440, thickness: 5, color: WALL_COLOR, label: 'Toilet Block North Wall'   },
-          { id: 112, startX: 340, startY: 560, endX: 635, endY: 560, thickness: 5, color: WALL_COLOR, label: 'Toilet Block South Wall'   },
-          { id: 113, startX: 480, startY: 280, endX: 480, endY: 440, thickness: 4, color: WALL_COLOR, label: 'Gents/Ladies Divider'      },
-          { id: 114, startX: 635, startY: 280, endX: 635, endY: 440, thickness: 4, color: WALL_COLOR, label: 'Toilet Block East Wall'    },
-          // ── Reception area
-          { id: 115, startX: 635, startY:  80, endX: 635, endY: 280, thickness: 5, color: WALL_COLOR, label: 'Reception West Wall'  },
-          { id: 116, startX: 635, startY: 280, endX: 855, endY: 280, thickness: 4, color: WALL_COLOR, label: 'Reception South Wall' },
-          { id: 117, startX: 855, startY:  80, endX: 855, endY: 280, thickness: 4, color: WALL_COLOR, label: 'Reception East Wall'  },
-          // ── Area of Stay / Storage / Legal
-          { id: 118, startX: 635, startY: 440, endX: 760, endY: 440, thickness: 4, color: WALL_COLOR, label: 'Area of Stay North Wall'  },
-          { id: 119, startX: 635, startY: 560, endX: 760, endY: 560, thickness: 4, color: WALL_COLOR, label: 'Storage Room South Wall'  },
-          { id: 120, startX: 760, startY: 280, endX: 760, endY: 560, thickness: 4, color: WALL_COLOR, label: 'Storage/Stay East Wall'   },
-          // ── Monitor / Policy Room
-          { id: 121, startX: 855, startY: 280, endX: 890, endY: 280, thickness: 4, color: WALL_COLOR, label: 'Monitor Room North Wall' },
-          { id: 122, startX: 890, startY:  80, endX: 890, endY: 560, thickness: 4, color: WALL_COLOR, label: 'Monitor Room East Wall'  },
-          { id: 123, startX: 855, startY: 560, endX: 890, endY: 560, thickness: 4, color: WALL_COLOR, label: 'Monitor Room South Wall' },
-          // ── Director Offices west partition
-          { id: 124, startX: 890, startY:  80, endX:  890, endY: 720, thickness: 6, color: WALL_COLOR, label: 'Director Offices West Wall'       },
-          { id: 125, startX: 890, startY: 400, endX: 1120, endY: 400, thickness: 4, color: WALL_COLOR, label: 'Director Office Internal Division' },
-          { id: 126, startX: 1010, startY: 80, endX: 1010, endY: 400, thickness: 4, color: WALL_COLOR, label: 'Data Office West Wall'            },
-          { id: 127, startX: 890, startY: 560, endX: 1120, endY: 560, thickness: 4, color: WALL_COLOR, label: 'Right Toilet Block divider'       },
-          { id: 128, startX: 1010, startY: 400, endX: 1010, endY: 560, thickness: 4, color: WALL_COLOR, label: 'AFSB / Toilet Divider'          },
-        ]);
-        setArchElements([
-          { id: 201, type: 'DOOR',        x: 600, y:  80, width: 50, rotation:  90, label: 'Main Entry Gate',       openDirection: 'RIGHT' },
-          { id: 202, type: 'DOOR',        x: 120, y: 340, width: 44, rotation:   0, label: 'Canteen Side Entry',    openDirection: 'RIGHT' },
-          { id: 203, type: 'DOOR',        x: 340, y: 200, width: 44, rotation:   0, label: 'Canteen-Lobby Door',    openDirection: 'LEFT'  },
-          { id: 204, type: 'DOOR',        x: 430, y: 280, width: 44, rotation:  90, label: 'Electrical Room Door',  openDirection: 'RIGHT' },
-          { id: 205, type: 'DOOR',        x: 635, y: 160, width: 44, rotation:   0, label: 'Reception Entry Door',  openDirection: 'RIGHT' },
-          { id: 206, type: 'DOOR',        x: 855, y: 400, width: 44, rotation:   0, label: 'Monitor Room Door',     openDirection: 'LEFT'  },
-          { id: 207, type: 'DOUBLE_DOOR', x: 890, y: 400, width: 60, rotation:   0, label: 'Director Entry Gate',   openDirection: 'RIGHT' },
-          { id: 208, type: 'ELEVATOR',    x: 130, y: 150, width: 32, rotation:   0, label: 'Lift A'                                        },
-          { id: 209, type: 'STAIRS',      x: 130, y: 240, width: 40, rotation:   0, label: 'Staircase GF'                                  },
-          { id: 210, type: 'COLUMN',      x: 480, y:  80, width: 16, rotation:   0, label: 'Column-GF-1'                                   },
-          { id: 211, type: 'COLUMN',      x: 760, y:  80, width: 16, rotation:   0, label: 'Column-GF-2'                                   },
-          { id: 212, type: 'WINDOW',      x: 420, y:  80, width: 80, rotation:   0, label: 'Window North A'                                },
-          { id: 213, type: 'WINDOW',      x: 770, y:  80, width: 80, rotation:   0, label: 'Window North B'                                },
-          { id: 214, type: 'WINDOW',      x: 960, y:  80, width: 80, rotation:   0, label: 'Window North C'                                },
-          { id: 215, type: 'DOOR',        x: 890, y: 460, width: 44, rotation:   0, label: 'AFSB Office Door',      openDirection: 'RIGHT' },
-          { id: 216, type: 'DOOR',        x: 1010, y: 460, width: 44, rotation:   0, label: 'Right Restrooms Door',  openDirection: 'LEFT'  },
-          { id: 217, type: 'DOOR',        x: 890, y: 220, width: 44, rotation:   0, label: 'Data Office Door',      openDirection: 'RIGHT' },
-        ]);
-
       } else if (activeFloor === 1) {
         // ════════════════════════════════════════════════════════════════
         //  AREA A — INTERMEDIATE FLOOR
-        //  Key areas: CMS Room, CMS Maintenance, CHS Executives, Radio
-        //  Interface, Automation Servers, Cyber TAC, UHF/VCS, Battery,
-        //  Fallback Servers, Commercial
         // ════════════════════════════════════════════════════════════════
         setPlacedCams(ALPHA2_AREA_A_CAMERAS.map(c => ({
           id: c.id, x: c.x, y: c.y, angle: c.angle, fov: c.fov,
@@ -703,55 +778,9 @@ export default function LayoutEditor() {
           { id: 309, name: 'Area A Entry Tripwire', type: 'TRIPWIRE', color: ZONE_COLORS.TRIPWIRE, dwell_alert_seconds: 0, is_active: true,
             points: [{ x:  80, y:  80 }, { x: 200, y:  80 }, { x: 200, y: 140 }, { x:  80, y: 140 }] },
         ]);
-        setWalls([
-          // ── Outer perimeter
-          { id: 401, startX:   80, startY:  80, endX: 1120, endY:  80, thickness: 8, color: WALL_COLOR, label: 'North Perimeter Wall' },
-          { id: 402, startX:   80, startY:  80, endX:   80, endY: 720, thickness: 8, color: WALL_COLOR, label: 'West Perimeter Wall'  },
-          { id: 403, startX: 1120, startY:  80, endX: 1120, endY: 720, thickness: 8, color: WALL_COLOR, label: 'East Perimeter Wall'  },
-          { id: 404, startX:   80, startY: 720, endX: 1120, endY: 720, thickness: 8, color: WALL_COLOR, label: 'South Perimeter Wall' },
-          // ── Server room row partition (lower third)
-          { id: 405, startX:   80, startY: 490, endX: 1120, endY: 490, thickness: 6, color: WALL_COLOR, label: 'Server Room North Wall'      },
-          // ── CMS Room block
-          { id: 406, startX:   80, startY: 300, endX:  340, endY: 300, thickness: 5, color: WALL_COLOR, label: 'CMS Room South Wall'         },
-          { id: 407, startX:  340, startY:  80, endX:  340, endY: 490, thickness: 5, color: WALL_COLOR, label: 'CMS Block East Wall'         },
-          { id: 408, startX:  210, startY: 300, endX:  210, endY: 490, thickness: 4, color: WALL_COLOR, label: 'CMS Server Rack Divider'     },
-          // ── CMS Maintenance Room (upper left)
-          { id: 409, startX:   80, startY: 170, endX:  340, endY: 170, thickness: 4, color: WALL_COLOR, label: 'CMS Maintenance South Wall'  },
-          // ── Central comms / radio / locker area
-          { id: 410, startX:  340, startY: 300, endX:  620, endY: 300, thickness: 5, color: WALL_COLOR, label: 'Comms Room South Wall'       },
-          { id: 411, startX:  480, startY: 300, endX:  480, endY: 490, thickness: 4, color: WALL_COLOR, label: 'Radio Room East Wall'        },
-          // ── CHS Executive zone
-          { id: 412, startX:  620, startY:  80, endX:  620, endY: 490, thickness: 5, color: WALL_COLOR, label: 'CHS Executive West Wall'     },
-          { id: 413, startX:  620, startY: 300, endX:  860, endY: 300, thickness: 4, color: WALL_COLOR, label: 'Executive Room South Wall'   },
-          { id: 414, startX:  860, startY:  80, endX:  860, endY: 490, thickness: 5, color: WALL_COLOR, label: 'Director East Partition'     },
-          { id: 415, startX:  860, startY: 300, endX:  940, endY: 300, thickness: 4, color: WALL_COLOR, label: 'Director Office South Wall'  },
-          { id: 416, startX:  940, startY:  80, endX:  940, endY: 490, thickness: 4, color: WALL_COLOR, label: 'Inner Office East Wall'      },
-          // ── Server sub-partitions (lower section)
-          { id: 417, startX:  255, startY: 490, endX:  255, endY: 720, thickness: 4, color: WALL_COLOR, label: 'Server Divider 1'            },
-          { id: 418, startX:  440, startY: 490, endX:  440, endY: 720, thickness: 4, color: WALL_COLOR, label: 'Cyber TAC East Wall'         },
-          { id: 419, startX:  590, startY: 490, endX:  590, endY: 720, thickness: 4, color: WALL_COLOR, label: 'UHF Room East Wall'          },
-          { id: 420, startX:  740, startY: 490, endX:  740, endY: 720, thickness: 4, color: WALL_COLOR, label: 'Battery Room East Wall'      },
-          { id: 421, startX:  890, startY: 490, endX:  890, endY: 720, thickness: 4, color: WALL_COLOR, label: 'Fallback Server Room W Wall' },
-        ]);
-        setArchElements([
-          { id: 501, type: 'DOOR',     x: 210, y: 300, width: 44, rotation:  0, label: 'CMS Room Entry',          openDirection: 'RIGHT' },
-          { id: 502, type: 'DOOR',     x: 340, y: 200, width: 44, rotation:  0, label: 'CMS Maintenance Entry',   openDirection: 'LEFT'  },
-          { id: 503, type: 'DOOR',     x: 480, y: 390, width: 44, rotation:  0, label: 'Radio Room Entry',        openDirection: 'RIGHT' },
-          { id: 504, type: 'DOOR',     x: 720, y: 390, width: 44, rotation:  0, label: 'Executive Room Entry',    openDirection: 'LEFT'  },
-          { id: 505, type: 'DOOR',     x: 860, y: 200, width: 44, rotation:  0, label: 'Director Area Entry',     openDirection: 'RIGHT' },
-          { id: 506, type: 'DOOR',     x: 350, y: 560, width: 44, rotation:  0, label: 'Cyber TAC Room Entry',    openDirection: 'RIGHT' },
-          { id: 507, type: 'ELEVATOR', x: 130, y: 150, width: 32, rotation:  0, label: 'Lift A (Area A)'                                  },
-          { id: 508, type: 'STAIRS',   x: 130, y: 240, width: 40, rotation:  0, label: 'Staircase Area A'                                 },
-          { id: 509, type: 'COLUMN',   x: 480, y:  80, width: 16, rotation:  0, label: 'Column-AA-1'                                      },
-          { id: 510, type: 'COLUMN',   x: 760, y:  80, width: 16, rotation:  0, label: 'Column-AA-2'                                      },
-        ]);
-
       } else if (activeFloor === 2) {
         // ════════════════════════════════════════════════════════════════
         //  FIRST FLOOR ALPHA-2
-        //  Key areas: ACC Rooms (4 bays), STM Room, WSO, APP Room,
-        //  Training In-Charge, Training Support, Gents Rest Rooms (×3),
-        //  Recreation Room, UPS Battery Room, Shower Cubicles
         // ════════════════════════════════════════════════════════════════
         setPlacedCams(ALPHA2_FF_CAMERAS.map(c => ({
           id: c.id, x: c.x, y: c.y, angle: c.angle, fov: c.fov,
@@ -760,64 +789,28 @@ export default function LayoutEditor() {
           location: c.location, is_overhead: c.is_overhead,
         })));
         setDrawnZones([
-          { id: 401, name: 'ACC Room — Bay 1', type: 'RESTRICTED', color: ZONE_COLORS.RESTRICTED, dwell_alert_seconds: 0, is_active: true,
-            points: [{ x: 190, y: 380 }, { x: 370, y: 380 }, { x: 370, y: 720 }, { x: 190, y: 720 }] },
-          { id: 402, name: 'ACC Room — Bay 2', type: 'RESTRICTED', color: ZONE_COLORS.RESTRICTED, dwell_alert_seconds: 0, is_active: true,
-            points: [{ x: 370, y: 380 }, { x: 550, y: 380 }, { x: 550, y: 720 }, { x: 370, y: 720 }] },
-          { id: 403, name: 'ACC Room — Bay 3', type: 'RESTRICTED', color: ZONE_COLORS.RESTRICTED, dwell_alert_seconds: 0, is_active: true,
-            points: [{ x: 550, y: 380 }, { x: 730, y: 380 }, { x: 730, y: 720 }, { x: 550, y: 720 }] },
-          { id: 404, name: 'ACC Room — Bay 4 (WSO)', type: 'RESTRICTED', color: ZONE_COLORS.RESTRICTED, dwell_alert_seconds: 0, is_active: true,
-            points: [{ x: 730, y: 380 }, { x: 890, y: 380 }, { x: 890, y: 720 }, { x: 730, y: 720 }] },
-          { id: 405, name: 'STM Telecom Room', type: 'RESTRICTED', color: ZONE_COLORS.RESTRICTED, dwell_alert_seconds: 0, is_active: true,
-            points: [{ x:  80, y: 380 }, { x: 190, y: 380 }, { x: 190, y: 720 }, { x:  80, y: 720 }] },
-          { id: 406, name: 'APP Room', type: 'RESTRICTED', color: ZONE_COLORS.RESTRICTED, dwell_alert_seconds: 0, is_active: true,
-            points: [{ x: 890, y: 380 }, { x: 1120, y: 380 }, { x: 1120, y: 720 }, { x: 890, y: 720 }] },
-          { id: 407, name: 'Training Area', type: 'DWELL', color: ZONE_COLORS.DWELL, dwell_alert_seconds: 3600, is_active: true,
-            points: [{ x: 260, y:  80 }, { x: 460, y:  80 }, { x: 460, y: 380 }, { x: 260, y: 380 }] },
-          { id: 408, name: 'Recreation Room', type: 'LOUNGE', color: ZONE_COLORS.LOUNGE, dwell_alert_seconds: 1200, is_active: true,
-            points: [{ x: 750, y:  80 }, { x: 925, y:  80 }, { x: 925, y: 380 }, { x: 750, y: 380 }] },
-          { id: 409, name: 'First Floor Entry Tripwire', type: 'TRIPWIRE', color: ZONE_COLORS.TRIPWIRE, dwell_alert_seconds: 0, is_active: true,
-            points: [{ x:  80, y:  80 }, { x: 200, y:  80 }, { x: 200, y: 140 }, { x:  80, y: 140 }] },
-        ]);
-        setWalls([
-          // ── Outer perimeter
-          { id: 601, startX:   80, startY:  80, endX: 1120, endY:  80, thickness: 8, color: WALL_COLOR, label: 'North Perimeter Wall' },
-          { id: 602, startX:   80, startY:  80, endX:   80, endY: 720, thickness: 8, color: WALL_COLOR, label: 'West Perimeter Wall'  },
-          { id: 603, startX: 1120, startY:  80, endX: 1120, endY: 720, thickness: 8, color: WALL_COLOR, label: 'East Perimeter Wall'  },
-          { id: 604, startX:   80, startY: 720, endX: 1120, endY: 720, thickness: 8, color: WALL_COLOR, label: 'South Perimeter Wall' },
-          // ── Upper/Lower split — ACC rooms occupy lower section
-          { id: 605, startX:   80, startY: 380, endX: 1120, endY: 380, thickness: 6, color: WALL_COLOR, label: 'ACC Room North Wall'          },
-          // ── Upper section (training, rest rooms, recreation)
-          { id: 606, startX:   80, startY: 250, endX:  260, endY: 250, thickness: 4, color: WALL_COLOR, label: 'Shower Room South Wall'       },
-          { id: 607, startX:  260, startY:  80, endX:  260, endY: 380, thickness: 5, color: WALL_COLOR, label: 'Shower/Staircase East Wall'   },
-          { id: 608, startX:  260, startY: 180, endX:  460, endY: 180, thickness: 4, color: WALL_COLOR, label: 'Training In-Charge South Wall'},
-          { id: 609, startX:  460, startY:  80, endX:  460, endY: 380, thickness: 5, color: WALL_COLOR, label: 'Training Room East Wall'      },
-          { id: 610, startX:  550, startY:  80, endX:  550, endY: 380, thickness: 4, color: WALL_COLOR, label: 'Gents Rest Room 1 East Wall'  },
-          { id: 611, startX:  650, startY:  80, endX:  650, endY: 380, thickness: 4, color: WALL_COLOR, label: 'Gents Rest Room 2 East Wall'  },
-          { id: 612, startX:  750, startY:  80, endX:  750, endY: 380, thickness: 4, color: WALL_COLOR, label: 'Gents Rest Room 3 East Wall'  },
-          { id: 613, startX:  925, startY:  80, endX:  925, endY: 380, thickness: 5, color: WALL_COLOR, label: 'Recreation Room East Wall'    },
-          { id: 614, startX:  925, startY: 200, endX: 1120, endY: 200, thickness: 4, color: WALL_COLOR, label: 'UPS Battery Room South Wall'  },
-          // ── ACC Room dividers (lower section)
-          { id: 615, startX:  190, startY: 380, endX:  190, endY: 720, thickness: 5, color: WALL_COLOR, label: 'STM Room East Wall'            },
-          { id: 616, startX:  370, startY: 380, endX:  370, endY: 720, thickness: 5, color: WALL_COLOR, label: 'ACC Bay 1 East Wall'           },
-          { id: 617, startX:  550, startY: 380, endX:  550, endY: 720, thickness: 5, color: WALL_COLOR, label: 'ACC Bay 2 East Wall'           },
-          { id: 618, startX:  730, startY: 380, endX:  730, endY: 720, thickness: 5, color: WALL_COLOR, label: 'ACC Bay 3 East Wall'           },
-          { id: 619, startX:  890, startY: 380, endX:  890, endY: 720, thickness: 5, color: WALL_COLOR, label: 'APP/WSO Room West Wall'        },
-        ]);
-        setArchElements([
-          { id: 701, type: 'DOOR',        x: 260, y: 155, width: 44, rotation:  0, label: 'Shower Room Entry',        openDirection: 'RIGHT' },
-          { id: 702, type: 'DOOR',        x: 360, y: 180, width: 44, rotation: 90, label: 'Training In-Charge Entry', openDirection: 'LEFT'  },
-          { id: 703, type: 'DOOR',        x: 460, y: 220, width: 44, rotation:  0, label: 'Training Support Entry',   openDirection: 'RIGHT' },
-          { id: 704, type: 'DOUBLE_DOOR', x: 280, y: 380, width: 60, rotation: 90, label: 'ACC Bay 1 Entry',          openDirection: 'RIGHT' },
-          { id: 705, type: 'DOOR',        x: 460, y: 380, width: 44, rotation: 90, label: 'ACC Bay 2 Entry',          openDirection: 'LEFT'  },
-          { id: 706, type: 'DOOR',        x: 640, y: 380, width: 44, rotation: 90, label: 'ACC Bay 3 Entry',          openDirection: 'RIGHT' },
-          { id: 707, type: 'DOOR',        x: 810, y: 380, width: 44, rotation: 90, label: 'ACC Bay 4/WSO Entry',      openDirection: 'LEFT'  },
-          { id: 708, type: 'DOOR',        x: 135, y: 380, width: 44, rotation: 90, label: 'STM Room Entry',           openDirection: 'RIGHT' },
-          { id: 709, type: 'DOOR',        x: 990, y: 380, width: 44, rotation: 90, label: 'APP Room Entry',           openDirection: 'LEFT'  },
-          { id: 710, type: 'ELEVATOR',    x: 130, y: 200, width: 32, rotation:  0, label: 'Lift A (First Floor)'                             },
-          { id: 711, type: 'STAIRS',      x: 130, y: 300, width: 40, rotation:  0, label: 'Staircase First Floor'                            },
-          { id: 712, type: 'COLUMN',      x: 460, y:  80, width: 16, rotation:  0, label: 'Column-FF-1'                                      },
-          { id: 713, type: 'COLUMN',      x: 750, y:  80, width: 16, rotation:  0, label: 'Column-FF-2'                                      },
+          { id: 501, name: 'Security Check Area', type: 'LOUNGE', color: '#22c55e', dwell_alert_seconds: 1200, is_active: true,
+            points: [{ x: 240, y: 240 }, { x: 384, y: 240 }, { x: 384, y: 380 }, { x: 240, y: 380 }] },
+          { id: 502, name: 'Training Area', type: 'DWELL', color: '#f59e0b', dwell_alert_seconds: 3600, is_active: true,
+            points: [{ x: 384, y: 240 }, { x: 528, y: 240 }, { x: 528, y: 380 }, { x: 384, y: 380 }] },
+          { id: 503, name: 'Control Office', type: 'DWELL', color: '#3b82f6', dwell_alert_seconds: 1800, is_active: true,
+            points: [{ x: 528, y: 240 }, { x: 672, y: 240 }, { x: 672, y: 380 }, { x: 528, y: 380 }] },
+          { id: 504, name: 'Recreation Room', type: 'LOUNGE', color: '#22c55e', dwell_alert_seconds: 1200, is_active: true,
+            points: [{ x: 672, y: 240 }, { x: 816, y: 240 }, { x: 816, y: 380 }, { x: 672, y: 380 }] },
+          { id: 505, name: 'Utility Room', type: 'DWELL', color: '#6b7280', dwell_alert_seconds: 900, is_active: true,
+            points: [{ x: 816, y: 240 }, { x: 960, y: 240 }, { x: 960, y: 380 }, { x: 816, y: 380 }] },
+          { id: 506, name: 'STM Telecom Room', type: 'RESTRICTED', color: '#ff0055', dwell_alert_seconds: 0, is_active: true,
+            points: [{ x: 240, y: 420 }, { x: 360, y: 420 }, { x: 360, y: 560 }, { x: 240, y: 560 }] },
+          { id: 507, name: 'ACC Room - Bay 1', type: 'RESTRICTED', color: '#ff0055', dwell_alert_seconds: 0, is_active: true,
+            points: [{ x: 360, y: 420 }, { x: 480, y: 420 }, { x: 480, y: 560 }, { x: 360, y: 560 }] },
+          { id: 508, name: 'ACC Room - Bay 2', type: 'RESTRICTED', color: '#ff0055', dwell_alert_seconds: 0, is_active: true,
+            points: [{ x: 480, y: 420 }, { x: 600, y: 420 }, { x: 600, y: 560 }, { x: 480, y: 560 }] },
+          { id: 509, name: 'ACC Room - Bay 3', type: 'RESTRICTED', color: '#ff0055', dwell_alert_seconds: 0, is_active: true,
+            points: [{ x: 600, y: 420 }, { x: 720, y: 420 }, { x: 720, y: 560 }, { x: 600, y: 560 }] },
+          { id: 510, name: 'ACC Room - Bay 4 (WSO)', type: 'RESTRICTED', color: '#ff0055', dwell_alert_seconds: 0, is_active: true,
+            points: [{ x: 720, y: 420 }, { x: 840, y: 420 }, { x: 840, y: 560 }, { x: 720, y: 560 }] },
+          { id: 511, name: 'APP Room', type: 'RESTRICTED', color: '#ff0055', dwell_alert_seconds: 0, is_active: true,
+            points: [{ x: 840, y: 420 }, { x: 960, y: 420 }, { x: 960, y: 560 }, { x: 840, y: 560 }] },
         ]);
       }
       setIsDirty(false);
@@ -1067,6 +1060,7 @@ export default function LayoutEditor() {
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     ctx.save();
     ctx.translate(panX, panY);
@@ -1290,6 +1284,7 @@ export default function LayoutEditor() {
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     ctx.save();
     ctx.translate(panX, panY);
@@ -3877,8 +3872,25 @@ export default function LayoutEditor() {
             </div>
           </div>
 
+          {/* Map Legend */}
+          <div style={{ borderTop: '1px solid var(--border)', padding: '16px', marginTop: 'auto' }}>
+            <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-ghost)', textTransform: 'uppercase', letterSpacing: '0.12em', marginBottom: 12 }}>
+              Map Legend
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{ fontSize: 12 }}>🟢</span>
+                <span style={{ fontSize: 11, color: 'var(--text-secondary)' }}>Access Door</span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{ display: 'inline-block', width: 12, height: 12, borderRadius: 3, background: '#6b7280' }} />
+                <span style={{ fontSize: 11, color: 'var(--text-secondary)' }}>Utility Area</span>
+              </div>
+            </div>
+          </div>
+
           {/* Summary */}
-          <div style={{ padding: '16px', marginTop: 'auto', borderTop: '1px solid var(--border)', background: 'var(--surface-1)', borderBottomLeftRadius: 'var(--radius-lg)', borderBottomRightRadius: 'var(--radius-lg)' }}>
+          <div style={{ padding: '16px', borderTop: '1px solid var(--border)', background: 'var(--surface-1)', borderBottomLeftRadius: 'var(--radius-lg)', borderBottomRightRadius: 'var(--radius-lg)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
               <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>Walls</span>
               <span style={{ fontSize: 13, fontFamily: 'Outfit, sans-serif', fontWeight: 700, color: 'var(--amber)' }}>{walls.length} DRAWN</span>

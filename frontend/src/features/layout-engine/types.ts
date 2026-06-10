@@ -8,7 +8,8 @@ export type ArchElementType =
   | 'WINDOW'
   | 'COLUMN'
   | 'STAIRS'
-  | 'ELEVATOR';
+  | 'ELEVATOR'
+  | 'ACCESS_DOOR';
 
 export interface LayoutPoint {
   x: number;
