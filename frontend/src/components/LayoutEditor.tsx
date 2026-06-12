@@ -502,6 +502,10 @@ export default function LayoutEditor() {
   const [showLiftsLayer, setShowLiftsLayer] = useState(true);
   const [showZonesLayer, setShowZonesLayer] = useState(true);
   const [showCamerasLayer, setShowCamerasLayer] = useState(true);
+  const [showLiveHeatmap, setShowLiveHeatmap] = useState(false);
+  const [showZoneOccupancy, setShowZoneOccupancy] = useState(false);
+  const [liveHeatmap, setLiveHeatmap] = useState<Record<number, Record<string, number>>>({ 0: {}, 1: {}, 2: {} });
+  const [liveTracksHistory, setLiveTracksHistory] = useState<Record<string, { x: number; y: number; floor: number; timestamp: number }[]>>({});
   // Default to programmatic blueprint (accurate walls from CAD trace).
   // Toggle to Plan Image for the raw CAD photo, or enable both for overlay.
   const [showPlanOverlay, setShowPlanOverlay] = useState(false);
@@ -518,6 +522,9 @@ export default function LayoutEditor() {
       setBlueprintVersion((v) => v + 1);
     };
   }, [activeFloor]);
+
+
+
   const [hoveredCamId, setHoveredCamId] = useState<number | null>(null);
 
   const coveragePercentage = useMemo(() => {
@@ -1006,6 +1013,61 @@ export default function LayoutEditor() {
   }, [activeFloor, archElements, canvasSize.height, canvasSize.width, getFloorBounds, walls]);
 
   const liveTracks = useStore((state) => state.tracks);
+
+  // Accumulate live heatmap positions
+  useEffect(() => {
+    if (!showLiveHeatmap || isSimulatorActive) return;
+
+    const freshTracks = Object.values(liveTracks).filter(
+      (t) => (Date.now() / 1000 - t.timestamp) < 5.0
+    );
+    if (freshTracks.length === 0) return;
+
+    setLiveHeatmap((prev) => {
+      const floorHeatmap = { ...(prev[activeFloor] || {}) };
+      freshTracks.forEach((track) => {
+        const cam = cameras.find((c) => c.id === track.camera_id);
+        if (cam && cam.floor === activeFloor) {
+          const gx = Math.floor(track.x / 20);
+          const gy = Math.floor(track.y / 20);
+          const key = `${gx},${gy}`;
+          floorHeatmap[key] = (floorHeatmap[key] || 0) + 1;
+        }
+      });
+      return {
+        ...prev,
+        [activeFloor]: floorHeatmap
+      };
+    });
+  }, [liveTracks, showLiveHeatmap, activeFloor, isSimulatorActive, cameras]);
+
+  // Accumulate live tracks history
+  useEffect(() => {
+    if (isSimulatorActive) return;
+
+    const freshTracks = Object.values(liveTracks).filter(
+      (t) => (Date.now() / 1000 - t.timestamp) < 5.0
+    );
+
+    setLiveTracksHistory((prev) => {
+      const updated = { ...prev };
+      freshTracks.forEach((track) => {
+        const cam = cameras.find((c) => c.id === track.camera_id);
+        const floor = cam ? cam.floor : activeFloor;
+        const history = updated[track.global_id] || [];
+        
+        const last = history[history.length - 1];
+        if (!last || last.x !== track.x || last.y !== track.y || last.floor !== floor) {
+          const newHistory = [...history, { x: track.x, y: track.y, floor, timestamp: Date.now() }];
+          if (newHistory.length > 50) {
+            newHistory.shift();
+          }
+          updated[track.global_id] = newHistory;
+        }
+      });
+      return updated;
+    });
+  }, [liveTracks, isSimulatorActive, activeFloor, cameras]);
 
   // spawnAgents now accepts either inline (from HUD presets) or spawns default agents
   const spawnAgents = useCallback((freshAgents?: SimulatorAgent[]) => {
@@ -1979,6 +2041,73 @@ export default function LayoutEditor() {
       ctx.fillText('⚡ SIMULATION MODE', 115, 110);
     }
 
+    // 6.5 Live Dwell Heatmap (non-simulation mode)
+    if (!isSimulatorActive && showLiveHeatmap) {
+      const floorHeatmap = liveHeatmap[activeFloor] || {};
+      const heatvals = Object.values(floorHeatmap);
+      if (heatvals.length > 0) {
+        const maxVal = Math.max(...heatvals);
+        for (const [key, val] of Object.entries(floorHeatmap)) {
+          const [gx, gy] = key.split(',').map(Number);
+          const t = Math.min(1, val / (maxVal * 0.5));
+          const alpha = t * 0.45;
+          // Color: blue → yellow → red
+          const r = Math.round(t > 0.5 ? 255 : t * 2 * 255);
+          const g = Math.round(t < 0.5 ? t * 2 * 200 : (1 - (t - 0.5) * 2) * 200);
+          const b = Math.round(t < 0.5 ? 255 : 0);
+          ctx.fillStyle = `rgba(${r},${g},${b},${alpha})`;
+          ctx.fillRect(gx * 20, gy * 20, 20, 20);
+        }
+      }
+    }
+
+    // 6.6 Live Zone Occupancy Badges (non-simulation mode)
+    if (!isSimulatorActive && showZoneOccupancy) {
+      const liveOccupancy: Record<number, number> = {};
+      drawnZones.forEach((z) => { liveOccupancy[z.id] = 0; });
+
+      const activeTracksForOccupancy = Object.values(liveTracks).filter((t) => {
+        const isActive = (Date.now() / 1000 - t.timestamp) < 5.0;
+        if (!isActive) return false;
+        const cam = cameras.find((c) => c.id === t.camera_id);
+        const floor = cam ? cam.floor : activeFloor;
+        return floor === activeFloor;
+      });
+
+      activeTracksForOccupancy.forEach((track) => {
+        drawnZones.forEach((zone) => {
+          if (zone.points.length >= 3 && isPointInPolygon({ x: track.x, y: track.y }, zone.points)) {
+            liveOccupancy[zone.id] = (liveOccupancy[zone.id] ?? 0) + 1;
+          }
+        });
+      });
+
+      drawnZones.forEach((zone) => {
+        if (zone.points.length < 3) return;
+        const cx = zone.points.reduce((s, p) => s + p.x, 0) / zone.points.length;
+        const cy = zone.points.reduce((s, p) => s + p.y, 0) / zone.points.length;
+        const occ = liveOccupancy[zone.id] ?? 0;
+        // Color based on occupancy level
+        const badgeColor = occ === 0 ? 'rgba(100,116,139,0.9)' : occ <= 5 ? 'rgba(34,197,94,0.9)' : occ <= 10 ? 'rgba(245,158,11,0.9)' : 'rgba(239,68,68,0.9)';
+        const bgColor = occ === 0 ? 'rgba(0,0,0,0.5)' : occ <= 5 ? 'rgba(34,197,94,0.15)' : occ <= 10 ? 'rgba(245,158,11,0.15)' : 'rgba(239,68,68,0.2)';
+        const badgeW = 64;
+        const badgeH = 20;
+        ctx.fillStyle = bgColor;
+        ctx.beginPath();
+        if (ctx.roundRect) { ctx.roundRect(cx - badgeW / 2, cy + 12, badgeW, badgeH, 4); }
+        else { ctx.rect(cx - badgeW / 2, cy + 12, badgeW, badgeH); }
+        ctx.fill();
+        ctx.strokeStyle = badgeColor;
+        ctx.lineWidth = 1;
+        ctx.stroke();
+        ctx.fillStyle = badgeColor;
+        ctx.font = 'bold 10px Outfit, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(`👥 ${occ}${occ === 0 ? ' empty' : ''}`, cx, cy + 22);
+      });
+    }
+
     // 7. Live person dots — color-coded by identity
     if (tool === 'select' && !isSimulatorActive) {
       const IDENTITY_COLORS: Record<string, { fill: string; stroke: string; glow: string }> = {
@@ -1989,9 +2118,13 @@ export default function LayoutEditor() {
         UNKNOWN:         { fill: 'rgba(148, 163, 184, 0.7)', stroke: 'rgba(100, 116, 139, 0.8)', glow: 'rgba(148, 163, 184, 0.2)' },
       };
 
-      const activeTracks = Object.values(liveTracks).filter(
-        (t) => (Date.now() / 1000 - t.timestamp) < 5.0
-      );
+      const activeTracks = Object.values(liveTracks).filter((t) => {
+        const isActive = (Date.now() / 1000 - t.timestamp) < 5.0;
+        if (!isActive) return false;
+        const cam = cameras.find((c) => c.id === t.camera_id);
+        const floor = cam ? cam.floor : activeFloor;
+        return floor === activeFloor;
+      });
       
       if (activeTracks.length > 0) {
         activeTracks.forEach((track) => {
@@ -2014,6 +2147,17 @@ export default function LayoutEditor() {
             ctx.strokeStyle = colors.fill + Math.round(pulse * 100).toString(16).padStart(2, '0');
             ctx.lineWidth = 2;
             ctx.stroke();
+          }
+
+          // Highlight selection ring if this live track is currently selected
+          if (track.global_id === selectedTrackId) {
+            ctx.beginPath();
+            ctx.arc(track.x, track.y, dotRadius + 8, 0, Math.PI * 2);
+            ctx.strokeStyle = '#00f0ff';
+            ctx.lineWidth = 2;
+            ctx.setLineDash([3, 2]);
+            ctx.stroke();
+            ctx.setLineDash([]);
           }
 
           ctx.beginPath();
@@ -2059,6 +2203,35 @@ export default function LayoutEditor() {
             ctx.fillText(icon, track.x + dotRadius + 8, track.y - 2);
           }
         });
+
+        // 8. Draw clicked passenger historic path
+        if (selectedTrackId) {
+          const history = liveTracksHistory[selectedTrackId] || [];
+          const floorHistory = history.filter((p) => p.floor === activeFloor);
+          if (floorHistory.length > 1) {
+            ctx.beginPath();
+            ctx.moveTo(floorHistory[0].x, floorHistory[0].y);
+            for (let i = 1; i < floorHistory.length; i++) {
+              ctx.lineTo(floorHistory[i].x, floorHistory[i].y);
+            }
+            ctx.strokeStyle = '#00f0ff';
+            ctx.lineWidth = 2;
+            ctx.setLineDash([4, 4]);
+            ctx.stroke();
+            ctx.setLineDash([]);
+
+            // Draw trailing smaller dots
+            floorHistory.forEach((pt) => {
+              ctx.beginPath();
+              ctx.arc(pt.x, pt.y, 3, 0, Math.PI * 2);
+              ctx.fillStyle = 'rgba(0, 240, 255, 0.6)';
+              ctx.fill();
+              ctx.strokeStyle = '#ffffff';
+              ctx.lineWidth = 1;
+              ctx.stroke();
+            });
+          }
+        }
 
         // Track count overlay
         const knownCount = activeTracks.filter(t => t.identity_type !== 'UNKNOWN').length;
@@ -2113,7 +2286,7 @@ export default function LayoutEditor() {
       }
     }
 
-  }, [placedCams, drawnZones, selectedCam, selectedZone, selectedWall, selectedArch, zoom, panX, panY, drawingZone, zoneType, tool, activeFloor, liveTracks, walls, archElements, drawingWall, wallPreviewEnd, pxPerFoot, measureUnit, showDimensions, getFloorBounds, isSimulatorActive, simulatorAgents, showCoverageHeatmap, showCameraLabels, showZoneLabels, hoveredCamId, blueprintVersion, showPlanOverlay, showStructureOverlay, showDxfLabels, fittedDxfLabels, showWallsLayer, showDoorsLayer, showWindowsLayer, showStairsLayer, showLiftsLayer, showZonesLayer, showCamerasLayer, isDemo]);
+  }, [placedCams, drawnZones, selectedCam, selectedZone, selectedWall, selectedArch, zoom, panX, panY, drawingZone, zoneType, tool, activeFloor, liveTracks, walls, archElements, drawingWall, wallPreviewEnd, pxPerFoot, measureUnit, showDimensions, getFloorBounds, isSimulatorActive, simulatorAgents, showCoverageHeatmap, showCameraLabels, showZoneLabels, hoveredCamId, blueprintVersion, showPlanOverlay, showStructureOverlay, showDxfLabels, fittedDxfLabels, showWallsLayer, showDoorsLayer, showWindowsLayer, showStairsLayer, showLiftsLayer, showZonesLayer, showCamerasLayer, isDemo, liveHeatmap, showLiveHeatmap, showZoneOccupancy, cameras, selectedTrackId, liveTracksHistory]);
 
 
 
@@ -3364,6 +3537,20 @@ export default function LayoutEditor() {
                 <span className="scale-config-label">Layer Zones</span>
                 <label className="toggle-switch">
                   <input type="checkbox" checked={showZonesLayer} onChange={(e) => setShowZonesLayer(e.target.checked)} />
+                  <span className="toggle-slider" />
+                </label>
+              </div>
+              <div className="scale-config-row">
+                <span className="scale-config-label">Live Heatmap</span>
+                <label className="toggle-switch">
+                  <input type="checkbox" checked={showLiveHeatmap} onChange={(e) => setShowLiveHeatmap(e.target.checked)} />
+                  <span className="toggle-slider" />
+                </label>
+              </div>
+              <div className="scale-config-row">
+                <span className="scale-config-label">Zone Occupancy</span>
+                <label className="toggle-switch">
+                  <input type="checkbox" checked={showZoneOccupancy} onChange={(e) => setShowZoneOccupancy(e.target.checked)} />
                   <span className="toggle-slider" />
                 </label>
               </div>

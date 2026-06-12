@@ -1,5 +1,14 @@
 import numpy as np
 import cv2
+import torch
+# Monkeypatch torch.load to bypass weights_only default in PyTorch 2.6
+_orig_load = torch.load
+def _custom_load(*args, **kwargs):
+    if 'weights_only' not in kwargs:
+        kwargs['weights_only'] = False
+    return _orig_load(*args, **kwargs)
+torch.load = _custom_load
+
 from ultralytics import YOLO
 
 class PersonDetector:
