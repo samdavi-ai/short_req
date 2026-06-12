@@ -26,6 +26,8 @@ function CameraFeedCard({ cam, selected, onClick }: {
   onClick: () => void;
 }) {
   const tracks = useStore((state) => state.tracks);
+  const token = useStore((state) => state.token);
+  const isDemoMode = !token || token === 'demo-token';
   const isOffline = cam.status === 'OFFLINE';
   const isMaint = cam.status === 'MAINTENANCE';
   const videoRef = React.useRef<HTMLVideoElement | null>(null);
@@ -134,11 +136,13 @@ function CameraFeedCard({ cam, selected, onClick }: {
               pointerEvents: 'none',
             }} />
             {/* Real movement dots via Websocket Tracks (Wait, this is LiveFeeds... We just show a dummy stream if not active.) */}
-            <svg style={{ position: 'absolute', inset: 0, width: '100%', height: '100%' }}>
-              {TRACK_DOTS.slice(0, cam.id * 3 % 12).map((dot) => (
-                <circle key={dot.id} cx={`${dot.x}%`} cy={`${dot.y}%`} r="3" fill={dot.color} opacity={0.8} />
-              ))}
-            </svg>
+            {isDemoMode && (
+              <svg style={{ position: 'absolute', inset: 0, width: '100%', height: '100%' }}>
+                {TRACK_DOTS.slice(0, cam.id * 3 % 12).map((dot) => (
+                  <circle key={dot.id} cx={`${dot.x}%`} cy={`${dot.y}%`} r="3" fill={dot.color} opacity={0.8} />
+                ))}
+              </svg>
+            )}
             <Camera size={20} color="rgba(255,255,255,0.15)" />
             <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.2)' }}>CLICK TO STREAM WEBCAM</span>
           </>

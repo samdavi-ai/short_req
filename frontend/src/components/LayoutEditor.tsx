@@ -2574,12 +2574,33 @@ export default function LayoutEditor() {
         ctx.fillText(`● ${unknownCount} Unknown`, 118, 700);
         ctx.fillStyle = '#ffffff';
         ctx.fillText(`${activeTracks.length} Total`, 220, 693);
-      } else {
-        // Fallback to simulated passenger flow
+      } else if (isDemo) {
+        // Fallback to simulated passenger flow only in Demo Mode
+        // Determine building layout bounding box from walls to prevent dots landing outside the building structure
+        let minX = Infinity;
+        let minY = Infinity;
+        let maxX = -Infinity;
+        let maxY = -Infinity;
+
+        walls.forEach(w => {
+          minX = Math.min(minX, w.startX, w.endX);
+          minY = Math.min(minY, w.startY, w.endY);
+          maxX = Math.max(maxX, w.startX, w.endX);
+          maxY = Math.max(maxY, w.startY, w.endY);
+        });
+
+        const hasValidWalls = minX !== Infinity && minY !== Infinity && maxX !== -Infinity && maxY !== -Infinity;
+        const bboxLeft = hasValidWalls ? minX : 150;
+        const bboxTop = hasValidWalls ? minY : 150;
+        const bboxWidth = hasValidWalls ? (maxX - minX) : 800;
+        const bboxHeight = hasValidWalls ? (maxY - minY) : 450;
+        const padding = 20;
+
         for (let i = 0; i < 18; i++) {
           const seed = (i * 137 + activeFloor * 31) % 1000;
-          const x = (seed % 900) + 150;
-          const y = ((seed * 3) % 500) + 150;
+          // Generate within the building bounding box with padding
+          const x = bboxLeft + padding + (seed % Math.max(1, bboxWidth - padding * 2));
+          const y = bboxTop + padding + ((seed * 3) % Math.max(1, bboxHeight - padding * 2));
           const isAlert = i % 11 === 0;
           ctx.beginPath();
           ctx.arc(x, y, 4, 0, Math.PI * 2);
@@ -2592,7 +2613,7 @@ export default function LayoutEditor() {
       }
     }
 
-  }, [placedCams, drawnZones, selectedCam, selectedZone, selectedWall, selectedArch, zoom, panX, panY, drawingZone, zoneType, tool, activeFloor, liveTracks, walls, archElements, drawingWall, wallPreviewEnd, pxPerFoot, measureUnit, showDimensions, getFloorBounds, isSimulatorActive, simulatorAgents, showCoverageHeatmap, showCameraLabels, showZoneLabels, hoveredCamId, blueprintVersion, showPlanOverlay, showStructureOverlay, showDxfLabels, fittedDxfLabels, showWallsLayer, showDoorsLayer, showWindowsLayer, showStairsLayer, showLiftsLayer, showZonesLayer, showCamerasLayer]);
+  }, [placedCams, drawnZones, selectedCam, selectedZone, selectedWall, selectedArch, zoom, panX, panY, drawingZone, zoneType, tool, activeFloor, liveTracks, walls, archElements, drawingWall, wallPreviewEnd, pxPerFoot, measureUnit, showDimensions, getFloorBounds, isSimulatorActive, simulatorAgents, showCoverageHeatmap, showCameraLabels, showZoneLabels, hoveredCamId, blueprintVersion, showPlanOverlay, showStructureOverlay, showDxfLabels, fittedDxfLabels, showWallsLayer, showDoorsLayer, showWindowsLayer, showStairsLayer, showLiftsLayer, showZonesLayer, showCamerasLayer, isDemo]);
 
 
 
