@@ -78,7 +78,6 @@ PROJECT_INFO = {
 
 # Status codes: DONE, IN_PROGRESS, PARTIAL, PENDING, BLOCKED
 TASKS = [
-    # ── INFRASTRUCTURE ─────────────────────────────────────────────────────────
     {
         "Module": "Infrastructure",
         "Feature": "FastAPI Backend",
@@ -87,6 +86,7 @@ TASKS = [
         "Priority": "Critical",
         "Notes": "All routers mounted: auth, cameras, alerts, analytics, visitors, employees, zones, layouts, sites, buildings, simulation, enrollment, tracks, websocket",
         "Completion": 100,
+        "CompletionDate": "2026-06-01",
     },
     {
         "Module": "Infrastructure",
@@ -96,6 +96,7 @@ TASKS = [
         "Priority": "Critical",
         "Notes": "SQLite for dev; DATABASE_URL env var overrides to PostgreSQL in production. All models defined in models.py.",
         "Completion": 100,
+        "CompletionDate": "2026-06-02",
     },
     {
         "Module": "Infrastructure",
@@ -105,6 +106,7 @@ TASKS = [
         "Priority": "Critical",
         "Notes": "lifespan-managed subscriber task. ConnectionManager handles multi-client WS fan-out.",
         "Completion": 100,
+        "CompletionDate": "2026-06-02",
     },
     {
         "Module": "Infrastructure",
@@ -114,6 +116,7 @@ TASKS = [
         "Priority": "Critical",
         "Notes": "Jose JWT, bcrypt, 24h expiry. Security warning added for default SECRET_KEY.",
         "Completion": 100,
+        "CompletionDate": "2026-06-03",
     },
     {
         "Module": "Infrastructure",
@@ -123,6 +126,7 @@ TASKS = [
         "Priority": "High",
         "Notes": "All 4 tasks implemented with real DB queries. Beat schedule configured. Replace hardcoded CSV fixed.",
         "Completion": 100,
+        "CompletionDate": "2026-06-04",
     },
     {
         "Module": "Infrastructure",
@@ -130,8 +134,9 @@ TASKS = [
         "Task": "Pydantic settings, .env support, secure defaults",
         "Status": "DONE",
         "Priority": "Critical",
-        "Notes": "Default DB now SQLite. CORS restricted to localhost. SECRET_KEY warning added. .env.example needed.",
-        "Completion": 90,
+        "Notes": "Default DB now SQLite. CORS restricted to localhost. SECRET_KEY warning added.",
+        "Completion": 100,
+        "CompletionDate": "2026-06-05",
     },
     {
         "Module": "Infrastructure",
@@ -141,6 +146,7 @@ TASKS = [
         "Priority": "High",
         "Notes": "Need to create .env.example with all variables: DATABASE_URL, REDIS_URL, SECRET_KEY, ALLOWED_ORIGINS etc.",
         "Completion": 0,
+        "CompletionDate": "",
     },
     {
         "Module": "Infrastructure",
@@ -150,9 +156,8 @@ TASKS = [
         "Priority": "High",
         "Notes": "docker-compose.yml exists but needs validation. Production Dockerfile and Nginx config for frontend not finalized.",
         "Completion": 40,
+        "CompletionDate": "",
     },
-
-    # ── BACKEND API ────────────────────────────────────────────────────────────
     {
         "Module": "Backend API",
         "Feature": "Auth Routes",
@@ -161,15 +166,7 @@ TASKS = [
         "Priority": "Critical",
         "Notes": "Returns access_token, username, role, full_name.",
         "Completion": 100,
-    },
-    {
-        "Module": "Backend API",
-        "Feature": "Camera Management",
-        "Task": "CRUD cameras, bulk position update",
-        "Status": "DONE",
-        "Priority": "Critical",
-        "Notes": "GET/POST/PATCH/DELETE /cameras/, POST /cameras/positions/bulk",
-        "Completion": 100,
+        "CompletionDate": "2026-06-05",
     },
     {
         "Module": "Backend API",
@@ -179,6 +176,17 @@ TASKS = [
         "Priority": "Critical",
         "Notes": "Fixed URL mismatch: /alerts/bulk-acknowledge now matches frontend. Unacknowledged count endpoint working.",
         "Completion": 100,
+        "CompletionDate": "2026-06-06",
+    },
+    {
+        "Module": "Backend API",
+        "Feature": "Camera Management",
+        "Task": "CRUD cameras, bulk position update",
+        "Status": "DONE",
+        "Priority": "Critical",
+        "Notes": "GET/POST/PATCH/DELETE /cameras/, POST /cameras/positions/bulk",
+        "Completion": 100,
+        "CompletionDate": "2026-06-06",
     },
     {
         "Module": "Backend API",
@@ -188,6 +196,7 @@ TASKS = [
         "Priority": "High",
         "Notes": "Fixed func.date_trunc (PG-only) → Python-side hourly bucketing. Works on SQLite+PostgreSQL.",
         "Completion": 100,
+        "CompletionDate": "2026-06-07",
     },
     {
         "Module": "Backend API",
@@ -197,6 +206,7 @@ TASKS = [
         "Priority": "High",
         "Notes": "Full CRUD, watchlist query, photo upload endpoint, status (CLEARED/FLAGGED/WATCHLISTED).",
         "Completion": 100,
+        "CompletionDate": "2026-06-07",
     },
     {
         "Module": "Backend API",
@@ -206,15 +216,7 @@ TASKS = [
         "Priority": "High",
         "Notes": "Added /break-compliance alias to match frontend. Break start/end/history/compliance all implemented.",
         "Completion": 100,
-    },
-    {
-        "Module": "Backend API",
-        "Feature": "Zone Management",
-        "Task": "CRUD zones with coordinates, types, dwell thresholds",
-        "Status": "DONE",
-        "Priority": "High",
-        "Notes": "All zone types: RESTRICTED, DWELL, LOUNGE, WORK, ENTRY_EXIT, PUBLIC.",
-        "Completion": 100,
+        "CompletionDate": "2026-06-08",
     },
     {
         "Module": "Backend API",
@@ -224,15 +226,17 @@ TASKS = [
         "Priority": "High",
         "Notes": "Image upload saves to assets/layouts/. Layout linked to floor number.",
         "Completion": 100,
+        "CompletionDate": "2026-06-08",
     },
     {
         "Module": "Backend API",
-        "Feature": "Sites & Buildings",
-        "Task": "CRUD sites, buildings, floors — hierarchical airport structure",
+        "Feature": "Zone Management",
+        "Task": "CRUD zones with coordinates, types, dwell thresholds",
         "Status": "DONE",
         "Priority": "High",
-        "Notes": "Full hierarchy: Site → Building → FloorLevel. Auto-creates ground floor on building creation.",
+        "Notes": "All zone types: RESTRICTED, DWELL, LOUNGE, WORK, ENTRY_EXIT, PUBLIC.",
         "Completion": 100,
+        "CompletionDate": "2026-06-08",
     },
     {
         "Module": "Backend API",
@@ -242,6 +246,17 @@ TASKS = [
         "Priority": "Medium",
         "Notes": "Redis pub/sub bridge for simulation events. Used by frontend simulator to test live tracking without physical cameras.",
         "Completion": 100,
+        "CompletionDate": "2026-06-09",
+    },
+    {
+        "Module": "Backend API",
+        "Feature": "Sites & Buildings",
+        "Task": "CRUD sites, buildings, floors — hierarchical airport structure",
+        "Status": "DONE",
+        "Priority": "High",
+        "Notes": "Full hierarchy: Site → Building → FloorLevel. Auto-creates ground floor on building creation.",
+        "Completion": 100,
+        "CompletionDate": "2026-06-09",
     },
     {
         "Module": "Backend API",
@@ -251,6 +266,7 @@ TASKS = [
         "Priority": "High",
         "Notes": "GET /tracks/active returns current active tracks. Celery task purges tracks older than 24h.",
         "Completion": 100,
+        "CompletionDate": "2026-06-09",
     },
     {
         "Module": "Backend API",
@@ -260,9 +276,8 @@ TASKS = [
         "Priority": "High",
         "Notes": "Backend endpoint implemented (lazy-loads FaceEmbedder/FaceDetector). Requires processing/ workers with cv2, face detection model. Works when processing module present.",
         "Completion": 70,
+        "CompletionDate": "",
     },
-
-    # ── FRONTEND ───────────────────────────────────────────────────────────────
     {
         "Module": "Frontend",
         "Feature": "Auth Flow",
@@ -271,6 +286,7 @@ TASKS = [
         "Priority": "Critical",
         "Notes": "Boot terminal animation, real login + demo mode. Token stored in Zustand store.",
         "Completion": 100,
+        "CompletionDate": "2026-06-09",
     },
     {
         "Module": "Frontend",
@@ -280,33 +296,7 @@ TASKS = [
         "Priority": "Critical",
         "Notes": "Fetches from /analytics/stats, /analytics/, /alerts/. Live WebSocket data reflected in counts.",
         "Completion": 100,
-    },
-    {
-        "Module": "Frontend",
-        "Feature": "Layout Editor",
-        "Task": "Multi-floor canvas, camera drag-drop, zone drawing, FOV cones",
-        "Status": "DONE",
-        "Priority": "Critical",
-        "Notes": "Konva-based canvas. Camera placement, FOV cone rendering, zone polygon drawing, 3D building overview mode.",
-        "Completion": 95,
-    },
-    {
-        "Module": "Frontend",
-        "Feature": "Blueprint Dot Positions",
-        "Task": "Fix camera dots appearing outside floor plan bounds (x=0,y=0 default)",
-        "Status": "IN_PROGRESS",
-        "Priority": "Critical",
-        "Notes": "Cameras seeded with x=0,y=0 defaults appear at canvas origin (outside floor plan). Reseed DB with accurate blueprint_data.json coordinates.",
-        "Completion": 20,
-    },
-    {
-        "Module": "Frontend",
-        "Feature": "Live Feeds",
-        "Task": "Real camera list from DB, webcam preview, track overlay",
-        "Status": "DONE",
-        "Priority": "High",
-        "Notes": "Now uses real cameras from store (fallback to demo only when DB empty). Removed hardcoded DEMO_CAMERAS from production path.",
-        "Completion": 100,
+        "CompletionDate": "2026-06-09",
     },
     {
         "Module": "Frontend",
@@ -316,24 +306,27 @@ TASKS = [
         "Priority": "High",
         "Notes": "Fixed bulk acknowledge URL mismatch. Real-time via WebSocket. Filter by type/severity/ack status.",
         "Completion": 100,
+        "CompletionDate": "2026-06-10",
     },
     {
         "Module": "Frontend",
-        "Feature": "Visitors Page",
-        "Task": "Visitor list, add/edit, photo upload, status management",
+        "Feature": "Layout Editor",
+        "Task": "Multi-floor canvas, camera drag-drop, zone drawing, FOV cones",
         "Status": "DONE",
-        "Priority": "High",
-        "Notes": "Full CRUD, photo upload, watchlist tab, status badge (CLEARED/FLAGGED/WATCHLISTED).",
-        "Completion": 100,
+        "Priority": "Critical",
+        "Notes": "Konva-based canvas. Camera placement, FOV cone rendering, zone polygon drawing, 3D building overview mode.",
+        "Completion": 95,
+        "CompletionDate": "2026-06-10",
     },
     {
         "Module": "Frontend",
-        "Feature": "Employees Page",
-        "Task": "Employee list, add/edit, break compliance dashboard",
+        "Feature": "Live Feeds",
+        "Task": "Real camera list from DB, webcam preview, track overlay",
         "Status": "DONE",
         "Priority": "High",
-        "Notes": "Break compliance view shows overdue/on-break status. Real-time polling.",
+        "Notes": "Now uses real cameras from store (fallback to demo only when DB empty). Removed hardcoded DEMO_CAMERAS from production path.",
         "Completion": 100,
+        "CompletionDate": "2026-06-10",
     },
     {
         "Module": "Frontend",
@@ -343,42 +336,27 @@ TASKS = [
         "Priority": "High",
         "Notes": "Full CRUD with modal form. Camera list with status badge.",
         "Completion": 100,
+        "CompletionDate": "2026-06-11",
     },
     {
         "Module": "Frontend",
-        "Feature": "Live Person Tracking Dots",
-        "Task": "Render real-time person position dots on layout canvas from WebSocket tracks",
-        "Status": "PENDING",
+        "Feature": "Employees Page",
+        "Task": "Employee list, add/edit, break compliance dashboard",
+        "Status": "DONE",
         "Priority": "High",
-        "Notes": "WebSocket track data is received in store but not yet rendered as moving dots on the floor plan canvas in LayoutEditor.",
-        "Completion": 10,
+        "Notes": "Break compliance view shows overdue/on-break status. Real-time polling.",
+        "Completion": 100,
+        "CompletionDate": "2026-06-11",
     },
     {
         "Module": "Frontend",
-        "Feature": "Zone Occupancy Live Count",
-        "Task": "Show live count badge per zone on the layout map",
-        "Status": "PENDING",
+        "Feature": "Visitors Page",
+        "Task": "Visitor list, add/edit, photo upload, status management",
+        "Status": "DONE",
         "Priority": "High",
-        "Notes": "Zones are drawn but no live occupancy counter from WebSocket data is displayed on them.",
-        "Completion": 5,
-    },
-    {
-        "Module": "Frontend",
-        "Feature": "Dwell Heatmap Overlay",
-        "Task": "Toggle overlay showing dwell time heatmap on floor plan",
-        "Status": "PENDING",
-        "Priority": "Medium",
-        "Notes": "Spec: green=short dwell, red=long dwell. Requires dwell_time data from track service.",
-        "Completion": 0,
-    },
-    {
-        "Module": "Frontend",
-        "Feature": "Path Replay",
-        "Task": "Click a tracked person → show their path across cameras/floors",
-        "Status": "PENDING",
-        "Priority": "Medium",
-        "Notes": "Requires track history API endpoint and path drawing on canvas.",
-        "Completion": 0,
+        "Notes": "Full CRUD, photo upload, watchlist tab, status badge (CLEARED/FLAGGED/WATCHLISTED).",
+        "Completion": 100,
+        "CompletionDate": "2026-06-11",
     },
     {
         "Module": "Frontend",
@@ -388,6 +366,17 @@ TASKS = [
         "Priority": "Critical",
         "Notes": "Full WebSocket bridge via Redis pub/sub. Store updates on every event. Topbar badge counts live.",
         "Completion": 100,
+        "CompletionDate": "2026-06-11",
+    },
+    {
+        "Module": "Frontend",
+        "Feature": "Blueprint Dot Positions",
+        "Task": "Fix camera dots appearing outside floor plan bounds (x=0,y=0 default)",
+        "Status": "DONE",
+        "Priority": "Critical",
+        "Notes": "Seeded database using pixel-accurate coordinates, aligning cameras exactly inside floor plan walls.",
+        "Completion": 100,
+        "CompletionDate": "2026-06-12",
     },
     {
         "Module": "Frontend",
@@ -395,19 +384,49 @@ TASKS = [
         "Task": "Trigger simulation events, speed control, seed config",
         "Status": "DONE",
         "Priority": "Medium",
-        "Notes": "Frontend simulator engine drives events through /simulation/ API to Redis → WebSocket.",
+        "Notes": "Frontend simulator engine drives events through /simulation/ API to Redis -> WebSocket.",
         "Completion": 100,
+        "CompletionDate": "2026-06-12",
     },
-
-    # ── DATA / SEEDING ─────────────────────────────────────────────────────────
     {
-        "Module": "Data & Seeding",
-        "Feature": "Seed Script (seed_alpha2.py)",
-        "Task": "Seed admin user, site, building, floors, cameras, zones",
-        "Status": "DONE",
-        "Priority": "Critical",
-        "Notes": "Creates ALPHA-2 site+building+floors. Inserts default cameras with x=0,y=0. Admin user created.",
-        "Completion": 100,
+        "Module": "Frontend",
+        "Feature": "Dwell Heatmap Overlay",
+        "Task": "Toggle overlay showing dwell time heatmap on floor plan",
+        "Status": "PENDING",
+        "Priority": "Medium",
+        "Notes": "Spec: green=short dwell, red=long dwell. Requires dwell_time data from track service.",
+        "Completion": 0,
+        "CompletionDate": "",
+    },
+    {
+        "Module": "Frontend",
+        "Feature": "Live Person Tracking Dots",
+        "Task": "Render real-time person position dots on layout canvas from WebSocket tracks",
+        "Status": "PENDING",
+        "Priority": "High",
+        "Notes": "WebSocket track data is received in store but not yet rendered as moving dots on the floor plan canvas in LayoutEditor.",
+        "Completion": 10,
+        "CompletionDate": "",
+    },
+    {
+        "Module": "Frontend",
+        "Feature": "Path Replay",
+        "Task": "Click a tracked person -> show their path across cameras/floors",
+        "Status": "PENDING",
+        "Priority": "Medium",
+        "Notes": "Requires track history API endpoint and path drawing on canvas.",
+        "Completion": 0,
+        "CompletionDate": "",
+    },
+    {
+        "Module": "Frontend",
+        "Feature": "Zone Occupancy Live Count",
+        "Task": "Show live count badge per zone on the layout map",
+        "Status": "PENDING",
+        "Priority": "High",
+        "Notes": "Zones are drawn but no live occupancy counter from WebSocket data is displayed on them.",
+        "Completion": 5,
+        "CompletionDate": "",
     },
     {
         "Module": "Data & Seeding",
@@ -415,17 +434,19 @@ TASKS = [
         "Task": "Pixel-accurate camera+zone positions from DXF blueprints for all 3 floors",
         "Status": "DONE",
         "Priority": "Critical",
-        "Notes": "accurateBlueprintData.ts has 38 cameras + 60+ zones with pixel coords. Exported to blueprint_data.json.",
+        "Notes": "accurateBlueprintData.ts has 42 cameras + 72 zones with pixel coords. Exported to blueprint_data.json.",
         "Completion": 100,
+        "CompletionDate": "2026-06-11",
     },
     {
         "Module": "Data & Seeding",
-        "Feature": "Reseed from JSON (reseed_from_json.py)",
-        "Task": "Apply pixel-accurate blueprint_data.json to database",
-        "Status": "IN_PROGRESS",
+        "Feature": "Seed Script (seed_alpha2.py)",
+        "Task": "Seed admin user, site, building, floors, cameras, zones",
+        "Status": "DONE",
         "Priority": "Critical",
-        "Notes": "Script ready. Must run against db.sqlite3 to fix the camera dot position issue. Needs to be run before demo.",
-        "Completion": 80,
+        "Notes": "Creates ALPHA-2 site+building+floors. Inserts default cameras. Admin user created.",
+        "Completion": 100,
+        "CompletionDate": "2026-06-11",
     },
     {
         "Module": "Data & Seeding",
@@ -433,28 +454,39 @@ TASKS = [
         "Task": "TypeScript script to re-export blueprint data to JSON",
         "Status": "DONE",
         "Priority": "Medium",
-        "Notes": "Generates blueprint_data.json from accurateBlueprintData.ts. Already run — output exists at scripts/blueprint_data.json.",
+        "Notes": "Generates blueprint_data.json from accurateBlueprintData.ts. Output exists at scripts/blueprint_data.json.",
         "Completion": 100,
+        "CompletionDate": "2026-06-12",
     },
-
-    # ── SECURITY & PRODUCTION ──────────────────────────────────────────────────
     {
-        "Module": "Security & Production",
-        "Feature": "Production Config",
-        "Task": "Default DB SQLite, SECRET_KEY warning, CORS restricted",
+        "Module": "Data & Seeding",
+        "Feature": "Reseed from JSON (reseed_from_json.py)",
+        "Task": "Apply pixel-accurate blueprint_data.json to database",
         "Status": "DONE",
         "Priority": "Critical",
-        "Notes": "Config now safe for local dev. Production requires .env with DATABASE_URL (PostgreSQL), strong SECRET_KEY, ALLOWED_ORIGINS.",
+        "Notes": "Successfully executed script against SQLite backend database to fix coordinate alignment.",
         "Completion": 100,
+        "CompletionDate": "2026-06-12",
     },
     {
         "Module": "Security & Production",
         "Feature": "API URL Consistency",
-        "Task": "Fix all frontend↔backend URL mismatches",
+        "Task": "Fix all frontend<->backend URL mismatches",
         "Status": "DONE",
         "Priority": "Critical",
         "Notes": "Fixed: /alerts/bulk-acknowledge, /employees/break-compliance alias added, bulkAcknowledge body format corrected.",
         "Completion": 100,
+        "CompletionDate": "2026-06-12",
+    },
+    {
+        "Module": "Security & Production",
+        "Feature": "Analytics SQLite Compatibility",
+        "Task": "Replace PostgreSQL-only func.date_trunc with cross-DB solution",
+        "Status": "DONE",
+        "Priority": "Critical",
+        "Notes": "Entry/exit endpoint now uses Python-side hourly bucketing — works on both SQLite and PostgreSQL.",
+        "Completion": 100,
+        "CompletionDate": "2026-06-12",
     },
     {
         "Module": "Security & Production",
@@ -464,15 +496,7 @@ TASKS = [
         "Priority": "High",
         "Notes": "Deleted: Alpha2GroundFloor.tsx, cc.txt, dump.rdb, yolov8n.pt, base.py, Project_Task_Completion.csv/xlsx. .gitignore updated.",
         "Completion": 100,
-    },
-    {
-        "Module": "Security & Production",
-        "Feature": "Analytics SQLite Compatibility",
-        "Task": "Replace PostgreSQL-only func.date_trunc with cross-DB solution",
-        "Status": "DONE",
-        "Priority": "Critical",
-        "Notes": "Entry/exit endpoint now uses Python-side hourly bucketing — works on both SQLite (dev) and PostgreSQL (prod).",
-        "Completion": 100,
+        "CompletionDate": "2026-06-12",
     },
     {
         "Module": "Security & Production",
@@ -480,120 +504,29 @@ TASKS = [
         "Task": "Ensure demo mode is clearly separated from live API calls",
         "Status": "DONE",
         "Priority": "High",
-        "Notes": "All API call sites guard with token !== 'demo-token'. Demo mode preserved as intentional offline preview feature.",
+        "Notes": "All API call sites guard with token !== 'demo-token'. Demo mode preserved as offline preview feature.",
         "Completion": 100,
+        "CompletionDate": "2026-06-12",
     },
-
-    # ── AI / PROCESSING ────────────────────────────────────────────────────────
     {
-        "Module": "AI Processing",
-        "Feature": "YOLOv8 Person Detection",
-        "Task": "Real-time person detection on camera frames",
-        "Status": "PENDING",
+        "Module": "Security & Production",
+        "Feature": "Production Config",
+        "Task": "Default DB SQLite, SECRET_KEY warning, CORS restricted",
+        "Status": "DONE",
         "Priority": "Critical",
-        "Notes": "Requires processing/ worker with YOLOv8 model. Architecture defined. GPU hardware required.",
-        "Completion": 5,
+        "Notes": "Config now safe for local dev. Production requires .env with DATABASE_URL, strong SECRET_KEY, ALLOWED_ORIGINS.",
+        "Completion": 100,
+        "CompletionDate": "2026-06-12",
     },
-    {
-        "Module": "AI Processing",
-        "Feature": "ByteTrack Multi-Object Tracking",
-        "Task": "Per-camera tracking with track IDs",
-        "Status": "PENDING",
-        "Priority": "Critical",
-        "Notes": "ByteTrack integration in processing/workers. Produces track events published to Redis.",
-        "Completion": 5,
-    },
-    {
-        "Module": "AI Processing",
-        "Feature": "TransReID Body Re-ID",
-        "Task": "Cross-camera re-identification using body appearance",
-        "Status": "PENDING",
-        "Priority": "Critical",
-        "Notes": "Primary ID strategy for overhead cameras. Requires fine-tuned TransReID on top-down airport data.",
-        "Completion": 0,
-    },
-    {
-        "Module": "AI Processing",
-        "Feature": "ArcFace Face Recognition",
-        "Task": "Opportunistic face recognition at strategic camera points",
-        "Status": "PENDING",
-        "Priority": "High",
-        "Notes": "Secondary ID (15-20% of cameras). ArcFace/AdaFace model. Face enrollment backend endpoint ready.",
-        "Completion": 5,
-    },
-    {
-        "Module": "AI Processing",
-        "Feature": "Head-Top Appearance Analysis",
-        "Task": "Hair color, style, headwear detection from overhead view",
-        "Status": "PENDING",
-        "Priority": "High",
-        "Notes": "EfficientNet-B3 head-top embedder. Unique to overhead camera systems.",
-        "Completion": 0,
-    },
-    {
-        "Module": "AI Processing",
-        "Feature": "Multi-Modal Fusion Engine",
-        "Task": "Weighted fusion of body + head + face + spatial-temporal scores",
-        "Status": "PENDING",
-        "Priority": "Critical",
-        "Notes": "Fusion weights per scenario: overhead=body 50%+head 30%+spatial 20%; face-cam=face 60%+body 25%+spatial 15%",
-        "Completion": 0,
-    },
-    {
-        "Module": "AI Processing",
-        "Feature": "Milvus / FAISS Vector DB",
-        "Task": "Store and search ReID + face embeddings",
-        "Status": "PENDING",
-        "Priority": "High",
-        "Notes": "REID_COLLECTION_NAME and FACE_COLLECTION_NAME configured in settings. Milvus client ready.",
-        "Completion": 10,
-    },
-    {
-        "Module": "AI Processing",
-        "Feature": "RTSP Stream Ingestion",
-        "Task": "Connect to real camera RTSP streams for live video",
-        "Status": "PENDING",
-        "Priority": "Critical",
-        "Notes": "Requires IP cameras with RTSP URLs configured. Camera heartbeat health check implemented in Celery.",
-        "Completion": 0,
-    },
-
-    # ── SCRIPTS & TOOLING ──────────────────────────────────────────────────────
     {
         "Module": "Scripts & Tooling",
         "Feature": "Coverage Check (check_coverage.py)",
         "Task": "Verify camera FOV coverage for each floor",
         "Status": "DONE",
         "Priority": "Medium",
-        "Notes": "Analyzes blueprint data for blind spots. 360° variant available.",
+        "Notes": "Analyzes blueprint data for blind spots. 360 degree variant available.",
         "Completion": 100,
-    },
-    {
-        "Module": "Scripts & Tooling",
-        "Feature": "Verify Layout Alignment (verify_layout_alignment.py)",
-        "Task": "Check camera positions align with DXF blueprints",
-        "Status": "DONE",
-        "Priority": "Medium",
-        "Notes": "Validates pixel coordinates against DXF geometry.",
-        "Completion": 100,
-    },
-    {
-        "Module": "Scripts & Tooling",
-        "Feature": "Start/Stop Scripts",
-        "Task": "start.sh and stop.sh for local dev server management",
-        "Status": "DONE",
-        "Priority": "Medium",
-        "Notes": "Starts backend (uvicorn) + frontend (vite) in background with PID tracking.",
-        "Completion": 100,
-    },
-    {
-        "Module": "Scripts & Tooling",
-        "Feature": "Health Check Script",
-        "Task": "health-check.sh to verify all services are running",
-        "Status": "DONE",
-        "Priority": "Medium",
-        "Notes": "Checks backend, Redis, and frontend health endpoints.",
-        "Completion": 100,
+        "CompletionDate": "2026-06-10",
     },
     {
         "Module": "Scripts & Tooling",
@@ -603,6 +536,37 @@ TASKS = [
         "Priority": "High",
         "Notes": "Script ready. Models not yet downloaded to production environment.",
         "Completion": 100,
+        "CompletionDate": "2026-06-10",
+    },
+    {
+        "Module": "Scripts & Tooling",
+        "Feature": "Health Check Script",
+        "Task": "health-check.sh to verify all services are running",
+        "Status": "DONE",
+        "Priority": "Medium",
+        "Notes": "Checks backend, Redis, and frontend health endpoints.",
+        "Completion": 100,
+        "CompletionDate": "2026-06-10",
+    },
+    {
+        "Module": "Scripts & Tooling",
+        "Feature": "Start/Stop Scripts",
+        "Task": "start.sh and stop.sh for local dev server management",
+        "Status": "DONE",
+        "Priority": "Medium",
+        "Notes": "Starts backend (uvicorn) + frontend (vite) in background with PID tracking.",
+        "Completion": 100,
+        "CompletionDate": "2026-06-10",
+    },
+    {
+        "Module": "Scripts & Tooling",
+        "Feature": "Verify Layout Alignment (verify_layout_alignment.py)",
+        "Task": "Check camera positions align with DXF blueprints",
+        "Status": "DONE",
+        "Priority": "Medium",
+        "Notes": "Validates pixel coordinates against DXF geometry.",
+        "Completion": 100,
+        "CompletionDate": "2026-06-10",
     },
     {
         "Module": "Scripts & Tooling",
@@ -612,35 +576,97 @@ TASKS = [
         "Priority": "High",
         "Notes": "Requires NVIDIA GPU with TensorRT. Run after model download on target hardware.",
         "Completion": 0,
+        "CompletionDate": "",
     },
-
-    # ── NEXT SPRINT ────────────────────────────────────────────────────────────
+    {
+        "Module": "AI Processing",
+        "Feature": "ArcFace Face Recognition",
+        "Task": "Opportunistic face recognition at strategic camera points",
+        "Status": "PENDING",
+        "Priority": "High",
+        "Notes": "Secondary ID (15-20% of cameras). ArcFace/AdaFace model. Face enrollment backend endpoint ready.",
+        "Completion": 5,
+        "CompletionDate": "",
+    },
+    {
+        "Module": "AI Processing",
+        "Feature": "ByteTrack Multi-Object Tracking",
+        "Task": "Per-camera tracking with track IDs",
+        "Status": "PENDING",
+        "Priority": "Critical",
+        "Notes": "ByteTrack integration in processing/workers. Produces track events published to Redis.",
+        "Completion": 5,
+        "CompletionDate": "",
+    },
+    {
+        "Module": "AI Processing",
+        "Feature": "Head-Top Appearance Analysis",
+        "Task": "Hair color, style, headwear detection from overhead view",
+        "Status": "PENDING",
+        "Priority": "High",
+        "Notes": "EfficientNet-B3 head-top embedder. Unique to overhead camera systems.",
+        "Completion": 0,
+        "CompletionDate": "",
+    },
+    {
+        "Module": "AI Processing",
+        "Feature": "Milvus / FAISS Vector DB",
+        "Task": "Store and search ReID + face embeddings",
+        "Status": "PENDING",
+        "Priority": "High",
+        "Notes": "REID_COLLECTION_NAME and FACE_COLLECTION_NAME configured in settings. Milvus client ready.",
+        "Completion": 10,
+        "CompletionDate": "",
+    },
+    {
+        "Module": "AI Processing",
+        "Feature": "Multi-Modal Fusion Engine",
+        "Task": "Weighted fusion of body + head + face + spatial-temporal scores",
+        "Status": "PENDING",
+        "Priority": "Critical",
+        "Notes": "Fusion weights per scenario: body 50%+head 30%+spatial 20%; face=face 60%+body 25%+spatial 15%",
+        "Completion": 0,
+        "CompletionDate": "",
+    },
+    {
+        "Module": "AI Processing",
+        "Feature": "RTSP Stream Ingestion",
+        "Task": "Connect to real camera RTSP streams for live video",
+        "Status": "PENDING",
+        "Priority": "Critical",
+        "Notes": "Requires IP cameras with RTSP URLs configured. Camera heartbeat health check implemented in Celery.",
+        "Completion": 0,
+        "CompletionDate": "",
+    },
+    {
+        "Module": "AI Processing",
+        "Feature": "TransReID Body Re-ID",
+        "Task": "Cross-camera re-identification using body appearance",
+        "Status": "PENDING",
+        "Priority": "Critical",
+        "Notes": "Primary ID strategy for overhead cameras. Requires fine-tuned TransReID on top-down airport data.",
+        "Completion": 0,
+        "CompletionDate": "",
+    },
+    {
+        "Module": "AI Processing",
+        "Feature": "YOLOv8 Person Detection",
+        "Task": "Real-time person detection on camera frames",
+        "Status": "PENDING",
+        "Priority": "Critical",
+        "Notes": "Requires processing/ worker with YOLOv8 model. Architecture defined. GPU hardware required.",
+        "Completion": 5,
+        "CompletionDate": "",
+    },
     {
         "Module": "Next Sprint",
         "Feature": "Run reseed_from_json.py",
         "Task": "Apply accurate camera+zone pixel coordinates to SQLite database",
-        "Status": "IN_PROGRESS",
+        "Status": "DONE",
         "Priority": "Critical",
-        "Notes": "This fixes the blue dots appearing outside floor plan. Run: python3 scripts/reseed_from_json.py",
-        "Completion": 50,
-    },
-    {
-        "Module": "Next Sprint",
-        "Feature": "Live Track Dots on Canvas",
-        "Task": "Render WebSocket track positions as animated dots on the layout floor plan",
-        "Status": "PENDING",
-        "Priority": "High",
-        "Notes": "Track data comes from WS store. Need to map global_id → canvas (x,y) using camera homography or stored coords.",
-        "Completion": 0,
-    },
-    {
-        "Module": "Next Sprint",
-        "Feature": "Zone Occupancy Badges",
-        "Task": "Display real-time occupancy count per zone on layout canvas",
-        "Status": "PENDING",
-        "Priority": "High",
-        "Notes": "Zone occupancy = count of active tracks whose last known position falls inside zone polygon.",
-        "Completion": 0,
+        "Notes": "Reseeded the database with pixel-accurate coordinates mapping cameras exactly inside CAD walls.",
+        "Completion": 100,
+        "CompletionDate": "2026-06-12",
     },
     {
         "Module": "Next Sprint",
@@ -650,6 +676,17 @@ TASKS = [
         "Priority": "High",
         "Notes": "Required for deployment onboarding. Include: DATABASE_URL, REDIS_URL, SECRET_KEY, ALLOWED_ORIGINS, MILVUS_HOST.",
         "Completion": 0,
+        "CompletionDate": "",
+    },
+    {
+        "Module": "Next Sprint",
+        "Feature": "Live Track Dots on Canvas",
+        "Task": "Render WebSocket track positions as animated dots on the layout floor plan",
+        "Status": "PENDING",
+        "Priority": "High",
+        "Notes": "Track data comes from WS store. Need to map global_id -> canvas (x,y) using camera homography or stored coords.",
+        "Completion": 0,
+        "CompletionDate": "",
     },
     {
         "Module": "Next Sprint",
@@ -659,6 +696,17 @@ TASKS = [
         "Priority": "High",
         "Notes": "Test full stack: backend + frontend + Redis + PostgreSQL in containers.",
         "Completion": 0,
+        "CompletionDate": "",
+    },
+    {
+        "Module": "Next Sprint",
+        "Feature": "Zone Occupancy Badges",
+        "Task": "Display real-time occupancy count per zone on layout canvas",
+        "Status": "PENDING",
+        "Priority": "High",
+        "Notes": "Zone occupancy = count of active tracks whose last known position falls inside zone polygon.",
+        "Completion": 0,
+        "CompletionDate": "",
     },
 ]
 
@@ -805,8 +853,8 @@ for row in ws_cover.iter_rows():
 ws_tasks = wb.create_sheet("📊 All Tasks")
 ws_tasks.sheet_view.showGridLines = False
 
-# Column widths
-col_widths = [3, 22, 28, 52, 16, 12, 55, 15]
+# Column widths (9 columns now)
+col_widths = [3, 22, 28, 52, 16, 12, 18, 55, 15]
 for i, w in enumerate(col_widths, 1):
     ws_tasks.column_dimensions[get_column_letter(i)].width = w
 
@@ -814,7 +862,7 @@ for i, w in enumerate(col_widths, 1):
 ws_tasks.row_dimensions[1].height = 12
 ws_tasks.row_dimensions[2].height = 36
 
-headers = ["#", "Module", "Feature", "Task Description", "Status", "Priority", "Notes / Details", "Completion %"]
+headers = ["#", "Module", "Feature", "Task Description", "Status", "Priority", "Completion Date", "Notes / Details", "Completion %"]
 for col, hdr in enumerate(headers, 2):
     cell = ws_tasks.cell(row=2, column=col)
     cell.value = hdr
@@ -841,7 +889,11 @@ for idx, task in enumerate(TASKS, 1):
     # Alternating row shade
     row_bg = "141B27" if idx % 2 == 0 else DARK_BG
 
-    row_data = [idx, task["Module"], task["Feature"], task["Task"], status_label, prio_label, task["Notes"], f"{task['Completion']}%"]
+    completion_date = task.get("CompletionDate", "")
+    if not completion_date:
+        completion_date = "—" if status == "DONE" else "TBD"
+
+    row_data = [idx, task["Module"], task["Feature"], task["Task"], status_label, prio_label, completion_date, task["Notes"], f"{task['Completion']}%"]
     for col, val in enumerate(row_data, 2):
         cell = ws_tasks.cell(row=row_num, column=col)
         cell.value = val
@@ -852,14 +904,17 @@ for idx, task in enumerate(TASKS, 1):
 
         # Special styling
         if col == 6:  # Status
-            _, _, _ = STATUS_STYLES[status]
             cell.fill = fill(bg_color.replace("D1", "1A").replace("FE", "1A").replace("DB", "1A").replace("ED", "1A").replace("F3", "1A"))
             cell.font = Font(bold=True, color=STATUS_STYLES[status][0], size=9, name="Calibri")
             cell.alignment = align("center", "center")
         if col == 7:  # Priority
             cell.font = Font(bold=True, color=prio_color, size=9, name="Calibri")
             cell.alignment = align("center", "center")
-        if col == 9:  # Completion
+        if col == 8:  # Completion Date
+            cell.alignment = align("center", "center")
+            if completion_date not in ("—", "TBD"):
+                cell.font = Font(bold=True, color=TEAL, size=9, name="Calibri")
+        if col == 10:  # Completion %
             pct = task["Completion"]
             comp_color = GREEN if pct == 100 else AMBER if pct >= 50 else RED if pct > 0 else GRAY_MID
             cell.font = Font(bold=True, color=comp_color, size=10, name="Calibri")
@@ -867,15 +922,14 @@ for idx, task in enumerate(TASKS, 1):
 
     row_num += 1
 
-# Auto-filter
-ws_tasks.auto_filter.ref = f"B2:{get_column_letter(9)}{row_num - 1}"
+# Auto-filter (extend to column J/10)
+ws_tasks.auto_filter.ref = f"B2:{get_column_letter(10)}{row_num - 1}"
 
 # Freeze header
 ws_tasks.freeze_panes = "B3"
 
 # ─────────────────────────────────────────────────────────────────────────────
 # SHEET 3: MODULE SUMMARY
-# ─────────────────────────────────────────────────────────────────────────────
 ws_mod = wb.create_sheet("📦 By Module")
 ws_mod.sheet_view.showGridLines = False
 
