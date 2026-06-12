@@ -8,6 +8,8 @@ def parse_zones(filepath):
     def extract_array(name):
         match = re.search(r'const\s+' + name + r'\s*:\s*ZoneOnCanvas\[\]\s*=\s*\[(.*?)\];', content, re.DOTALL)
         if not match:
+            match = re.search(r'export\s+const\s+' + name + r'\s*:\s*ZoneOnCanvas\[\]\s*=\s*\[(.*?)\];', content, re.DOTALL)
+        if not match:
             match = re.search(r'const\s+' + name + r'\s*=\s*\[(.*?)\];', content, re.DOTALL)
         if not match:
             return []
@@ -27,10 +29,8 @@ def parse_zones(filepath):
         return zones
 
     return {
-        "GF": extract_array('GF_ROOM_ZONES'),
-        "SF": extract_array('SF_ROOM_ZONES'),
-        "FF": extract_array('FF_ROOM_ZONES'),
-        "AA": extract_array('AA_ROOM_ZONES')
+        "GF": extract_array('GF_ZONES_ACCURATE'),
+        "FF": extract_array('FF_ZONES_ACCURATE')
     }
 
 def get_extents(walls):
@@ -91,7 +91,7 @@ def get_fitted_labels(raw_walls, fitted_walls, labels, flip_y=False):
     return fitted_labels
 
 def main():
-    layout_editor_path = "/Users/samdavi/projects/short_req/frontend/src/components/LayoutEditor.tsx"
+    accurate_data_path = "/Users/samdavi/projects/short_req/frontend/src/features/layout-engine/templates/accurateBlueprintData.ts"
     dxf_templates_path = "/Users/samdavi/projects/short_req/frontend/src/features/layout-engine/templates/alpha2DxfTemplates.ts"
     
     with open(dxf_templates_path, 'r') as f:
@@ -122,14 +122,12 @@ def main():
 
     raw_gf_walls = parse_dxf_array('ALPHA2_GROUND_WALLS_DXF')
     raw_gf_labels = parse_dxf_array('ALPHA2_GROUND_LABELS_DXF')
-    raw_sf_walls = parse_dxf_array('ALPHA2_SECOND_WALLS_DXF')
-    raw_sf_labels = parse_dxf_array('ALPHA2_SECOND_LABELS_DXF')
     raw_ff_walls = parse_dxf_array('ALPHA2_FIRST_WALLS_DXF')
     raw_ff_labels = parse_dxf_array('ALPHA2_FIRST_LABELS_DXF')
     
-    zones = parse_zones(layout_editor_path)
+    zones = parse_zones(accurate_data_path)
     
-    # Target Canvas Wall bounds
+    # Target Canvas Wall bounds from accurateBlueprintData.ts
     gf_walls_fitted = [
         {"startX": 80, "startY": 80, "endX": 1120, "endY": 80},
         {"startX": 80, "startY": 80, "endX": 80, "endY": 720},
@@ -137,24 +135,16 @@ def main():
         {"startX": 80, "startY": 720, "endX": 1120, "endY": 720}
     ]
     
-    sf_walls_fitted = [
-        {"startX": 220, "startY": 230, "endX": 980, "endY": 230},
-        {"startX": 220, "startY": 230, "endX": 220, "endY": 570},
-        {"startX": 980, "startY": 230, "endX": 980, "endY": 570},
-        {"startX": 220, "startY": 570, "endX": 980, "endY": 570}
-    ]
-    
     ff_walls_fitted = [
-        {"startX": 240, "startY": 240, "endX": 960, "endY": 240},
-        {"startX": 240, "startY": 240, "endX": 240, "endY": 560},
-        {"startX": 960, "startY": 240, "endX": 960, "endY": 560},
-        {"startX": 240, "startY": 560, "endX": 960, "endY": 560}
+        {"startX": 235, "startY": 235, "endX": 960, "endY": 235},
+        {"startX": 235, "startY": 235, "endX": 235, "endY": 565},
+        {"startX": 960, "startY": 235, "endX": 960, "endY": 565},
+        {"startX": 235, "startY": 565, "endX": 960, "endY": 565}
     ]
 
     # Map labels to fitted walls with flip_y=True
     print("=================== WITH FLIP Y = True ===================")
     gf_fitted_labels = get_fitted_labels(raw_gf_walls, gf_walls_fitted, raw_gf_labels, flip_y=True)
-    sf_fitted_labels = get_fitted_labels(raw_sf_walls, sf_walls_fitted, raw_sf_labels, flip_y=True)
     ff_fitted_labels = get_fitted_labels(raw_ff_walls, ff_walls_fitted, raw_ff_labels, flip_y=True)
     
     # ── Report Ground Floor ──
@@ -186,21 +176,6 @@ def main():
             print(f"Label: '{label['text']}' falls into Zone: '{matched_zone['name']}' (ID: {matched_zone['id']})")
         else:
             print(f"Label: '{label['text']}' at ({label['x']:.1f}, {label['y']:.1f}) is OUTSIDE any First Floor zone!")
-
-    # ── Report Second Floor ──
-    print("\n--- SECOND FLOOR LABELS VS PREDEFINED ZONES ---")
-    sf_room_zones = zones['SF']
-    sf_name_labels = [l for l in sf_fitted_labels if not re.match(r'^\d+[\'\d"]*x\d+', l['text'])]
-    for label in sf_name_labels:
-        matched_zone = None
-        for zone in sf_room_zones:
-            if is_point_in_polygon(label['x'], label['y'], zone['points']):
-                matched_zone = zone
-                break
-        if matched_zone:
-            print(f"Label: '{label['text']}' falls into Zone: '{matched_zone['name']}' (ID: {matched_zone['id']})")
-        else:
-            print(f"Label: '{label['text']}' at ({label['x']:.1f}, {label['y']:.1f}) is OUTSIDE any Second Floor zone!")
 
 if __name__ == '__main__':
     main()
