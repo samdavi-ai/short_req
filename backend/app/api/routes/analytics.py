@@ -106,10 +106,10 @@ def get_analytics_dashboard(db: Session = Depends(get_db)):
     )
     top_alert_zones = [{"zone": row[0], "alert_count": row[1]} for row in top_zones_raw]
 
-    # Camera FPS (mock values — will be replaced by real Prometheus metrics)
-    cameras = db.query(Camera).filter(Camera.status == CameraStatusEnum.ACTIVE).all()
+    # Camera status summary (FPS requires live Prometheus metrics; show status-based value)
+    cameras = db.query(Camera).all()
     camera_fps = [
-        {"camera_id": c.id, "name": c.name, "fps": 29.5 if c.status == "ACTIVE" else 0}
+        {"camera_id": c.id, "name": c.name, "fps": 25.0 if c.status == CameraStatusEnum.ACTIVE else 0.0, "status": c.status.value if hasattr(c.status, 'value') else str(c.status)}
         for c in cameras
     ]
 
@@ -134,17 +134,35 @@ def get_entry_exit_counts(
 ):
     """
     Aggregate entry/exit event counts per hour for the last N hours.
-    Based on Alert records of type RESTRICTED_ZONE (proxy for crossings).
+    Uses Python-side hourly bucketing for SQLite + PostgreSQL compatibility.
     """
-    since = datetime.now(timezone.utc) - timedelta(hours=hours)
-    rows = (
-        db.query(
-            func.date_trunc("hour", Alert.timestamp).label("hour"),
-            func.count(Alert.id).label("count"),
-        )
+    now = datetime.now(timezone.utc)
+    since = now - timedelta(hours=hours)
+
+    # Fetch all alerts in range and bucket them by hour in Python
+    # (avoids func.date_trunc which is PostgreSQL-only)
+    alerts_in_range = (
+        db.query(Alert.timestamp)
         .filter(Alert.timestamp >= since)
-        .group_by(func.date_trunc("hour", Alert.timestamp))
-        .order_by(func.date_trunc("hour", Alert.timestamp))
         .all()
     )
-    return [{"hour": str(row.hour), "count": row.count} for row in rows]
+
+    # Build hourly buckets
+    buckets: dict = {}
+    for i in range(hours):
+        bucket_key = (now - timedelta(hours=hours - 1 - i)).replace(minute=0, second=0, microsecond=0)
+        buckets[bucket_key] = 0
+
+    for (ts,) in alerts_in_range:
+        if ts is None:
+            continue
+        if ts.tzinfo is None:
+            ts = ts.replace(tzinfo=timezone.utc)
+        bucket_key = ts.replace(minute=0, second=0, microsecond=0)
+        if bucket_key in buckets:
+            buckets[bucket_key] += 1
+
+    return [
+        {"hour": k.strftime("%Y-%m-%dT%H:00:00Z"), "count": v}
+        for k, v in sorted(buckets.items())
+    ]

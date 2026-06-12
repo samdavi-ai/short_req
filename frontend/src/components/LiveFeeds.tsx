@@ -1,27 +1,21 @@
 import React, { useState } from 'react';
 import { Camera, Grid, WifiOff } from 'lucide-react';
-import { useStore } from '../stores/appStore';
+import { useStore, Camera as CameraType } from '../stores/appStore';
 
-const DEMO_CAMERAS = [
-  { id: 1, name: 'Gate A1 — Entrance', floor: 1, status: 'ACTIVE', location: 'Terminal 1 Entry' },
-  { id: 2, name: 'Security Checkpoint', floor: 1, status: 'ACTIVE', location: 'Main Security' },
-  { id: 3, name: 'Baggage Claim B', floor: 1, status: 'ACTIVE', location: 'Arrivals Hall' },
-  { id: 4, name: 'Gate B3 — Restricted', floor: 2, status: 'OFFLINE', location: 'Boarding Gate B3' },
-  { id: 5, name: 'Retail Zone East', floor: 2, status: 'ACTIVE', location: 'Shopping Corridor' },
-  { id: 6, name: 'Elevator Lobby F1', floor: 1, status: 'ACTIVE', location: 'Elevator Bank' },
-  { id: 7, name: 'Tarmac Camera 1', floor: 0, status: 'ACTIVE', location: 'Tarmac North' },
-  { id: 8, name: 'Parking Level 2', floor: -1, status: 'MAINTENANCE', location: 'Multi-Storey Parking' },
+// Fallback demo cameras shown only when no cameras are in the database
+const DEMO_CAMERAS: CameraType[] = [
+  { id: 1, name: 'Gate A1 — Entrance', floor: 1, status: 'ACTIVE', location: 'Terminal 1 Entry', rtsp_url: '', x_coord: 0, y_coord: 0, angle: 0, is_overhead: true },
+  { id: 2, name: 'Security Checkpoint', floor: 1, status: 'ACTIVE', location: 'Main Security', rtsp_url: '', x_coord: 0, y_coord: 0, angle: 0, is_overhead: true },
+  { id: 3, name: 'Baggage Claim B', floor: 1, status: 'ACTIVE', location: 'Arrivals Hall', rtsp_url: '', x_coord: 0, y_coord: 0, angle: 0, is_overhead: true },
+  { id: 4, name: 'Gate B3 — Restricted', floor: 2, status: 'OFFLINE', location: 'Boarding Gate B3', rtsp_url: '', x_coord: 0, y_coord: 0, angle: 0, is_overhead: true },
+  { id: 5, name: 'Retail Zone East', floor: 2, status: 'ACTIVE', location: 'Shopping Corridor', rtsp_url: '', x_coord: 0, y_coord: 0, angle: 0, is_overhead: true },
+  { id: 6, name: 'Elevator Lobby F1', floor: 1, status: 'ACTIVE', location: 'Elevator Bank', rtsp_url: '', x_coord: 0, y_coord: 0, angle: 0, is_overhead: true },
+  { id: 7, name: 'Tarmac Camera 1', floor: 0, status: 'ACTIVE', location: 'Tarmac North', rtsp_url: '', x_coord: 0, y_coord: 0, angle: 0, is_overhead: true },
+  { id: 8, name: 'Parking Level 2', floor: -1, status: 'MAINTENANCE', location: 'Multi-Storey Parking', rtsp_url: '', x_coord: 0, y_coord: 0, angle: 0, is_overhead: true },
 ];
 
-const TRACK_DOTS = Array.from({ length: 24 }, (_, i) => ({
-  id: i,
-  x: Math.random() * 80 + 10,
-  y: Math.random() * 80 + 10,
-  color: Math.random() > 0.9 ? '#ef4444' : '#22c55e',
-}));
-
 function CameraFeedCard({ cam, selected, onClick }: {
-  cam: typeof DEMO_CAMERAS[0];
+  cam: CameraType;
   selected: boolean;
   onClick: () => void;
 }) {
@@ -138,7 +132,12 @@ function CameraFeedCard({ cam, selected, onClick }: {
             {/* Real movement dots via Websocket Tracks (Wait, this is LiveFeeds... We just show a dummy stream if not active.) */}
             {isDemoMode && (
               <svg style={{ position: 'absolute', inset: 0, width: '100%', height: '100%' }}>
-                {TRACK_DOTS.slice(0, cam.id * 3 % 12).map((dot) => (
+                {Array.from({ length: Math.max(1, (cam.id * 3) % 12) }, (_, i) => ({
+                  id: i,
+                  x: ((cam.id * 17 + i * 31) % 80) + 10,
+                  y: ((cam.id * 23 + i * 13) % 80) + 10,
+                  color: (cam.id + i) % 10 === 0 ? '#ef4444' : '#22c55e',
+                })).map((dot) => (
                   <circle key={dot.id} cx={`${dot.x}%`} cy={`${dot.y}%`} r="3" fill={dot.color} opacity={0.8} />
                 ))}
               </svg>
@@ -238,7 +237,7 @@ export default function LiveFeeds() {
           {filtered.map((cam) => (
             <CameraFeedCard
               key={cam.id}
-              cam={cam as typeof DEMO_CAMERAS[0]}
+              cam={cam}
               selected={selectedCam === cam.id}
               onClick={() => setSelectedCam(selectedCam === cam.id ? null : cam.id)}
             />

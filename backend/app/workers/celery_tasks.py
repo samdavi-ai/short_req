@@ -226,16 +226,40 @@ def camera_health_check(self):
 @celery_app.task(name="app.workers.celery_tasks.generate_analytics_report")
 def generate_analytics_report(report_type: str = "daily"):
     """
-    Generate PDF/CSV analytics report and save to assets/reports/.
+    Generate CSV analytics report and save to assets/reports/.
     Triggered on-demand from the Analytics dashboard Export button.
     """
+    from app.core.database import SessionLocal
+    from app.models.models import Camera, Alert, ActiveTrack
+    from datetime import datetime, timezone, timedelta
+
     os.makedirs("assets/reports", exist_ok=True)
-    filename = f"assets/reports/{report_type}_report.csv"
+    now = datetime.now(timezone.utc)
+    since = now - timedelta(hours=24 if report_type == "daily" else 168)
+    report_date = now.strftime("%Y-%m-%d")
+    filename = f"assets/reports/{report_type}_report_{report_date}.csv"
 
-    # Placeholder: real implementation queries DB and writes CSV/PDF
+    db = SessionLocal()
+    try:
+        cameras = db.query(Camera).all()
+        rows = []
+        for cam in cameras:
+            track_count = db.query(ActiveTrack).filter(
+                ActiveTrack.camera_id == cam.id,
+                ActiveTrack.first_seen >= since,
+            ).count()
+            alert_count = db.query(Alert).filter(
+                Alert.camera_id == cam.id,
+                Alert.timestamp >= since,
+            ).count()
+            rows.append(f"{cam.id},{cam.name},{track_count},{alert_count},{report_date}")
+    finally:
+        db.close()
+
     with open(filename, "w") as f:
-        f.write("camera_id,tracks_count,alerts_count,date\n")
-        f.write("1,142,3,2026-06-01\n")
+        f.write("camera_id,camera_name,tracks_count,alerts_count,date\n")
+        for row in rows:
+            f.write(row + "\n")
 
-    logger.info("Analytics report generated: %s", filename)
-    return {"status": "SUCCESS", "report_path": filename}
+    logger.info("Analytics report generated: %s (%d cameras)", filename, len(rows))
+    return {"status": "SUCCESS", "report_path": filename, "cameras_reported": len(rows)}

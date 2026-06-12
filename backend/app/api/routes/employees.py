@@ -158,6 +158,7 @@ def get_employee_breaks(
 
 
 @router.get("/compliance/all", response_model=List[BreakComplianceStatus])
+@router.get("/break-compliance", response_model=List[BreakComplianceStatus])
 def get_all_compliance(db: Session = Depends(get_db)):
     """
     Real-time break compliance check for ALL active employees.

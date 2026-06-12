@@ -99,7 +99,7 @@ def acknowledge_alert(
     return alert
 
 
-@router.post("/bulk/acknowledge", response_model=dict)
+@router.post("/bulk-acknowledge", response_model=dict)
 def bulk_acknowledge(
     alert_ids: List[int],
     acknowledged_by: str = Query(...),

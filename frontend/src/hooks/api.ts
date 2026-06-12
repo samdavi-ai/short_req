@@ -113,10 +113,11 @@ export const api = {
   },
 
   bulkAcknowledge: async (token: string, ids: number[], by: string) => {
-    const res = await fetch(`${BASE}/alerts/bulk-acknowledge`, {
+    const params = new URLSearchParams({ acknowledged_by: by });
+    const res = await fetch(`${BASE}/alerts/bulk-acknowledge?${params.toString()}`, {
       method: 'POST',
       headers: authHeaders(token),
-      body: JSON.stringify({ alert_ids: ids, acknowledged_by: by }),
+      body: JSON.stringify(ids),
     });
     await checkOk(res);
     return res.json();

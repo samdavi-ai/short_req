@@ -100,3 +100,17 @@ docker/data/
 celerybeat-schedule
 celerybeat.pid
 test_video.mp4
+
+# ─── Redis Dump ──────────────────────────────────────────────────────
+dump.rdb
+*.rdb
+
+# ─── Project Management / Office Files ──────────────────────────────
+*.xlsx
+*.xls
+Project_*.csv
+Project_*.xlsx
+
+# ─── Temporary / Root Level Prototypes ──────────────────────────────
+Alpha2GroundFloor.tsx
+cc.txt
