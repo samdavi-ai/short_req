@@ -39,7 +39,11 @@ export default function Wall3D({ startX, startY, endX, endY, thickness, color, p
       onClick={(e) => { e.stopPropagation(); onSelect(id); }}
     >
       <boxGeometry args={[length, height, t]} />
-      <meshStandardMaterial color={isSelected ? '#f59e0b' : color} transparent opacity={0.9} />
+      <meshStandardMaterial 
+        color={isSelected ? '#FF6B00' : (color === '#111111' ? '#4ECDC4' : color)} 
+        transparent 
+        opacity={isSelected ? 0.95 : (color === '#111111' ? 0.4 : 0.85)} 
+      />
     </mesh>
   );
 }

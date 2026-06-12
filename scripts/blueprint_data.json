@@ -1,0 +1,2454 @@
+{
+  "cameras": [
+    {
+      "id": 7001,
+      "x": 595,
+      "y": 110,
+      "angle": 90,
+      "fov": 110,
+      "name": "GF-CAM-01 Main Entry",
+      "status": "ACTIVE",
+      "location": "Main North Entry",
+      "is_overhead": true,
+      "floor": 0
+    },
+    {
+      "id": 7002,
+      "x": 105,
+      "y": 110,
+      "angle": 45,
+      "fov": 110,
+      "name": "GF-CAM-02 Porch / Lift",
+      "status": "ACTIVE",
+      "location": "Porch NW Corner",
+      "is_overhead": true,
+      "floor": 0
+    },
+    {
+      "id": 7003,
+      "x": 252,
+      "y": 110,
+      "angle": 90,
+      "fov": 110,
+      "name": "GF-CAM-03 Locker Room",
+      "status": "ACTIVE",
+      "location": "Locker Room North",
+      "is_overhead": true,
+      "floor": 0
+    },
+    {
+      "id": 7004,
+      "x": 105,
+      "y": 350,
+      "angle": 45,
+      "fov": 120,
+      "name": "GF-CAM-04 Canteen NW",
+      "status": "ACTIVE",
+      "location": "Canteen Dining NW",
+      "is_overhead": true,
+      "floor": 0
+    },
+    {
+      "id": 7005,
+      "x": 310,
+      "y": 490,
+      "angle": 225,
+      "fov": 120,
+      "name": "GF-CAM-05 Canteen SE",
+      "status": "ACTIVE",
+      "location": "Canteen Dining SE",
+      "is_overhead": true,
+      "floor": 0
+    },
+    {
+      "id": 7006,
+      "x": 445,
+      "y": 110,
+      "angle": 90,
+      "fov": 110,
+      "name": "GF-CAM-06 Electrical Room",
+      "status": "ACTIVE",
+      "location": "LT MCC HV Electrical",
+      "is_overhead": true,
+      "floor": 0
+    },
+    {
+      "id": 7007,
+      "x": 490,
+      "y": 490,
+      "angle": 0,
+      "fov": 120,
+      "name": "GF-CAM-07 Central Corridor",
+      "status": "ACTIVE",
+      "location": "Toilet Corridor Junction",
+      "is_overhead": true,
+      "floor": 0
+    },
+    {
+      "id": 7008,
+      "x": 750,
+      "y": 110,
+      "angle": 90,
+      "fov": 120,
+      "name": "GF-CAM-08 Reception",
+      "status": "ACTIVE",
+      "location": "Reception Lobby",
+      "is_overhead": true,
+      "floor": 0
+    },
+    {
+      "id": 7009,
+      "x": 655,
+      "y": 450,
+      "angle": 45,
+      "fov": 110,
+      "name": "GF-CAM-09 Storage / Legal",
+      "status": "ACTIVE",
+      "location": "Storage Room NW",
+      "is_overhead": true,
+      "floor": 0
+    },
+    {
+      "id": 7010,
+      "x": 790,
+      "y": 310,
+      "angle": 45,
+      "fov": 110,
+      "name": "GF-CAM-10 Monitor Room",
+      "status": "ACTIVE",
+      "location": "Monitor / Dispatch",
+      "is_overhead": true,
+      "floor": 0
+    },
+    {
+      "id": 7011,
+      "x": 760,
+      "y": 570,
+      "angle": 0,
+      "fov": 120,
+      "name": "GF-CAM-11 South Corridor",
+      "status": "ACTIVE",
+      "location": "South Corridor",
+      "is_overhead": true,
+      "floor": 0
+    },
+    {
+      "id": 7012,
+      "x": 920,
+      "y": 110,
+      "angle": 90,
+      "fov": 110,
+      "name": "GF-CAM-12 Data / Server",
+      "status": "ACTIVE",
+      "location": "Data Office / Server",
+      "is_overhead": true,
+      "floor": 0
+    },
+    {
+      "id": 7013,
+      "x": 980,
+      "y": 270,
+      "angle": 90,
+      "fov": 120,
+      "name": "GF-CAM-13 Workstations",
+      "status": "ACTIVE",
+      "location": "Open Work Stations",
+      "is_overhead": true,
+      "floor": 0
+    },
+    {
+      "id": 7014,
+      "x": 910,
+      "y": 395,
+      "angle": 0,
+      "fov": 120,
+      "name": "GF-CAM-14 Office Row",
+      "status": "ACTIVE",
+      "location": "Office Row Corridor",
+      "is_overhead": true,
+      "floor": 0
+    },
+    {
+      "id": 7015,
+      "x": 910,
+      "y": 570,
+      "angle": 45,
+      "fov": 110,
+      "name": "GF-CAM-15 East Wing S",
+      "status": "ACTIVE",
+      "location": "AFSB / East Gents Entry",
+      "is_overhead": true,
+      "floor": 0
+    },
+    {
+      "id": 7016,
+      "x": 1095,
+      "y": 110,
+      "angle": 135,
+      "fov": 110,
+      "name": "GF-CAM-16 Director Recep",
+      "status": "ACTIVE",
+      "location": "Director Wing Reception",
+      "is_overhead": true,
+      "floor": 0
+    },
+    {
+      "id": 8001,
+      "x": 110,
+      "y": 110,
+      "angle": 45,
+      "fov": 110,
+      "name": "AA-CAM-01 CMS Maintenance",
+      "status": "ACTIVE",
+      "location": "CMS Maintenance Room",
+      "is_overhead": true,
+      "floor": 1
+    },
+    {
+      "id": 8002,
+      "x": 315,
+      "y": 310,
+      "angle": 225,
+      "fov": 110,
+      "name": "AA-CAM-02 CMS Server",
+      "status": "ACTIVE",
+      "location": "CMS Server Room",
+      "is_overhead": true,
+      "floor": 1
+    },
+    {
+      "id": 8003,
+      "x": 110,
+      "y": 425,
+      "angle": 45,
+      "fov": 110,
+      "name": "AA-CAM-03 CMS Lower",
+      "status": "ACTIVE",
+      "location": "CMS Lower Zone",
+      "is_overhead": true,
+      "floor": 1
+    },
+    {
+      "id": 8004,
+      "x": 360,
+      "y": 215,
+      "angle": 0,
+      "fov": 120,
+      "name": "AA-CAM-04 Upper Corridor W",
+      "status": "ACTIVE",
+      "location": "Pest + RADAR Entry Sweep",
+      "is_overhead": true,
+      "floor": 1
+    },
+    {
+      "id": 8005,
+      "x": 555,
+      "y": 110,
+      "angle": 90,
+      "fov": 110,
+      "name": "AA-CAM-05 RADAR Interface",
+      "status": "ACTIVE",
+      "location": "RADAR EXT Interface",
+      "is_overhead": true,
+      "floor": 1
+    },
+    {
+      "id": 8006,
+      "x": 750,
+      "y": 110,
+      "angle": 90,
+      "fov": 120,
+      "name": "AA-CAM-06 CHS Executives",
+      "status": "ACTIVE",
+      "location": "CHS Executives Room",
+      "is_overhead": true,
+      "floor": 1
+    },
+    {
+      "id": 8007,
+      "x": 910,
+      "y": 110,
+      "angle": 90,
+      "fov": 120,
+      "name": "AA-CAM-07 Director Area",
+      "status": "ACTIVE",
+      "location": "Director + East Corridor",
+      "is_overhead": true,
+      "floor": 1
+    },
+    {
+      "id": 8008,
+      "x": 1000,
+      "y": 215,
+      "angle": 90,
+      "fov": 120,
+      "name": "AA-CAM-08 East Locker Corr",
+      "status": "ACTIVE",
+      "location": "East Locker Corridor Sweep",
+      "is_overhead": true,
+      "floor": 1
+    },
+    {
+      "id": 8009,
+      "x": 170,
+      "y": 500,
+      "angle": 90,
+      "fov": 110,
+      "name": "AA-CAM-09 AMRS Server",
+      "status": "ACTIVE",
+      "location": "AMRS Server Room",
+      "is_overhead": true,
+      "floor": 1
+    },
+    {
+      "id": 8010,
+      "x": 355,
+      "y": 500,
+      "angle": 90,
+      "fov": 110,
+      "name": "AA-CAM-10 Cyber TAC",
+      "status": "ACTIVE",
+      "location": "Cyber Security TAC",
+      "is_overhead": true,
+      "floor": 1
+    },
+    {
+      "id": 8011,
+      "x": 520,
+      "y": 500,
+      "angle": 90,
+      "fov": 110,
+      "name": "AA-CAM-11 UHF / CCS",
+      "status": "ACTIVE",
+      "location": "UHF / CCS Data Room",
+      "is_overhead": true,
+      "floor": 1
+    },
+    {
+      "id": 8012,
+      "x": 670,
+      "y": 500,
+      "angle": 90,
+      "fov": 110,
+      "name": "AA-CAM-12 Battery Room",
+      "status": "ACTIVE",
+      "location": "UPS Battery Room",
+      "is_overhead": true,
+      "floor": 1
+    },
+    {
+      "id": 8013,
+      "x": 825,
+      "y": 500,
+      "angle": 90,
+      "fov": 110,
+      "name": "AA-CAM-13 Dist Panel",
+      "status": "ACTIVE",
+      "location": "Distribution Panel Area",
+      "is_overhead": true,
+      "floor": 1
+    },
+    {
+      "id": 8014,
+      "x": 1010,
+      "y": 500,
+      "angle": 90,
+      "fov": 110,
+      "name": "AA-CAM-14 Fallback Srv",
+      "status": "ACTIVE",
+      "location": "Fallback Servers Room",
+      "is_overhead": true,
+      "floor": 1
+    },
+    {
+      "id": 9001,
+      "x": 300,
+      "y": 400,
+      "angle": 0,
+      "fov": 120,
+      "name": "FF-CAM-01 Corridor West",
+      "status": "ACTIVE",
+      "location": "Corridor West Sweep",
+      "is_overhead": true,
+      "floor": 2
+    },
+    {
+      "id": 9002,
+      "x": 600,
+      "y": 400,
+      "angle": 180,
+      "fov": 120,
+      "name": "FF-CAM-02 Corridor Centre",
+      "status": "ACTIVE",
+      "location": "Corridor Centre Sweep",
+      "is_overhead": true,
+      "floor": 2
+    },
+    {
+      "id": 9003,
+      "x": 760,
+      "y": 400,
+      "angle": 0,
+      "fov": 120,
+      "name": "FF-CAM-03 Corridor East",
+      "status": "ACTIVE",
+      "location": "Corridor East Sweep",
+      "is_overhead": true,
+      "floor": 2
+    },
+    {
+      "id": 9004,
+      "x": 340,
+      "y": 265,
+      "angle": 90,
+      "fov": 110,
+      "name": "FF-CAM-04 Training IC",
+      "status": "ACTIVE",
+      "location": "Training In-Charge Room",
+      "is_overhead": true,
+      "floor": 2
+    },
+    {
+      "id": 9005,
+      "x": 690,
+      "y": 265,
+      "angle": 90,
+      "fov": 110,
+      "name": "FF-CAM-05 Recreation",
+      "status": "ACTIVE",
+      "location": "Recreation Room",
+      "is_overhead": true,
+      "floor": 2
+    },
+    {
+      "id": 9006,
+      "x": 775,
+      "y": 265,
+      "angle": 90,
+      "fov": 110,
+      "name": "FF-CAM-06 UPS Battery",
+      "status": "ACTIVE",
+      "location": "UPS Battery Room",
+      "is_overhead": true,
+      "floor": 2
+    },
+    {
+      "id": 9007,
+      "x": 410,
+      "y": 450,
+      "angle": 90,
+      "fov": 110,
+      "name": "FF-CAM-07 STM Telecom",
+      "status": "ACTIVE",
+      "location": "STM Telecom Room",
+      "is_overhead": true,
+      "floor": 2
+    },
+    {
+      "id": 9008,
+      "x": 475,
+      "y": 450,
+      "angle": 45,
+      "fov": 120,
+      "name": "FF-CAM-08 ACC Bay 1-2",
+      "status": "ACTIVE",
+      "location": "ACC Bay 1 + Bay 2",
+      "is_overhead": true,
+      "floor": 2
+    },
+    {
+      "id": 9009,
+      "x": 655,
+      "y": 450,
+      "angle": 45,
+      "fov": 120,
+      "name": "FF-CAM-09 ACC Bay 3-4",
+      "status": "ACTIVE",
+      "location": "ACC Bay 3 + Bay 4",
+      "is_overhead": true,
+      "floor": 2
+    },
+    {
+      "id": 9010,
+      "x": 895,
+      "y": 450,
+      "angle": 90,
+      "fov": 110,
+      "name": "FF-CAM-10 APP Room",
+      "status": "ACTIVE",
+      "location": "APP Room",
+      "is_overhead": true,
+      "floor": 2
+    },
+    {
+      "id": 9011,
+      "x": 255,
+      "y": 310,
+      "angle": 0,
+      "fov": 110,
+      "name": "FF-CAM-11 Stairwell W",
+      "status": "ACTIVE",
+      "location": "West Stairwell",
+      "is_overhead": true,
+      "floor": 2
+    },
+    {
+      "id": 9012,
+      "x": 945,
+      "y": 310,
+      "angle": 180,
+      "fov": 110,
+      "name": "FF-CAM-12 Stairwell E",
+      "status": "ACTIVE",
+      "location": "East Stairwell",
+      "is_overhead": true,
+      "floor": 2
+    }
+  ],
+  "zones": [
+    {
+      "id": 2001,
+      "name": "Covered Porch",
+      "type": "LOUNGE",
+      "color": "#22c55e",
+      "dwell_alert_seconds": 600,
+      "is_active": true,
+      "points": [
+        {
+          "x": 80,
+          "y": 80
+        },
+        {
+          "x": 175,
+          "y": 80
+        },
+        {
+          "x": 175,
+          "y": 220
+        },
+        {
+          "x": 80,
+          "y": 220
+        }
+      ],
+      "floor": 0
+    },
+    {
+      "id": 2002,
+      "name": "Locker Room",
+      "type": "LOUNGE",
+      "color": "#22c55e",
+      "dwell_alert_seconds": 900,
+      "is_active": true,
+      "points": [
+        {
+          "x": 175,
+          "y": 80
+        },
+        {
+          "x": 330,
+          "y": 80
+        },
+        {
+          "x": 330,
+          "y": 220
+        },
+        {
+          "x": 175,
+          "y": 220
+        }
+      ],
+      "floor": 0
+    },
+    {
+      "id": 2003,
+      "name": "Sofa / Rest Area",
+      "type": "LOUNGE",
+      "color": "#22c55e",
+      "dwell_alert_seconds": 1200,
+      "is_active": true,
+      "points": [
+        {
+          "x": 80,
+          "y": 220
+        },
+        {
+          "x": 330,
+          "y": 220
+        },
+        {
+          "x": 330,
+          "y": 330
+        },
+        {
+          "x": 80,
+          "y": 330
+        }
+      ],
+      "floor": 0
+    },
+    {
+      "id": 2004,
+      "name": "BIAL Canteen — R&M Dining",
+      "type": "DWELL",
+      "color": "#3b82f6",
+      "dwell_alert_seconds": 3600,
+      "is_active": true,
+      "points": [
+        {
+          "x": 80,
+          "y": 330
+        },
+        {
+          "x": 330,
+          "y": 330
+        },
+        {
+          "x": 330,
+          "y": 510
+        },
+        {
+          "x": 80,
+          "y": 510
+        }
+      ],
+      "floor": 0
+    },
+    {
+      "id": 2005,
+      "name": "Canteen Kitchen",
+      "type": "RESTRICTED",
+      "color": "#ef4444",
+      "dwell_alert_seconds": 0,
+      "is_active": true,
+      "points": [
+        {
+          "x": 80,
+          "y": 510
+        },
+        {
+          "x": 210,
+          "y": 510
+        },
+        {
+          "x": 210,
+          "y": 720
+        },
+        {
+          "x": 80,
+          "y": 720
+        }
+      ],
+      "floor": 0
+    },
+    {
+      "id": 2006,
+      "name": "Canteen Storage / Pantry",
+      "type": "RESTRICTED",
+      "color": "#ef4444",
+      "dwell_alert_seconds": 0,
+      "is_active": true,
+      "points": [
+        {
+          "x": 210,
+          "y": 510
+        },
+        {
+          "x": 330,
+          "y": 510
+        },
+        {
+          "x": 330,
+          "y": 720
+        },
+        {
+          "x": 210,
+          "y": 720
+        }
+      ],
+      "floor": 0
+    },
+    {
+      "id": 2007,
+      "name": "LT MCC HV Electrical Room",
+      "type": "RESTRICTED",
+      "color": "#ef4444",
+      "dwell_alert_seconds": 0,
+      "is_active": true,
+      "points": [
+        {
+          "x": 330,
+          "y": 80
+        },
+        {
+          "x": 560,
+          "y": 80
+        },
+        {
+          "x": 560,
+          "y": 290
+        },
+        {
+          "x": 330,
+          "y": 290
+        }
+      ],
+      "floor": 0
+    },
+    {
+      "id": 2008,
+      "name": "Ladies Toilet (Centre)",
+      "type": "LOUNGE",
+      "color": "#22c55e",
+      "dwell_alert_seconds": 600,
+      "is_active": true,
+      "points": [
+        {
+          "x": 330,
+          "y": 290
+        },
+        {
+          "x": 485,
+          "y": 290
+        },
+        {
+          "x": 485,
+          "y": 430
+        },
+        {
+          "x": 330,
+          "y": 430
+        }
+      ],
+      "floor": 0
+    },
+    {
+      "id": 2009,
+      "name": "Gents Toilet (Centre)",
+      "type": "LOUNGE",
+      "color": "#22c55e",
+      "dwell_alert_seconds": 600,
+      "is_active": true,
+      "points": [
+        {
+          "x": 485,
+          "y": 290
+        },
+        {
+          "x": 640,
+          "y": 290
+        },
+        {
+          "x": 640,
+          "y": 430
+        },
+        {
+          "x": 485,
+          "y": 430
+        }
+      ],
+      "floor": 0
+    },
+    {
+      "id": 2010,
+      "name": "Toilet Block Corridor",
+      "type": "DWELL",
+      "color": "#3b82f6",
+      "dwell_alert_seconds": 300,
+      "is_active": true,
+      "points": [
+        {
+          "x": 330,
+          "y": 430
+        },
+        {
+          "x": 640,
+          "y": 430
+        },
+        {
+          "x": 640,
+          "y": 555
+        },
+        {
+          "x": 330,
+          "y": 555
+        }
+      ],
+      "floor": 0
+    },
+    {
+      "id": 2011,
+      "name": "Canteen Corridor / Lobby",
+      "type": "DWELL",
+      "color": "#3b82f6",
+      "dwell_alert_seconds": 600,
+      "is_active": true,
+      "points": [
+        {
+          "x": 330,
+          "y": 555
+        },
+        {
+          "x": 640,
+          "y": 555
+        },
+        {
+          "x": 640,
+          "y": 720
+        },
+        {
+          "x": 330,
+          "y": 720
+        }
+      ],
+      "floor": 0
+    },
+    {
+      "id": 2012,
+      "name": "Reception Lobby",
+      "type": "LOUNGE",
+      "color": "#22c55e",
+      "dwell_alert_seconds": 900,
+      "is_active": true,
+      "points": [
+        {
+          "x": 640,
+          "y": 80
+        },
+        {
+          "x": 860,
+          "y": 80
+        },
+        {
+          "x": 860,
+          "y": 290
+        },
+        {
+          "x": 640,
+          "y": 290
+        }
+      ],
+      "floor": 0
+    },
+    {
+      "id": 2013,
+      "name": "Waiting / Area of Stay",
+      "type": "DWELL",
+      "color": "#3b82f6",
+      "dwell_alert_seconds": 1800,
+      "is_active": true,
+      "points": [
+        {
+          "x": 560,
+          "y": 290
+        },
+        {
+          "x": 640,
+          "y": 290
+        },
+        {
+          "x": 640,
+          "y": 430
+        },
+        {
+          "x": 560,
+          "y": 430
+        }
+      ],
+      "floor": 0
+    },
+    {
+      "id": 2014,
+      "name": "Storage / Legal Room",
+      "type": "RESTRICTED",
+      "color": "#ef4444",
+      "dwell_alert_seconds": 0,
+      "is_active": true,
+      "points": [
+        {
+          "x": 640,
+          "y": 430
+        },
+        {
+          "x": 770,
+          "y": 430
+        },
+        {
+          "x": 770,
+          "y": 555
+        },
+        {
+          "x": 640,
+          "y": 555
+        }
+      ],
+      "floor": 0
+    },
+    {
+      "id": 2015,
+      "name": "Monitor / Dispatch Room",
+      "type": "RESTRICTED",
+      "color": "#ef4444",
+      "dwell_alert_seconds": 0,
+      "is_active": true,
+      "points": [
+        {
+          "x": 770,
+          "y": 290
+        },
+        {
+          "x": 895,
+          "y": 290
+        },
+        {
+          "x": 895,
+          "y": 555
+        },
+        {
+          "x": 770,
+          "y": 555
+        }
+      ],
+      "floor": 0
+    },
+    {
+      "id": 2016,
+      "name": "Corridor (Monitor South)",
+      "type": "DWELL",
+      "color": "#3b82f6",
+      "dwell_alert_seconds": 300,
+      "is_active": true,
+      "points": [
+        {
+          "x": 640,
+          "y": 555
+        },
+        {
+          "x": 895,
+          "y": 555
+        },
+        {
+          "x": 895,
+          "y": 720
+        },
+        {
+          "x": 640,
+          "y": 720
+        }
+      ],
+      "floor": 0
+    },
+    {
+      "id": 2017,
+      "name": "Data Office / Server Room",
+      "type": "RESTRICTED",
+      "color": "#ef4444",
+      "dwell_alert_seconds": 0,
+      "is_active": true,
+      "points": [
+        {
+          "x": 895,
+          "y": 80
+        },
+        {
+          "x": 1015,
+          "y": 80
+        },
+        {
+          "x": 1015,
+          "y": 250
+        },
+        {
+          "x": 895,
+          "y": 250
+        }
+      ],
+      "floor": 0
+    },
+    {
+      "id": 2018,
+      "name": "Director Wing Reception",
+      "type": "LOUNGE",
+      "color": "#22c55e",
+      "dwell_alert_seconds": 600,
+      "is_active": true,
+      "points": [
+        {
+          "x": 1015,
+          "y": 80
+        },
+        {
+          "x": 1120,
+          "y": 80
+        },
+        {
+          "x": 1120,
+          "y": 250
+        },
+        {
+          "x": 1015,
+          "y": 250
+        }
+      ],
+      "floor": 0
+    },
+    {
+      "id": 2019,
+      "name": "Open Work Stations",
+      "type": "DWELL",
+      "color": "#3b82f6",
+      "dwell_alert_seconds": 2400,
+      "is_active": true,
+      "points": [
+        {
+          "x": 895,
+          "y": 250
+        },
+        {
+          "x": 1070,
+          "y": 250
+        },
+        {
+          "x": 1070,
+          "y": 375
+        },
+        {
+          "x": 895,
+          "y": 375
+        }
+      ],
+      "floor": 0
+    },
+    {
+      "id": 2020,
+      "name": "Meeting Room",
+      "type": "DWELL",
+      "color": "#3b82f6",
+      "dwell_alert_seconds": 1800,
+      "is_active": true,
+      "points": [
+        {
+          "x": 1070,
+          "y": 250
+        },
+        {
+          "x": 1120,
+          "y": 250
+        },
+        {
+          "x": 1120,
+          "y": 375
+        },
+        {
+          "x": 1070,
+          "y": 375
+        }
+      ],
+      "floor": 0
+    },
+    {
+      "id": 2021,
+      "name": "HR / Admin Office",
+      "type": "RESTRICTED",
+      "color": "#ef4444",
+      "dwell_alert_seconds": 0,
+      "is_active": true,
+      "points": [
+        {
+          "x": 895,
+          "y": 375
+        },
+        {
+          "x": 950,
+          "y": 375
+        },
+        {
+          "x": 950,
+          "y": 590
+        },
+        {
+          "x": 895,
+          "y": 590
+        }
+      ],
+      "floor": 0
+    },
+    {
+      "id": 2022,
+      "name": "Accounts Office",
+      "type": "RESTRICTED",
+      "color": "#ef4444",
+      "dwell_alert_seconds": 0,
+      "is_active": true,
+      "points": [
+        {
+          "x": 950,
+          "y": 375
+        },
+        {
+          "x": 1005,
+          "y": 375
+        },
+        {
+          "x": 1005,
+          "y": 590
+        },
+        {
+          "x": 950,
+          "y": 590
+        }
+      ],
+      "floor": 0
+    },
+    {
+      "id": 2023,
+      "name": "CODC / CS Office",
+      "type": "RESTRICTED",
+      "color": "#ef4444",
+      "dwell_alert_seconds": 0,
+      "is_active": true,
+      "points": [
+        {
+          "x": 1005,
+          "y": 375
+        },
+        {
+          "x": 1060,
+          "y": 375
+        },
+        {
+          "x": 1060,
+          "y": 590
+        },
+        {
+          "x": 1005,
+          "y": 590
+        }
+      ],
+      "floor": 0
+    },
+    {
+      "id": 2024,
+      "name": "MD / Director Office",
+      "type": "RESTRICTED",
+      "color": "#ef4444",
+      "dwell_alert_seconds": 0,
+      "is_active": true,
+      "points": [
+        {
+          "x": 1060,
+          "y": 375
+        },
+        {
+          "x": 1120,
+          "y": 375
+        },
+        {
+          "x": 1120,
+          "y": 590
+        },
+        {
+          "x": 1060,
+          "y": 590
+        }
+      ],
+      "floor": 0
+    },
+    {
+      "id": 2025,
+      "name": "AFSB / Misc Office",
+      "type": "RESTRICTED",
+      "color": "#ef4444",
+      "dwell_alert_seconds": 0,
+      "is_active": true,
+      "points": [
+        {
+          "x": 895,
+          "y": 590
+        },
+        {
+          "x": 1015,
+          "y": 590
+        },
+        {
+          "x": 1015,
+          "y": 720
+        },
+        {
+          "x": 895,
+          "y": 720
+        }
+      ],
+      "floor": 0
+    },
+    {
+      "id": 2026,
+      "name": "Gents Toilet (East Wing)",
+      "type": "LOUNGE",
+      "color": "#22c55e",
+      "dwell_alert_seconds": 600,
+      "is_active": true,
+      "points": [
+        {
+          "x": 1015,
+          "y": 590
+        },
+        {
+          "x": 1120,
+          "y": 590
+        },
+        {
+          "x": 1120,
+          "y": 720
+        },
+        {
+          "x": 1015,
+          "y": 720
+        }
+      ],
+      "floor": 0
+    },
+    {
+      "id": 2027,
+      "name": "Main Entry Tripwire",
+      "type": "TRIPWIRE",
+      "color": "#f59e0b",
+      "dwell_alert_seconds": 0,
+      "is_active": true,
+      "points": [
+        {
+          "x": 80,
+          "y": 80
+        },
+        {
+          "x": 175,
+          "y": 80
+        },
+        {
+          "x": 175,
+          "y": 140
+        },
+        {
+          "x": 80,
+          "y": 140
+        }
+      ],
+      "floor": 0
+    },
+    {
+      "id": 2028,
+      "name": "South Exit Tripwire",
+      "type": "TRIPWIRE",
+      "color": "#f59e0b",
+      "dwell_alert_seconds": 0,
+      "is_active": true,
+      "points": [
+        {
+          "x": 80,
+          "y": 660
+        },
+        {
+          "x": 175,
+          "y": 660
+        },
+        {
+          "x": 175,
+          "y": 720
+        },
+        {
+          "x": 80,
+          "y": 720
+        }
+      ],
+      "floor": 0
+    },
+    {
+      "id": 4001,
+      "name": "CMS Maintenance Room",
+      "type": "RESTRICTED",
+      "color": "#ef4444",
+      "dwell_alert_seconds": 0,
+      "is_active": true,
+      "points": [
+        {
+          "x": 80,
+          "y": 80
+        },
+        {
+          "x": 340,
+          "y": 80
+        },
+        {
+          "x": 340,
+          "y": 170
+        },
+        {
+          "x": 80,
+          "y": 170
+        }
+      ],
+      "floor": 1
+    },
+    {
+      "id": 4002,
+      "name": "Technical Supervisor Room",
+      "type": "RESTRICTED",
+      "color": "#ef4444",
+      "dwell_alert_seconds": 0,
+      "is_active": true,
+      "points": [
+        {
+          "x": 80,
+          "y": 170
+        },
+        {
+          "x": 210,
+          "y": 170
+        },
+        {
+          "x": 210,
+          "y": 310
+        },
+        {
+          "x": 80,
+          "y": 310
+        }
+      ],
+      "floor": 1
+    },
+    {
+      "id": 4003,
+      "name": "CMS Server Room",
+      "type": "RESTRICTED",
+      "color": "#ef4444",
+      "dwell_alert_seconds": 0,
+      "is_active": true,
+      "points": [
+        {
+          "x": 210,
+          "y": 310
+        },
+        {
+          "x": 340,
+          "y": 310
+        },
+        {
+          "x": 340,
+          "y": 400
+        },
+        {
+          "x": 210,
+          "y": 400
+        }
+      ],
+      "floor": 1
+    },
+    {
+      "id": 4004,
+      "name": "CMS Rack Room (Tech Sup.)",
+      "type": "RESTRICTED",
+      "color": "#ef4444",
+      "dwell_alert_seconds": 0,
+      "is_active": true,
+      "points": [
+        {
+          "x": 80,
+          "y": 310
+        },
+        {
+          "x": 210,
+          "y": 310
+        },
+        {
+          "x": 210,
+          "y": 400
+        },
+        {
+          "x": 80,
+          "y": 400
+        }
+      ],
+      "floor": 1
+    },
+    {
+      "id": 4005,
+      "name": "CMS Lower Zone",
+      "type": "RESTRICTED",
+      "color": "#ef4444",
+      "dwell_alert_seconds": 0,
+      "is_active": true,
+      "points": [
+        {
+          "x": 80,
+          "y": 400
+        },
+        {
+          "x": 340,
+          "y": 400
+        },
+        {
+          "x": 340,
+          "y": 480
+        },
+        {
+          "x": 80,
+          "y": 480
+        }
+      ],
+      "floor": 1
+    },
+    {
+      "id": 4006,
+      "name": "Pest Room — Ladies",
+      "type": "LOUNGE",
+      "color": "#22c55e",
+      "dwell_alert_seconds": 600,
+      "is_active": true,
+      "points": [
+        {
+          "x": 340,
+          "y": 200
+        },
+        {
+          "x": 410,
+          "y": 200
+        },
+        {
+          "x": 410,
+          "y": 310
+        },
+        {
+          "x": 340,
+          "y": 310
+        }
+      ],
+      "floor": 1
+    },
+    {
+      "id": 4007,
+      "name": "Pest Room — Gents",
+      "type": "LOUNGE",
+      "color": "#22c55e",
+      "dwell_alert_seconds": 600,
+      "is_active": true,
+      "points": [
+        {
+          "x": 410,
+          "y": 200
+        },
+        {
+          "x": 480,
+          "y": 200
+        },
+        {
+          "x": 480,
+          "y": 310
+        },
+        {
+          "x": 410,
+          "y": 310
+        }
+      ],
+      "floor": 1
+    },
+    {
+      "id": 4008,
+      "name": "RAF / RADAR ADD EXT Interface",
+      "type": "RESTRICTED",
+      "color": "#ef4444",
+      "dwell_alert_seconds": 0,
+      "is_active": true,
+      "points": [
+        {
+          "x": 480,
+          "y": 200
+        },
+        {
+          "x": 630,
+          "y": 200
+        },
+        {
+          "x": 630,
+          "y": 310
+        },
+        {
+          "x": 480,
+          "y": 310
+        }
+      ],
+      "floor": 1
+    },
+    {
+      "id": 4009,
+      "name": "Radio / Comms Room",
+      "type": "RESTRICTED",
+      "color": "#ef4444",
+      "dwell_alert_seconds": 0,
+      "is_active": true,
+      "points": [
+        {
+          "x": 340,
+          "y": 310
+        },
+        {
+          "x": 480,
+          "y": 310
+        },
+        {
+          "x": 480,
+          "y": 480
+        },
+        {
+          "x": 340,
+          "y": 480
+        }
+      ],
+      "floor": 1
+    },
+    {
+      "id": 4010,
+      "name": "CHS Executives Room (West)",
+      "type": "RESTRICTED",
+      "color": "#ef4444",
+      "dwell_alert_seconds": 0,
+      "is_active": true,
+      "points": [
+        {
+          "x": 480,
+          "y": 310
+        },
+        {
+          "x": 630,
+          "y": 310
+        },
+        {
+          "x": 630,
+          "y": 480
+        },
+        {
+          "x": 480,
+          "y": 480
+        }
+      ],
+      "floor": 1
+    },
+    {
+      "id": 4011,
+      "name": "CHS Executives Room (East)",
+      "type": "RESTRICTED",
+      "color": "#ef4444",
+      "dwell_alert_seconds": 0,
+      "is_active": true,
+      "points": [
+        {
+          "x": 630,
+          "y": 80
+        },
+        {
+          "x": 870,
+          "y": 80
+        },
+        {
+          "x": 870,
+          "y": 310
+        },
+        {
+          "x": 630,
+          "y": 310
+        }
+      ],
+      "floor": 1
+    },
+    {
+      "id": 4012,
+      "name": "Director Office Area",
+      "type": "RESTRICTED",
+      "color": "#ef4444",
+      "dwell_alert_seconds": 0,
+      "is_active": true,
+      "points": [
+        {
+          "x": 630,
+          "y": 310
+        },
+        {
+          "x": 870,
+          "y": 310
+        },
+        {
+          "x": 870,
+          "y": 480
+        },
+        {
+          "x": 630,
+          "y": 480
+        }
+      ],
+      "floor": 1
+    },
+    {
+      "id": 4013,
+      "name": "Inner Director Office",
+      "type": "RESTRICTED",
+      "color": "#ef4444",
+      "dwell_alert_seconds": 0,
+      "is_active": true,
+      "points": [
+        {
+          "x": 870,
+          "y": 80
+        },
+        {
+          "x": 950,
+          "y": 80
+        },
+        {
+          "x": 950,
+          "y": 480
+        },
+        {
+          "x": 870,
+          "y": 480
+        }
+      ],
+      "floor": 1
+    },
+    {
+      "id": 4014,
+      "name": "Locker Room (East)",
+      "type": "LOUNGE",
+      "color": "#22c55e",
+      "dwell_alert_seconds": 900,
+      "is_active": true,
+      "points": [
+        {
+          "x": 950,
+          "y": 80
+        },
+        {
+          "x": 1120,
+          "y": 80
+        },
+        {
+          "x": 1120,
+          "y": 200
+        },
+        {
+          "x": 950,
+          "y": 200
+        }
+      ],
+      "floor": 1
+    },
+    {
+      "id": 4015,
+      "name": "Ladies Rest Room",
+      "type": "LOUNGE",
+      "color": "#22c55e",
+      "dwell_alert_seconds": 900,
+      "is_active": true,
+      "points": [
+        {
+          "x": 950,
+          "y": 200
+        },
+        {
+          "x": 1020,
+          "y": 200
+        },
+        {
+          "x": 1020,
+          "y": 480
+        },
+        {
+          "x": 950,
+          "y": 480
+        }
+      ],
+      "floor": 1
+    },
+    {
+      "id": 4016,
+      "name": "Gents Rest Room",
+      "type": "LOUNGE",
+      "color": "#22c55e",
+      "dwell_alert_seconds": 900,
+      "is_active": true,
+      "points": [
+        {
+          "x": 1020,
+          "y": 200
+        },
+        {
+          "x": 1070,
+          "y": 200
+        },
+        {
+          "x": 1070,
+          "y": 480
+        },
+        {
+          "x": 1020,
+          "y": 480
+        }
+      ],
+      "floor": 1
+    },
+    {
+      "id": 4017,
+      "name": "Office C / Director Room",
+      "type": "RESTRICTED",
+      "color": "#ef4444",
+      "dwell_alert_seconds": 0,
+      "is_active": true,
+      "points": [
+        {
+          "x": 1070,
+          "y": 200
+        },
+        {
+          "x": 1120,
+          "y": 200
+        },
+        {
+          "x": 1120,
+          "y": 480
+        },
+        {
+          "x": 1070,
+          "y": 480
+        }
+      ],
+      "floor": 1
+    },
+    {
+      "id": 4018,
+      "name": "Automation Server Room (AMRS)",
+      "type": "RESTRICTED",
+      "color": "#ef4444",
+      "dwell_alert_seconds": 0,
+      "is_active": true,
+      "points": [
+        {
+          "x": 80,
+          "y": 480
+        },
+        {
+          "x": 260,
+          "y": 480
+        },
+        {
+          "x": 260,
+          "y": 720
+        },
+        {
+          "x": 80,
+          "y": 720
+        }
+      ],
+      "floor": 1
+    },
+    {
+      "id": 4019,
+      "name": "Cyber Security & ASMOS TAC Room",
+      "type": "RESTRICTED",
+      "color": "#ef4444",
+      "dwell_alert_seconds": 0,
+      "is_active": true,
+      "points": [
+        {
+          "x": 260,
+          "y": 480
+        },
+        {
+          "x": 445,
+          "y": 480
+        },
+        {
+          "x": 445,
+          "y": 720
+        },
+        {
+          "x": 260,
+          "y": 720
+        }
+      ],
+      "floor": 1
+    },
+    {
+      "id": 4020,
+      "name": "UHF / CCS / DATA / GTR Room",
+      "type": "RESTRICTED",
+      "color": "#ef4444",
+      "dwell_alert_seconds": 0,
+      "is_active": true,
+      "points": [
+        {
+          "x": 445,
+          "y": 480
+        },
+        {
+          "x": 595,
+          "y": 480
+        },
+        {
+          "x": 595,
+          "y": 720
+        },
+        {
+          "x": 445,
+          "y": 720
+        }
+      ],
+      "floor": 1
+    },
+    {
+      "id": 4021,
+      "name": "UPS Battery Room",
+      "type": "RESTRICTED",
+      "color": "#ef4444",
+      "dwell_alert_seconds": 0,
+      "is_active": true,
+      "points": [
+        {
+          "x": 595,
+          "y": 480
+        },
+        {
+          "x": 745,
+          "y": 480
+        },
+        {
+          "x": 745,
+          "y": 720
+        },
+        {
+          "x": 595,
+          "y": 720
+        }
+      ],
+      "floor": 1
+    },
+    {
+      "id": 4022,
+      "name": "Distribution Panel Area",
+      "type": "RESTRICTED",
+      "color": "#ef4444",
+      "dwell_alert_seconds": 0,
+      "is_active": true,
+      "points": [
+        {
+          "x": 745,
+          "y": 480
+        },
+        {
+          "x": 900,
+          "y": 480
+        },
+        {
+          "x": 900,
+          "y": 720
+        },
+        {
+          "x": 745,
+          "y": 720
+        }
+      ],
+      "floor": 1
+    },
+    {
+      "id": 4023,
+      "name": "Fallback Servers Room",
+      "type": "RESTRICTED",
+      "color": "#ef4444",
+      "dwell_alert_seconds": 0,
+      "is_active": true,
+      "points": [
+        {
+          "x": 900,
+          "y": 480
+        },
+        {
+          "x": 1120,
+          "y": 480
+        },
+        {
+          "x": 1120,
+          "y": 720
+        },
+        {
+          "x": 900,
+          "y": 720
+        }
+      ],
+      "floor": 1
+    },
+    {
+      "id": 6001,
+      "name": "Shower / Cloak Room",
+      "type": "LOUNGE",
+      "color": "#22c55e",
+      "dwell_alert_seconds": 600,
+      "is_active": true,
+      "points": [
+        {
+          "x": 235,
+          "y": 235
+        },
+        {
+          "x": 305,
+          "y": 235
+        },
+        {
+          "x": 305,
+          "y": 380
+        },
+        {
+          "x": 235,
+          "y": 380
+        }
+      ],
+      "floor": 2
+    },
+    {
+      "id": 6002,
+      "name": "Training In-Charge Room",
+      "type": "RESTRICTED",
+      "color": "#ef4444",
+      "dwell_alert_seconds": 1800,
+      "is_active": true,
+      "points": [
+        {
+          "x": 305,
+          "y": 235
+        },
+        {
+          "x": 375,
+          "y": 235
+        },
+        {
+          "x": 375,
+          "y": 380
+        },
+        {
+          "x": 305,
+          "y": 380
+        }
+      ],
+      "floor": 2
+    },
+    {
+      "id": 6003,
+      "name": "Training Support Room",
+      "type": "DWELL",
+      "color": "#3b82f6",
+      "dwell_alert_seconds": 2400,
+      "is_active": true,
+      "points": [
+        {
+          "x": 375,
+          "y": 235
+        },
+        {
+          "x": 445,
+          "y": 235
+        },
+        {
+          "x": 445,
+          "y": 380
+        },
+        {
+          "x": 375,
+          "y": 380
+        }
+      ],
+      "floor": 2
+    },
+    {
+      "id": 6004,
+      "name": "Gent's Rest Room — 1",
+      "type": "LOUNGE",
+      "color": "#22c55e",
+      "dwell_alert_seconds": 600,
+      "is_active": true,
+      "points": [
+        {
+          "x": 445,
+          "y": 235
+        },
+        {
+          "x": 515,
+          "y": 235
+        },
+        {
+          "x": 515,
+          "y": 380
+        },
+        {
+          "x": 445,
+          "y": 380
+        }
+      ],
+      "floor": 2
+    },
+    {
+      "id": 6005,
+      "name": "Gent's Rest Room — 2",
+      "type": "LOUNGE",
+      "color": "#22c55e",
+      "dwell_alert_seconds": 600,
+      "is_active": true,
+      "points": [
+        {
+          "x": 515,
+          "y": 235
+        },
+        {
+          "x": 585,
+          "y": 235
+        },
+        {
+          "x": 585,
+          "y": 380
+        },
+        {
+          "x": 515,
+          "y": 380
+        }
+      ],
+      "floor": 2
+    },
+    {
+      "id": 6006,
+      "name": "Gent's Rest Room — 3",
+      "type": "LOUNGE",
+      "color": "#22c55e",
+      "dwell_alert_seconds": 600,
+      "is_active": true,
+      "points": [
+        {
+          "x": 585,
+          "y": 235
+        },
+        {
+          "x": 655,
+          "y": 235
+        },
+        {
+          "x": 655,
+          "y": 380
+        },
+        {
+          "x": 585,
+          "y": 380
+        }
+      ],
+      "floor": 2
+    },
+    {
+      "id": 6007,
+      "name": "Recreation Room",
+      "type": "LOUNGE",
+      "color": "#22c55e",
+      "dwell_alert_seconds": 1200,
+      "is_active": true,
+      "points": [
+        {
+          "x": 655,
+          "y": 235
+        },
+        {
+          "x": 725,
+          "y": 235
+        },
+        {
+          "x": 725,
+          "y": 380
+        },
+        {
+          "x": 655,
+          "y": 380
+        }
+      ],
+      "floor": 2
+    },
+    {
+      "id": 6008,
+      "name": "UPS Battery Room",
+      "type": "RESTRICTED",
+      "color": "#ef4444",
+      "dwell_alert_seconds": 0,
+      "is_active": true,
+      "points": [
+        {
+          "x": 725,
+          "y": 235
+        },
+        {
+          "x": 820,
+          "y": 235
+        },
+        {
+          "x": 820,
+          "y": 380
+        },
+        {
+          "x": 725,
+          "y": 380
+        }
+      ],
+      "floor": 2
+    },
+    {
+      "id": 6009,
+      "name": "East Wing Rooms",
+      "type": "RESTRICTED",
+      "color": "#ef4444",
+      "dwell_alert_seconds": 0,
+      "is_active": true,
+      "points": [
+        {
+          "x": 820,
+          "y": 235
+        },
+        {
+          "x": 960,
+          "y": 235
+        },
+        {
+          "x": 960,
+          "y": 380
+        },
+        {
+          "x": 820,
+          "y": 380
+        }
+      ],
+      "floor": 2
+    },
+    {
+      "id": 6010,
+      "name": "OPS Room 1",
+      "type": "RESTRICTED",
+      "color": "#ef4444",
+      "dwell_alert_seconds": 0,
+      "is_active": true,
+      "points": [
+        {
+          "x": 235,
+          "y": 380
+        },
+        {
+          "x": 395,
+          "y": 380
+        },
+        {
+          "x": 395,
+          "y": 420
+        },
+        {
+          "x": 235,
+          "y": 420
+        }
+      ],
+      "floor": 2
+    },
+    {
+      "id": 6011,
+      "name": "OPS Room 2",
+      "type": "RESTRICTED",
+      "color": "#ef4444",
+      "dwell_alert_seconds": 0,
+      "is_active": true,
+      "points": [
+        {
+          "x": 395,
+          "y": 380
+        },
+        {
+          "x": 555,
+          "y": 380
+        },
+        {
+          "x": 555,
+          "y": 420
+        },
+        {
+          "x": 395,
+          "y": 420
+        }
+      ],
+      "floor": 2
+    },
+    {
+      "id": 6012,
+      "name": "RAF / RADAR ADD EXT Interface Room",
+      "type": "RESTRICTED",
+      "color": "#ef4444",
+      "dwell_alert_seconds": 0,
+      "is_active": true,
+      "points": [
+        {
+          "x": 555,
+          "y": 380
+        },
+        {
+          "x": 715,
+          "y": 380
+        },
+        {
+          "x": 715,
+          "y": 420
+        },
+        {
+          "x": 555,
+          "y": 420
+        }
+      ],
+      "floor": 2
+    },
+    {
+      "id": 6013,
+      "name": "Reception Room",
+      "type": "LOUNGE",
+      "color": "#22c55e",
+      "dwell_alert_seconds": 900,
+      "is_active": true,
+      "points": [
+        {
+          "x": 715,
+          "y": 380
+        },
+        {
+          "x": 960,
+          "y": 380
+        },
+        {
+          "x": 960,
+          "y": 420
+        },
+        {
+          "x": 715,
+          "y": 420
+        }
+      ],
+      "floor": 2
+    },
+    {
+      "id": 6014,
+      "name": "Janitor / Pantry Room",
+      "type": "RESTRICTED",
+      "color": "#ef4444",
+      "dwell_alert_seconds": 0,
+      "is_active": true,
+      "points": [
+        {
+          "x": 235,
+          "y": 420
+        },
+        {
+          "x": 280,
+          "y": 420
+        },
+        {
+          "x": 280,
+          "y": 565
+        },
+        {
+          "x": 235,
+          "y": 565
+        }
+      ],
+      "floor": 2
+    },
+    {
+      "id": 6015,
+      "name": "Electrical Room (FF)",
+      "type": "RESTRICTED",
+      "color": "#ef4444",
+      "dwell_alert_seconds": 0,
+      "is_active": true,
+      "points": [
+        {
+          "x": 280,
+          "y": 420
+        },
+        {
+          "x": 350,
+          "y": 420
+        },
+        {
+          "x": 350,
+          "y": 565
+        },
+        {
+          "x": 280,
+          "y": 565
+        }
+      ],
+      "floor": 2
+    },
+    {
+      "id": 6016,
+      "name": "STM Telecom Room",
+      "type": "RESTRICTED",
+      "color": "#ef4444",
+      "dwell_alert_seconds": 0,
+      "is_active": true,
+      "points": [
+        {
+          "x": 350,
+          "y": 420
+        },
+        {
+          "x": 465,
+          "y": 420
+        },
+        {
+          "x": 465,
+          "y": 565
+        },
+        {
+          "x": 350,
+          "y": 565
+        }
+      ],
+      "floor": 2
+    },
+    {
+      "id": 6017,
+      "name": "ACC Room — Bay 1",
+      "type": "RESTRICTED",
+      "color": "#ef4444",
+      "dwell_alert_seconds": 0,
+      "is_active": true,
+      "points": [
+        {
+          "x": 465,
+          "y": 420
+        },
+        {
+          "x": 555,
+          "y": 420
+        },
+        {
+          "x": 555,
+          "y": 565
+        },
+        {
+          "x": 465,
+          "y": 565
+        }
+      ],
+      "floor": 2
+    },
+    {
+      "id": 6018,
+      "name": "ACC Room — Bay 2",
+      "type": "RESTRICTED",
+      "color": "#ef4444",
+      "dwell_alert_seconds": 0,
+      "is_active": true,
+      "points": [
+        {
+          "x": 555,
+          "y": 420
+        },
+        {
+          "x": 645,
+          "y": 420
+        },
+        {
+          "x": 645,
+          "y": 565
+        },
+        {
+          "x": 555,
+          "y": 565
+        }
+      ],
+      "floor": 2
+    },
+    {
+      "id": 6019,
+      "name": "ACC Room — Bay 3",
+      "type": "RESTRICTED",
+      "color": "#ef4444",
+      "dwell_alert_seconds": 0,
+      "is_active": true,
+      "points": [
+        {
+          "x": 645,
+          "y": 420
+        },
+        {
+          "x": 735,
+          "y": 420
+        },
+        {
+          "x": 735,
+          "y": 565
+        },
+        {
+          "x": 645,
+          "y": 565
+        }
+      ],
+      "floor": 2
+    },
+    {
+      "id": 6020,
+      "name": "ACC Room — Bay 4 (WSO)",
+      "type": "RESTRICTED",
+      "color": "#ef4444",
+      "dwell_alert_seconds": 0,
+      "is_active": true,
+      "points": [
+        {
+          "x": 735,
+          "y": 420
+        },
+        {
+          "x": 845,
+          "y": 420
+        },
+        {
+          "x": 845,
+          "y": 565
+        },
+        {
+          "x": 735,
+          "y": 565
+        }
+      ],
+      "floor": 2
+    },
+    {
+      "id": 6021,
+      "name": "APP Room",
+      "type": "RESTRICTED",
+      "color": "#ef4444",
+      "dwell_alert_seconds": 0,
+      "is_active": true,
+      "points": [
+        {
+          "x": 845,
+          "y": 420
+        },
+        {
+          "x": 960,
+          "y": 420
+        },
+        {
+          "x": 960,
+          "y": 565
+        },
+        {
+          "x": 845,
+          "y": 565
+        }
+      ],
+      "floor": 2
+    }
+  ]
+}

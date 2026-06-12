@@ -1,4 +1,4 @@
-import type { FloorBounds, LayoutPoint, MeasureUnit, WallSegment } from './types';
+import type { ArchElement, FloorBounds, LayoutPoint, MeasureUnit, WallSegment } from './types';
 
 export function isPointInPolygon(point: LayoutPoint, vertices: LayoutPoint[]): boolean {
   const x = point.x;
@@ -78,8 +78,9 @@ export function distToSegment(px: number, py: number, x1: number, y1: number, x2
 }
 
 export function getFloorBounds(width: number, height: number): FloorBounds {
-  const padX = Math.max(80, Math.floor(width * 0.08));
-  const padY = Math.max(80, Math.floor(height * 0.12));
+  // Keep usable floor area stable across varied viewport sizes.
+  const padX = Math.max(48, Math.floor(width * 0.06));
+  const padY = Math.max(48, Math.floor(height * 0.08));
   return {
     left: padX,
     top: padY,
@@ -97,5 +98,56 @@ export function clampToFloorBounds(
   return {
     x: Math.min(bounds.right - radius, Math.max(bounds.left + radius, x)),
     y: Math.min(bounds.bottom - radius, Math.max(bounds.top + radius, y)),
+  };
+}
+
+export function fitLayoutTemplateToBounds(
+  walls: WallSegment[],
+  archElements: ArchElement[],
+  bounds: FloorBounds
+): { walls: WallSegment[]; archElements: ArchElement[] } {
+  if (walls.length === 0) return { walls, archElements };
+
+  let minX = Infinity;
+  let minY = Infinity;
+  let maxX = -Infinity;
+  let maxY = -Infinity;
+  for (const w of walls) {
+    minX = Math.min(minX, w.startX, w.endX);
+    minY = Math.min(minY, w.startY, w.endY);
+    maxX = Math.max(maxX, w.startX, w.endX);
+    maxY = Math.max(maxY, w.startY, w.endY);
+  }
+
+  const srcW = Math.max(1, maxX - minX);
+  const srcH = Math.max(1, maxY - minY);
+  const targetPad = 8;
+  const targetW = Math.max(1, bounds.right - bounds.left - targetPad * 2);
+  const targetH = Math.max(1, bounds.bottom - bounds.top - targetPad * 2);
+  const scale = Math.min(targetW / srcW, targetH / srcH);
+
+  const fittedW = srcW * scale;
+  const fittedH = srcH * scale;
+  const offsetX = bounds.left + targetPad + (targetW - fittedW) / 2;
+  const offsetY = bounds.top + targetPad + (targetH - fittedH) / 2;
+
+  const mapX = (x: number) => offsetX + (x - minX) * scale;
+  const mapY = (y: number) => offsetY + (y - minY) * scale;
+
+  return {
+    walls: walls.map((w) => ({
+      ...w,
+      startX: mapX(w.startX),
+      startY: mapY(w.startY),
+      endX: mapX(w.endX),
+      endY: mapY(w.endY),
+      thickness: Math.max(2, Math.min(10, w.thickness * Math.max(0.75, scale))),
+    })),
+    archElements: archElements.map((a) => ({
+      ...a,
+      x: mapX(a.x),
+      y: mapY(a.y),
+      width: Math.max(10, a.width * scale),
+    })),
   };
 }

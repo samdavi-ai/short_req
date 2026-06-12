@@ -10,6 +10,7 @@ import FloorScene3D from './layout3d/FloorScene3D';
 import {
   clampToFloorBounds as clampToFloorBoundsShared,
   distToSegment as distToSegmentShared,
+  fitLayoutTemplateToBounds as fitLayoutTemplateToBoundsShared,
   formatLength as formatLengthShared,
   getFloorBounds as getFloorBoundsShared,
   getWallAngleDeg as getWallAngleDegShared,
@@ -27,8 +28,23 @@ import { getCanvasPosFromClient as getCanvasPosFromClientShared } from '../featu
 import type { FloorBounds } from '../features/layout-engine/types';
 import { useSimulatorStore } from '../stores/simulatorStore';
 import { tickSimulation } from '../features/simulator/engine';
+// Pixel-accurate blueprints traced from the real CAD floor plan images
+import {
+  GF_WALLS_ACCURATE, GF_ARCH_ACCURATE, GF_ZONES_ACCURATE, GF_CAMERAS_DEFAULT,
+  AA_WALLS_ACCURATE, AA_ARCH_ACCURATE, AA_ZONES_ACCURATE, AA_CAMERAS_DEFAULT,
+  FF_WALLS_ACCURATE, FF_ARCH_ACCURATE, FF_ZONES_ACCURATE, FF_CAMERAS_DEFAULT,
+} from '../features/layout-engine/templates/accurateBlueprintData';
 import type { AgentBehavior, SimulatorAgent } from '../features/simulator/types';
 import SimulatorHUD, { KEMPEGOWDA_CAMERAS } from './SimulatorHUD';
+import {
+  ALPHA2_FIRST_WALLS_DXF,
+  ALPHA2_FIRST_LABELS_DXF,
+  ALPHA2_GROUND_WALLS_DXF,
+  ALPHA2_GROUND_LABELS_DXF,
+  ALPHA2_SECOND_WALLS_DXF,
+  ALPHA2_SECOND_LABELS_DXF,
+} from '../features/layout-engine/templates/alpha2DxfTemplates';
+import { getAlpha2GroundFloorWalls } from '../features/layout-engine/templates/Alpha2GroundFloor';
 
 // ─── Existing Interfaces ──────────────────────────────────────────────────────
 
@@ -98,6 +114,24 @@ const CAMERA_TYPES = [
   { label: 'Face Capture',    icon: '◈', type: 'face' },
 ];
 
+const FLOOR_BLUEPRINT_IMAGES: Record<number, string> = {
+  // Re-mapped to floor plan image set for better DXF/image consistency.
+  0: '/floorplans/alpha2-1.png',
+  1: '/floorplans/alpha2-2.png',
+  2: '/floorplans/alpha2-3.png',
+};
+
+type BlueprintCropRect = { x: number; y: number; w: number; h: number };
+const FLOOR_BLUEPRINT_CROP: Record<number, BlueprintCropRect> = {
+  // Crop tuned per floor to trim title block / whitespace and fill canvas tightly.
+  // Ground Floor (page-1): title at top, plan area below
+  0: { x: 0.01, y: 0.08, w: 0.98, h: 0.80 },
+  // Area A (page-2): very little top margin, wide plan
+  1: { x: 0.01, y: 0.06, w: 0.98, h: 0.84 },
+  // First Floor (page-3): large title at top, plan lower
+  2: { x: 0.01, y: 0.12, w: 0.98, h: 0.78 },
+};
+
 // ── BIAL Alpha-2 Building — Kempegowda International Airport, Bangalore ──────
 // Based on actual floor plans: Ground Floor Alpha-2, Area A (Intermediate), First Floor Alpha-2
 // Building dimensions: 41 m wide × 25 m deep  |  Canvas scale: ~25 px/m
@@ -151,37 +185,137 @@ const ALPHA2_FF_CAMERAS = [
   { id: 9212, name: 'CAM-FF-12 · ACC WSO Desk',      location: 'ACC Room — Bay 4 (WSO) Interior',       x: 780, y: 560, angle: 270, fov: 120, status: 'ACTIVE' as const, is_overhead: true  },
 ];
 
-const WALL_COLOR = '#ffffff';
+const WALL_COLOR = '#111111';
+
+const dxfWallsToCanvasWalls = (
+  walls: readonly {
+    id: number;
+    startX: number;
+    startY: number;
+    endX: number;
+    endY: number;
+    thickness: number;
+    color: string;
+    label: string;
+  }[],
+  floorPrefix: string,
+): WallSegment[] =>
+  walls.map((wall) => ({
+    id: wall.id,
+    startX: wall.startX,
+    startY: wall.startY,
+    endX: wall.endX,
+    endY: wall.endY,
+    thickness: Math.max(3, wall.thickness),
+    color: wall.color || WALL_COLOR,
+    label: `${floorPrefix} ${wall.label}`,
+  }));
+
+const DXF_GROUND_WALLS: WallSegment[] = dxfWallsToCanvasWalls(ALPHA2_GROUND_WALLS_DXF, 'GF');
+const DXF_SECOND_WALLS: WallSegment[] = dxfWallsToCanvasWalls(ALPHA2_SECOND_WALLS_DXF, 'SF');
+const DXF_FIRST_WALLS: WallSegment[] = dxfWallsToCanvasWalls(ALPHA2_FIRST_WALLS_DXF, 'FF');
+
+
+type DxfLabel = { text: string; x: number; y: number; height: number };
+type Extents = { minX: number; minY: number; maxX: number; maxY: number };
+
+const getWallExtents = (
+  wallSet: readonly { startX: number; startY: number; endX: number; endY: number }[],
+): Extents => {
+  const xs: number[] = [];
+  const ys: number[] = [];
+  wallSet.forEach((wall) => {
+    xs.push(wall.startX, wall.endX);
+    ys.push(wall.startY, wall.endY);
+  });
+  return {
+    minX: Math.min(...xs),
+    minY: Math.min(...ys),
+    maxX: Math.max(...xs),
+    maxY: Math.max(...ys),
+  };
+};
+
+const mapDxfLabelsToFittedWalls = (
+  rawWalls: readonly { startX: number; startY: number; endX: number; endY: number }[],
+  fittedWalls: readonly WallSegment[],
+  labels: readonly DxfLabel[],
+): DxfLabel[] => {
+  if (!rawWalls.length || !fittedWalls.length || !labels.length) return [];
+  const raw = getWallExtents(rawWalls);
+  const fitted = getWallExtents(fittedWalls);
+  const rawW = Math.max(1, raw.maxX - raw.minX);
+  const rawH = Math.max(1, raw.maxY - raw.minY);
+  const fitW = Math.max(1, fitted.maxX - fitted.minX);
+  const fitH = Math.max(1, fitted.maxY - fitted.minY);
+  const sx = fitW / rawW;
+  const sy = fitH / rawH;
+  const scale = Math.min(sx, sy);
+
+  // DXF uses Y-up (origin at bottom-left), canvas uses Y-down (origin at top-left).
+  // We must invert the Y axis so labels appear in the correct position on screen.
+  return labels.map((label) => ({
+    text: label.text,
+    x: fitted.minX + (label.x - raw.minX) * sx,
+    y: fitted.minY + (raw.maxY - label.y) * sy,
+    height: Math.max(9, label.height * scale * 0.08),
+  }));
+};
+
 
 const GF_WALLS: WallSegment[] = [
+  // ── Outer Perimeter ─────────────────────────────────────────────────────────
   { id: 101, startX:   80, startY:  80, endX: 1120, endY:  80, thickness: 8, color: WALL_COLOR, label: 'North Perimeter Wall' },
   { id: 102, startX:   80, startY:  80, endX:   80, endY: 720, thickness: 8, color: WALL_COLOR, label: 'West Perimeter Wall'  },
   { id: 103, startX: 1120, startY:  80, endX: 1120, endY: 720, thickness: 8, color: WALL_COLOR, label: 'East Perimeter Wall'  },
   { id: 104, startX:   80, startY: 720, endX: 1120, endY: 720, thickness: 8, color: WALL_COLOR, label: 'South Perimeter Wall' },
-  { id: 105, startX: 340, startY:  80, endX: 340, endY: 720, thickness: 6, color: WALL_COLOR, label: 'Canteen East Wall' },
-  { id: 106, startX:  80, startY: 340, endX: 340, endY: 340, thickness: 5, color: WALL_COLOR, label: 'Canteen Upper Divider' },
-  { id: 107, startX: 175, startY:  80, endX: 175, endY: 340, thickness: 4, color: WALL_COLOR, label: 'Locker Room Wall'      },
-  { id: 108, startX: 175, startY: 200, endX: 340, endY: 200, thickness: 4, color: WALL_COLOR, label: 'Rest Room Divider'    },
+  // ── Canteen Wing ────────────────────────────────────────────────────────────
+  { id: 105, startX: 340, startY:  80, endX: 340, endY: 720, thickness: 6, color: WALL_COLOR, label: 'Canteen East Wall'      },
+  { id: 106, startX:  80, startY: 340, endX: 340, endY: 340, thickness: 5, color: WALL_COLOR, label: 'Canteen Upper Divider'  },
+  { id: 107, startX: 175, startY:  80, endX: 175, endY: 340, thickness: 4, color: WALL_COLOR, label: 'Locker Room East Wall'  },
+  { id: 108, startX: 175, startY: 200, endX: 340, endY: 200, thickness: 4, color: WALL_COLOR, label: 'Locker / Rest Divider'  },
+  // Canteen kitchen / pantry / storage sub-rooms
+  { id: 129, startX:  80, startY: 580, endX: 230, endY: 580, thickness: 4, color: WALL_COLOR, label: 'Canteen Kitchen North Wall' },
+  { id: 130, startX: 230, startY: 580, endX: 230, endY: 720, thickness: 4, color: WALL_COLOR, label: 'Canteen Kitchen East Wall'  },
+  { id: 131, startX: 230, startY: 490, endX: 340, endY: 490, thickness: 4, color: WALL_COLOR, label: 'Canteen Pantry North Wall'  },
+  { id: 132, startX: 230, startY: 490, endX: 230, endY: 580, thickness: 4, color: WALL_COLOR, label: 'Canteen Storage/Pantry Div' },
+  // ── LT MCC HV Electrical Room ───────────────────────────────────────────────
   { id: 109, startX: 340, startY: 280, endX: 555, endY: 280, thickness: 5, color: WALL_COLOR, label: 'Electrical Room South Wall' },
   { id: 110, startX: 555, startY:  80, endX: 555, endY: 280, thickness: 5, color: WALL_COLOR, label: 'Electrical Room East Wall'  },
-  { id: 111, startX: 340, startY: 440, endX: 635, endY: 440, thickness: 5, color: WALL_COLOR, label: 'Toilet Block North Wall'   },
-  { id: 112, startX: 340, startY: 560, endX: 635, endY: 560, thickness: 5, color: WALL_COLOR, label: 'Toilet Block South Wall'   },
-  { id: 113, startX: 480, startY: 280, endX: 480, endY: 440, thickness: 4, color: WALL_COLOR, label: 'Gents/Ladies Divider'      },
-  { id: 114, startX: 635, startY: 280, endX: 635, endY: 440, thickness: 4, color: WALL_COLOR, label: 'Toilet Block East Wall'    },
+  // ── Centre Toilet Block ──────────────────────────────────────────────────────
+  { id: 111, startX: 340, startY: 440, endX: 635, endY: 440, thickness: 5, color: WALL_COLOR, label: 'Toilet Block North Wall'    },
+  { id: 112, startX: 340, startY: 560, endX: 635, endY: 560, thickness: 5, color: WALL_COLOR, label: 'Toilet Block South Wall'    },
+  { id: 113, startX: 480, startY: 280, endX: 480, endY: 440, thickness: 4, color: WALL_COLOR, label: 'Gents / Ladies Divider'     },
+  { id: 114, startX: 635, startY: 280, endX: 635, endY: 440, thickness: 4, color: WALL_COLOR, label: 'Toilet Block East Wall'     },
+  { id: 133, startX: 340, startY: 280, endX: 340, endY: 440, thickness: 4, color: WALL_COLOR, label: 'Toilet Block West Wall'     },
+  // ── Reception Lobby ──────────────────────────────────────────────────────────
   { id: 115, startX: 635, startY:  80, endX: 635, endY: 280, thickness: 5, color: WALL_COLOR, label: 'Reception West Wall'  },
   { id: 116, startX: 635, startY: 280, endX: 855, endY: 280, thickness: 4, color: WALL_COLOR, label: 'Reception South Wall' },
   { id: 117, startX: 855, startY:  80, endX: 855, endY: 280, thickness: 4, color: WALL_COLOR, label: 'Reception East Wall'  },
+  // ── Area of Stay / Storage / Monitor ────────────────────────────────────────
   { id: 118, startX: 635, startY: 440, endX: 760, endY: 440, thickness: 4, color: WALL_COLOR, label: 'Area of Stay North Wall'  },
   { id: 119, startX: 635, startY: 560, endX: 760, endY: 560, thickness: 4, color: WALL_COLOR, label: 'Storage Room South Wall'  },
-  { id: 120, startX: 760, startY: 280, endX: 760, endY: 560, thickness: 4, color: WALL_COLOR, label: 'Storage/Stay East Wall'   },
-  { id: 121, startX: 855, startY: 280, endX: 890, endY: 280, thickness: 4, color: WALL_COLOR, label: 'Monitor Room North Wall' },
-  { id: 122, startX: 890, startY:  80, endX: 890, endY: 560, thickness: 4, color: WALL_COLOR, label: 'Monitor Room East Wall'  },
-  { id: 123, startX: 855, startY: 560, endX: 890, endY: 560, thickness: 4, color: WALL_COLOR, label: 'Monitor Room South Wall' },
-  { id: 124, startX: 890, startY:  80, endX:  890, endY: 720, thickness: 6, color: WALL_COLOR, label: 'Director Offices West Wall'       },
-  { id: 125, startX: 890, startY: 400, endX: 1120, endY: 400, thickness: 4, color: WALL_COLOR, label: 'Director Office Internal Division' },
-  { id: 126, startX: 1010, startY: 80, endX: 1010, endY: 400, thickness: 4, color: WALL_COLOR, label: 'Data Office West Wall'            },
-  { id: 127, startX: 890, startY: 560, endX: 1120, endY: 560, thickness: 4, color: WALL_COLOR, label: 'Right Toilet Block divider'       },
-  { id: 128, startX: 1010, startY: 400, endX: 1010, endY: 560, thickness: 4, color: WALL_COLOR, label: 'AFSB / Toilet Divider'          },
+  { id: 120, startX: 760, startY: 280, endX: 760, endY: 560, thickness: 4, color: WALL_COLOR, label: 'Storage / Stay East Wall'  },
+  { id: 121, startX: 855, startY: 280, endX: 890, endY: 280, thickness: 4, color: WALL_COLOR, label: 'Monitor Room North Wall'  },
+  { id: 122, startX: 890, startY:  80, endX: 890, endY: 560, thickness: 6, color: WALL_COLOR, label: 'Director Offices West Wall' },
+  { id: 123, startX: 855, startY: 560, endX: 890, endY: 560, thickness: 4, color: WALL_COLOR, label: 'Monitor Room South Wall'  },
+  // ── Director Offices Wing — internal partitions ─────────────────────────────
+  // Horizontal: splits upper row (Data/Server) from lower row (offices)
+  { id: 124, startX: 890, startY: 240, endX: 1120, endY: 240, thickness: 4, color: WALL_COLOR, label: 'Director Wing Upper Divider'    },
+  // Vertical: Data Office | Director Reception
+  { id: 126, startX: 1010, startY:  80, endX: 1010, endY: 240, thickness: 4, color: WALL_COLOR, label: 'Data Office East Wall'          },
+  // Horizontal: Director reception vs office rows
+  { id: 125, startX: 890, startY: 360, endX: 1120, endY: 360, thickness: 4, color: WALL_COLOR, label: 'Director Office Row Divider'    },
+  // Verticals dividing the 4 director offices
+  { id: 134, startX: 945, startY: 360, endX:  945, endY: 720, thickness: 4, color: WALL_COLOR, label: 'HR-Admin East Wall'             },
+  { id: 135, startX: 1000, startY: 360, endX: 1000, endY: 720, thickness: 4, color: WALL_COLOR, label: 'Accounts East Wall'            },
+  { id: 136, startX: 1055, startY: 360, endX: 1055, endY: 720, thickness: 4, color: WALL_COLOR, label: 'CODC-CS East Wall'             },
+  // Open Workstations / Meeting Room (lower corridor zone) separator
+  { id: 137, startX: 890, startY: 580, endX: 1120, endY: 580, thickness: 4, color: WALL_COLOR, label: 'Open Workstations South Wall'   },
+  { id: 138, startX: 1065, startY: 240, endX: 1065, endY: 360, thickness: 4, color: WALL_COLOR, label: 'Meeting Room East Divider'     },
+  // ── Right Toilet / AFSB Block ───────────────────────────────────────────────
+  { id: 127, startX: 890, startY: 560, endX: 1120, endY: 560, thickness: 4, color: WALL_COLOR, label: 'Right Toilet Block North Wall'  },
+  { id: 128, startX: 1010, startY: 560, endX: 1010, endY: 720, thickness: 4, color: WALL_COLOR, label: 'AFSB / Right Toilet Divider'   },
 ];
 
 const GF_ARCH_ELEMENTS: ArchElement[] = [
@@ -205,23 +339,44 @@ const GF_ARCH_ELEMENTS: ArchElement[] = [
 ];
 
 const AA_WALLS: WallSegment[] = [
-  { id: 401, startX:   80, startY:  80, endX: 1120, endY:  80, thickness: 8, color: WALL_COLOR, label: 'North Perimeter Wall' },
-  { id: 402, startX:   80, startY:  80, endX:   80, endY: 720, thickness: 8, color: WALL_COLOR, label: 'West Perimeter Wall'  },
-  { id: 403, startX: 1120, startY:  80, endX: 1120, endY: 720, thickness: 8, color: WALL_COLOR, label: 'East Perimeter Wall'  },
-  { id: 404, startX:   80, startY: 720, endX: 1120, endY: 720, thickness: 8, color: WALL_COLOR, label: 'South Perimeter Wall' },
+  // ── Outer Perimeter ─────────────────────────────────────────────────────────
+  { id: 401, startX:   80, startY:  80, endX: 1120, endY:  80, thickness: 8, color: WALL_COLOR, label: 'North Perimeter Wall'        },
+  { id: 402, startX:   80, startY:  80, endX:   80, endY: 720, thickness: 8, color: WALL_COLOR, label: 'West Perimeter Wall'         },
+  { id: 403, startX: 1120, startY:  80, endX: 1120, endY: 720, thickness: 8, color: WALL_COLOR, label: 'East Perimeter Wall'         },
+  { id: 404, startX:   80, startY: 720, endX: 1120, endY: 720, thickness: 8, color: WALL_COLOR, label: 'South Perimeter Wall'        },
+  // ── Main corridor divider (upper office zone vs lower server zone) ───────────
   { id: 405, startX:   80, startY: 490, endX: 1120, endY: 490, thickness: 6, color: WALL_COLOR, label: 'Server Room North Wall'      },
+  // ── CMS Block (west wing, upper) ─────────────────────────────────────────────
   { id: 406, startX:   80, startY: 300, endX:  340, endY: 300, thickness: 5, color: WALL_COLOR, label: 'CMS Room South Wall'         },
   { id: 407, startX:  340, startY:  80, endX:  340, endY: 490, thickness: 5, color: WALL_COLOR, label: 'CMS Block East Wall'         },
   { id: 408, startX:  210, startY: 300, endX:  210, endY: 490, thickness: 4, color: WALL_COLOR, label: 'CMS Server Rack Divider'     },
   { id: 409, startX:   80, startY: 170, endX:  340, endY: 170, thickness: 4, color: WALL_COLOR, label: 'CMS Maintenance South Wall'  },
+  // Technical Supervisor room (between CMS server area and CMS rack room)
+  { id: 422, startX:  210, startY: 390, endX:  340, endY: 390, thickness: 4, color: WALL_COLOR, label: 'Tech Supervisor South Wall'  },
+  // ── Pest Rooms (middle, upper) ───────────────────────────────────────────────
+  { id: 423, startX:  340, startY: 200, endX:  480, endY: 200, thickness: 4, color: WALL_COLOR, label: 'Pest Rooms North Divider'    },
+  { id: 424, startX:  410, startY: 200, endX:  410, endY: 300, thickness: 4, color: WALL_COLOR, label: 'Pest Room Ladies/Gents Div'  },
+  // ── RAF/RADAR Interface Room ─────────────────────────────────────────────────
+  { id: 425, startX:  480, startY: 200, endX:  620, endY: 200, thickness: 4, color: WALL_COLOR, label: 'RADAR Interface South Wall'  },
+  { id: 426, startX:  480, startY: 200, endX:  480, endY: 300, thickness: 4, color: WALL_COLOR, label: 'RADAR Interface West Wall'   },
+  // ── Middle comms / executive zone ────────────────────────────────────────────
   { id: 410, startX:  340, startY: 300, endX:  620, endY: 300, thickness: 5, color: WALL_COLOR, label: 'Comms Room South Wall'       },
-  { id: 411, startX:  480, startY: 300, endX:  480, endY: 490, thickness: 4, color: WALL_COLOR, label: 'Radio Room East Wall'        },
+  { id: 411, startX:  480, startY: 300, endX:  480, endY: 490, thickness: 4, color: WALL_COLOR, label: 'Radio / Comms East Wall'     },
   { id: 412, startX:  620, startY:  80, endX:  620, endY: 490, thickness: 5, color: WALL_COLOR, label: 'CHS Executive West Wall'     },
   { id: 413, startX:  620, startY: 300, endX:  860, endY: 300, thickness: 4, color: WALL_COLOR, label: 'Executive Room South Wall'   },
   { id: 414, startX:  860, startY:  80, endX:  860, endY: 490, thickness: 5, color: WALL_COLOR, label: 'Director East Partition'     },
   { id: 415, startX:  860, startY: 300, endX:  940, endY: 300, thickness: 4, color: WALL_COLOR, label: 'Director Office South Wall'  },
   { id: 416, startX:  940, startY:  80, endX:  940, endY: 490, thickness: 4, color: WALL_COLOR, label: 'Inner Office East Wall'      },
-  { id: 417, startX:  255, startY: 490, endX:  255, endY: 720, thickness: 4, color: WALL_COLOR, label: 'Server Divider 1'            },
+  // Locker / Ladies Rest / Gents Rest (east upper area)
+  { id: 427, startX:  940, startY: 200, endX: 1120, endY: 200, thickness: 4, color: WALL_COLOR, label: 'Locker/Rest Rooms South Wall'},
+  { id: 428, startX: 1010, startY: 200, endX: 1010, endY: 490, thickness: 4, color: WALL_COLOR, label: 'Ladies / Gents Rest Divider' },
+  { id: 429, startX: 1060, startY: 200, endX: 1060, endY: 490, thickness: 4, color: WALL_COLOR, label: 'Gents / Dir Office Divider'  },
+  // ── Distribution Panels (lower server zone) ───────────────────────────────────
+  { id: 430, startX:  340, startY: 610, endX:  440, endY: 610, thickness: 4, color: WALL_COLOR, label: 'Distribution Panel 1 South'  },
+  { id: 431, startX:  440, startY: 570, endX:  440, endY: 610, thickness: 4, color: WALL_COLOR, label: 'Distribution Panel 1 East'   },
+  { id: 432, startX:  700, startY: 610, endX:  740, endY: 610, thickness: 4, color: WALL_COLOR, label: 'Distribution Panel 2 South'  },
+  // ── Lower server zone vertical dividers ──────────────────────────────────────
+  { id: 417, startX:  255, startY: 490, endX:  255, endY: 720, thickness: 4, color: WALL_COLOR, label: 'AMRS / Cyber TAC Divider'    },
   { id: 418, startX:  440, startY: 490, endX:  440, endY: 720, thickness: 4, color: WALL_COLOR, label: 'Cyber TAC East Wall'         },
   { id: 419, startX:  590, startY: 490, endX:  590, endY: 720, thickness: 4, color: WALL_COLOR, label: 'UHF Room East Wall'          },
   { id: 420, startX:  740, startY: 490, endX:  740, endY: 720, thickness: 4, color: WALL_COLOR, label: 'Battery Room East Wall'      },
@@ -229,50 +384,350 @@ const AA_WALLS: WallSegment[] = [
 ];
 
 const AA_ARCH_ELEMENTS: ArchElement[] = [
-  { id: 501, type: 'DOOR',     x: 210, y: 300, width: 44, rotation:  0, label: 'CMS Room Entry',          openDirection: 'RIGHT' },
-  { id: 502, type: 'DOOR',     x: 340, y: 200, width: 44, rotation:  0, label: 'CMS Maintenance Entry',   openDirection: 'LEFT'  },
-  { id: 503, type: 'DOOR',     x: 480, y: 390, width: 44, rotation:  0, label: 'Radio Room Entry',        openDirection: 'RIGHT' },
-  { id: 504, type: 'DOOR',     x: 720, y: 390, width: 44, rotation:  0, label: 'Executive Room Entry',    openDirection: 'LEFT'  },
-  { id: 505, type: 'DOOR',     x: 860, y: 200, width: 44, rotation:  0, label: 'Director Area Entry',     openDirection: 'RIGHT' },
-  { id: 506, type: 'DOOR',     x: 350, y: 560, width: 44, rotation:  0, label: 'Cyber TAC Room Entry',    openDirection: 'RIGHT' },
-  { id: 507, type: 'ELEVATOR', x: 130, y: 150, width: 32, rotation:  0, label: 'Lift A (Area A)'                                  },
-  { id: 508, type: 'STAIRS',   x: 130, y: 240, width: 40, rotation:  0, label: 'Staircase Area A'                                 },
-  { id: 509, type: 'COLUMN',   x: 480, y:  80, width: 16, rotation:  0, label: 'Column-AA-1'                                      },
-  { id: 510, type: 'COLUMN',   x: 760, y:  80, width: 16, rotation:  0, label: 'Column-AA-2'                                      },
+  { id: 501, type: 'DOOR',     x: 210, y: 300, width: 44, rotation:  0, label: 'CMS Server Room Entry',     openDirection: 'RIGHT' },
+  { id: 502, type: 'DOOR',     x: 160, y: 170, width: 44, rotation:  0, label: 'CMS Maintenance Entry',     openDirection: 'LEFT'  },
+  { id: 503, type: 'DOOR',     x: 430, y: 300, width: 44, rotation:  0, label: 'Pest / Comms Entry',        openDirection: 'RIGHT' },
+  { id: 504, type: 'DOOR',     x: 720, y: 300, width: 44, rotation:  0, label: 'CHS Executive Entry',       openDirection: 'LEFT'  },
+  { id: 505, type: 'DOOR',     x: 860, y: 200, width: 44, rotation:  0, label: 'Director Area Entry',       openDirection: 'RIGHT' },
+  { id: 506, type: 'DOOR',     x: 350, y: 560, width: 44, rotation:  0, label: 'Cyber TAC Room Entry',      openDirection: 'RIGHT' },
+  { id: 507, type: 'ELEVATOR', x: 130, y: 140, width: 32, rotation:  0, label: 'Lift A (Area A)'                                   },
+  { id: 508, type: 'STAIRS',   x: 130, y: 230, width: 40, rotation:  0, label: 'Staircase Area A'                                  },
+  { id: 509, type: 'COLUMN',   x: 480, y:  80, width: 16, rotation:  0, label: 'Column-AA-1'                                       },
+  { id: 510, type: 'COLUMN',   x: 760, y:  80, width: 16, rotation:  0, label: 'Column-AA-2'                                       },
+  { id: 511, type: 'DOOR',     x: 210, y: 390, width: 44, rotation:  0, label: 'Tech Supervisor Entry',     openDirection: 'LEFT'  },
+  { id: 512, type: 'DOOR',     x: 375, y: 200, width: 36, rotation:  0, label: 'Pest Room Ladies Entry',    openDirection: 'RIGHT' },
+  { id: 513, type: 'DOOR',     x: 445, y: 200, width: 36, rotation:  0, label: 'Pest Room Gents Entry',     openDirection: 'LEFT'  },
+  { id: 514, type: 'DOOR',     x: 540, y: 200, width: 36, rotation:  0, label: 'RADAR Interface Entry',     openDirection: 'RIGHT' },
+  { id: 515, type: 'DOOR',     x: 475, y: 560, width: 44, rotation:  0, label: 'UHF/CCS Room Entry',        openDirection: 'RIGHT' },
+  { id: 516, type: 'DOOR',     x: 660, y: 560, width: 44, rotation:  0, label: 'Battery Room Entry',        openDirection: 'LEFT'  },
+  { id: 517, type: 'DOOR',     x: 800, y: 560, width: 44, rotation:  0, label: 'Fallback Server Entry',     openDirection: 'LEFT'  },
+];
+
+const AA_ROOM_ZONES: ZoneOnCanvas[] = [
+  // ── Upper Zone — West CMS Block ───────────────────────────────────────────
+  { id: 4001, name: 'CMS Maintenance Room', type: 'RESTRICTED', color: ZONE_COLORS.RESTRICTED, dwell_alert_seconds: 0, is_active: true,
+    points: [{ x:  80, y:  80 }, { x: 340, y:  80 }, { x: 340, y: 170 }, { x:  80, y: 170 }] },
+  { id: 4002, name: 'Technical Supervisor Room', type: 'RESTRICTED', color: ZONE_COLORS.RESTRICTED, dwell_alert_seconds: 0, is_active: true,
+    points: [{ x:  80, y: 170 }, { x: 210, y: 170 }, { x: 210, y: 390 }, { x:  80, y: 390 }] },
+  { id: 4003, name: 'CMS Server Room', type: 'RESTRICTED', color: ZONE_COLORS.RESTRICTED, dwell_alert_seconds: 0, is_active: true,
+    points: [{ x: 210, y: 300 }, { x: 340, y: 300 }, { x: 340, y: 490 }, { x: 210, y: 490 }] },
+  { id: 4004, name: 'CMS Room (Racks)', type: 'RESTRICTED', color: ZONE_COLORS.RESTRICTED, dwell_alert_seconds: 0, is_active: true,
+    points: [{ x:  80, y: 390 }, { x: 210, y: 390 }, { x: 210, y: 490 }, { x:  80, y: 490 }] },
+  // ── Upper Zone — Pest Rooms ───────────────────────────────────────────────
+  { id: 4005, name: 'Pest Room — Ladies', type: 'LOUNGE', color: ZONE_COLORS.LOUNGE, dwell_alert_seconds: 600, is_active: true,
+    points: [{ x: 340, y: 200 }, { x: 410, y: 200 }, { x: 410, y: 300 }, { x: 340, y: 300 }] },
+  { id: 4006, name: 'Pest Room — Gents', type: 'LOUNGE', color: ZONE_COLORS.LOUNGE, dwell_alert_seconds: 600, is_active: true,
+    points: [{ x: 410, y: 200 }, { x: 480, y: 200 }, { x: 480, y: 300 }, { x: 410, y: 300 }] },
+  // ── Upper Zone — RAF/RADAR Interface ──────────────────────────────────────
+  { id: 4007, name: 'RAF/RADAR EXT Interface Room', type: 'RESTRICTED', color: ZONE_COLORS.RESTRICTED, dwell_alert_seconds: 0, is_active: true,
+    points: [{ x: 480, y: 200 }, { x: 620, y: 200 }, { x: 620, y: 300 }, { x: 480, y: 300 }] },
+  // ── Upper Zone — Comms / Radio ────────────────────────────────────────────
+  { id: 4008, name: 'Radio / Comms Room', type: 'RESTRICTED', color: ZONE_COLORS.RESTRICTED, dwell_alert_seconds: 0, is_active: true,
+    points: [{ x: 340, y: 300 }, { x: 480, y: 300 }, { x: 480, y: 490 }, { x: 340, y: 490 }] },
+  // ── Upper Zone — CHS Executives ──────────────────────────────────────────
+  { id: 4009, name: 'CHS Executives Room', type: 'RESTRICTED', color: ZONE_COLORS.RESTRICTED, dwell_alert_seconds: 0, is_active: true,
+    points: [{ x: 480, y: 300 }, { x: 620, y: 300 }, { x: 620, y: 490 }, { x: 480, y: 490 }] },
+  { id: 4010, name: 'CHS Executives Room (East)', type: 'RESTRICTED', color: ZONE_COLORS.RESTRICTED, dwell_alert_seconds: 0, is_active: true,
+    points: [{ x: 620, y:  80 }, { x: 860, y:  80 }, { x: 860, y: 300 }, { x: 620, y: 300 }] },
+  { id: 4011, name: 'Director Office Area', type: 'RESTRICTED', color: ZONE_COLORS.RESTRICTED, dwell_alert_seconds: 0, is_active: true,
+    points: [{ x: 620, y: 300 }, { x: 860, y: 300 }, { x: 860, y: 490 }, { x: 620, y: 490 }] },
+  { id: 4012, name: 'Inner Director Office', type: 'RESTRICTED', color: ZONE_COLORS.RESTRICTED, dwell_alert_seconds: 0, is_active: true,
+    points: [{ x: 860, y:  80 }, { x: 940, y:  80 }, { x: 940, y: 490 }, { x: 860, y: 490 }] },
+  // ── Upper Zone — East Locker / Rest Rooms ─────────────────────────────────
+  { id: 4013, name: 'Locker Room', type: 'LOUNGE', color: ZONE_COLORS.LOUNGE, dwell_alert_seconds: 600, is_active: true,
+    points: [{ x: 940, y:  80 }, { x: 1120, y:  80 }, { x: 1120, y: 200 }, { x: 940, y: 200 }] },
+  { id: 4014, name: 'Ladies Rest Room', type: 'LOUNGE', color: ZONE_COLORS.LOUNGE, dwell_alert_seconds: 900, is_active: true,
+    points: [{ x: 940, y: 200 }, { x: 1010, y: 200 }, { x: 1010, y: 490 }, { x: 940, y: 490 }] },
+  { id: 4015, name: 'Gents Rest Room', type: 'LOUNGE', color: ZONE_COLORS.LOUNGE, dwell_alert_seconds: 900, is_active: true,
+    points: [{ x: 1010, y: 200 }, { x: 1060, y: 200 }, { x: 1060, y: 490 }, { x: 1010, y: 490 }] },
+  { id: 4016, name: 'Office C / Director Room', type: 'RESTRICTED', color: ZONE_COLORS.RESTRICTED, dwell_alert_seconds: 0, is_active: true,
+    points: [{ x: 1060, y: 200 }, { x: 1120, y: 200 }, { x: 1120, y: 490 }, { x: 1060, y: 490 }] },
+  // ── Lower Zone — Server / Technical Rooms ─────────────────────────────────
+  { id: 4017, name: 'Automation Server Room (AMRS)', type: 'RESTRICTED', color: ZONE_COLORS.RESTRICTED, dwell_alert_seconds: 0, is_active: true,
+    points: [{ x:  80, y: 490 }, { x: 255, y: 490 }, { x: 255, y: 720 }, { x:  80, y: 720 }] },
+  { id: 4018, name: 'Cyber Security & ASMOS TAC Room', type: 'RESTRICTED', color: ZONE_COLORS.RESTRICTED, dwell_alert_seconds: 0, is_active: true,
+    points: [{ x: 255, y: 490 }, { x: 440, y: 490 }, { x: 440, y: 720 }, { x: 255, y: 720 }] },
+  { id: 4019, name: 'UHF / CCS / DATA Room', type: 'RESTRICTED', color: ZONE_COLORS.RESTRICTED, dwell_alert_seconds: 0, is_active: true,
+    points: [{ x: 440, y: 490 }, { x: 590, y: 490 }, { x: 590, y: 720 }, { x: 440, y: 720 }] },
+  { id: 4020, name: 'Battery Room', type: 'RESTRICTED', color: ZONE_COLORS.RESTRICTED, dwell_alert_seconds: 0, is_active: true,
+    points: [{ x: 590, y: 490 }, { x: 740, y: 490 }, { x: 740, y: 720 }, { x: 590, y: 720 }] },
+  { id: 4021, name: 'Distribution Panel Area', type: 'RESTRICTED', color: ZONE_COLORS.RESTRICTED, dwell_alert_seconds: 0, is_active: true,
+    points: [{ x: 740, y: 490 }, { x: 890, y: 490 }, { x: 890, y: 720 }, { x: 740, y: 720 }] },
+  { id: 4022, name: 'Fallback Servers Room', type: 'RESTRICTED', color: ZONE_COLORS.RESTRICTED, dwell_alert_seconds: 0, is_active: true,
+    points: [{ x: 890, y: 490 }, { x: 1120, y: 490 }, { x: 1120, y: 720 }, { x: 890, y: 720 }] },
+];
+
+// ── Alpha-2 Second Floor (from clear plan image) ─────────────────────────────
+// Clean code-based blueprint geometry matching the uploaded "SECOND FLOOR" plan.
+const SF_WALLS: WallSegment[] = [
+  // Outer perimeter
+  { id: 5201, startX: 220, startY: 230, endX: 980, endY: 230, thickness: 8, color: WALL_COLOR, label: 'North Perimeter Wall' },
+  { id: 5202, startX: 220, startY: 230, endX: 220, endY: 570, thickness: 8, color: WALL_COLOR, label: 'West Perimeter Wall' },
+  { id: 5203, startX: 980, startY: 230, endX: 980, endY: 570, thickness: 8, color: WALL_COLOR, label: 'East Perimeter Wall' },
+  { id: 5204, startX: 220, startY: 570, endX: 980, endY: 570, thickness: 8, color: WALL_COLOR, label: 'South Perimeter Wall' },
+
+  // Main corridor band
+  { id: 5205, startX: 220, startY: 315, endX: 980, endY: 315, thickness: 6, color: WALL_COLOR, label: 'Corridor North Wall' },
+  { id: 5206, startX: 220, startY: 395, endX: 980, endY: 395, thickness: 6, color: WALL_COLOR, label: 'Corridor South Wall' },
+
+  // Top band rooms (Second Floor)
+  { id: 5210, startX: 260, startY: 230, endX: 260, endY: 315, thickness: 4, color: WALL_COLOR, label: 'Toilet / Stair Partition' },
+  { id: 5211, startX: 330, startY: 230, endX: 330, endY: 315, thickness: 4, color: WALL_COLOR, label: 'Stair / Air Maintenance Partition' },
+  { id: 5212, startX: 430, startY: 230, endX: 430, endY: 315, thickness: 4, color: WALL_COLOR, label: 'Air Maintenance / Work Rest Partition' },
+  { id: 5213, startX: 510, startY: 230, endX: 510, endY: 315, thickness: 4, color: WALL_COLOR, label: 'Work Rest / Ladies Rest Partition' },
+  { id: 5214, startX: 590, startY: 230, endX: 590, endY: 315, thickness: 4, color: WALL_COLOR, label: 'Ladies Rest / Civil Electrical Partition' },
+  { id: 5215, startX: 720, startY: 230, endX: 720, endY: 315, thickness: 4, color: WALL_COLOR, label: 'Civil Electrical / Gents Partition' },
+  { id: 5216, startX: 790, startY: 230, endX: 790, endY: 315, thickness: 4, color: WALL_COLOR, label: 'Gents / Cafeteria Partition' },
+  { id: 5217, startX: 875, startY: 230, endX: 875, endY: 315, thickness: 4, color: WALL_COLOR, label: 'Cafeteria / Open Office Partition' },
+  { id: 5218, startX: 940, startY: 230, endX: 940, endY: 315, thickness: 4, color: WALL_COLOR, label: 'Open Office / Pantry Partition' },
+
+  // Middle/bottom band rooms
+  { id: 5230, startX: 300, startY: 315, endX: 300, endY: 570, thickness: 4, color: WALL_COLOR, label: 'Server Room-1 Partition' },
+  { id: 5231, startX: 380, startY: 315, endX: 380, endY: 570, thickness: 4, color: WALL_COLOR, label: 'Server Room-2 Partition' },
+  { id: 5232, startX: 450, startY: 315, endX: 450, endY: 395, thickness: 4, color: WALL_COLOR, label: 'Pantry/IT Store Partition' },
+  { id: 5233, startX: 570, startY: 315, endX: 570, endY: 570, thickness: 4, color: WALL_COLOR, label: 'Core Stair West Partition' },
+  { id: 5234, startX: 650, startY: 315, endX: 650, endY: 570, thickness: 4, color: WALL_COLOR, label: 'Meeting Room / Office Partition' },
+  { id: 5235, startX: 720, startY: 315, endX: 720, endY: 570, thickness: 4, color: WALL_COLOR, label: 'Office / Open Office Partition' },
+  { id: 5236, startX: 560, startY: 470, endX: 980, endY: 470, thickness: 4, color: WALL_COLOR, label: 'Lower Open Office North Wall' },
+  { id: 5237, startX: 450, startY: 470, endX: 570, endY: 470, thickness: 4, color: WALL_COLOR, label: 'Ladies Toilet North Wall' },
+];
+
+const SF_ARCH_ELEMENTS: ArchElement[] = [
+  { id: 5301, type: 'DOOR', x: 260, y: 315, width: 28, rotation: 0, label: 'Toilet Entry', openDirection: 'RIGHT' },
+  { id: 5302, type: 'DOOR', x: 330, y: 315, width: 28, rotation: 0, label: 'Stair Entry', openDirection: 'LEFT' },
+  { id: 5303, type: 'DOOR', x: 430, y: 315, width: 28, rotation: 0, label: 'Air Maint Entry', openDirection: 'RIGHT' },
+  { id: 5304, type: 'DOOR', x: 510, y: 315, width: 28, rotation: 0, label: 'Work Rest Entry', openDirection: 'RIGHT' },
+  { id: 5305, type: 'DOOR', x: 590, y: 315, width: 28, rotation: 0, label: 'Ladies Rest Entry', openDirection: 'RIGHT' },
+  { id: 5306, type: 'DOOR', x: 720, y: 315, width: 28, rotation: 0, label: 'Civil/Electrical Entry', openDirection: 'RIGHT' },
+  { id: 5307, type: 'DOOR', x: 790, y: 315, width: 28, rotation: 0, label: 'Gents Entry', openDirection: 'LEFT' },
+  { id: 5308, type: 'DOOR', x: 875, y: 315, width: 28, rotation: 0, label: 'Cafeteria Entry', openDirection: 'LEFT' },
+  { id: 5309, type: 'DOOR', x: 940, y: 315, width: 28, rotation: 0, label: 'Pantry Entry', openDirection: 'LEFT' },
+  { id: 5310, type: 'STAIRS', x: 610, y: 355, width: 42, rotation: 0, label: 'Core Stair' },
+  { id: 5311, type: 'ELEVATOR', x: 240, y: 275, width: 30, rotation: 0, label: 'Lift' },
+];
+
+const GF_ROOM_ZONES: ZoneOnCanvas[] = [
+  // ── Electrical ──────────────────────────────────────────────────────────────
+  { id: 101, name: 'LT MCC HV Electrical Room', type: 'RESTRICTED', color: ZONE_COLORS.RESTRICTED, dwell_alert_seconds: 0, is_active: true,
+    points: [{ x: 340, y:  80 }, { x: 555, y:  80 }, { x: 555, y: 280 }, { x: 340, y: 280 }] },
+  // ── Canteen Wing ────────────────────────────────────────────────────────────
+  { id: 102, name: 'BIAL Canteen — R&M Dining', type: 'DWELL', color: ZONE_COLORS.DWELL, dwell_alert_seconds: 3600, is_active: true,
+    points: [{ x:  80, y: 340 }, { x: 340, y: 340 }, { x: 340, y: 490 }, { x: 230, y: 490 }, { x: 230, y: 580 }, { x:  80, y: 580 }] },
+  { id: 139, name: 'Canteen Kitchen', type: 'RESTRICTED', color: ZONE_COLORS.RESTRICTED, dwell_alert_seconds: 0, is_active: true,
+    points: [{ x:  80, y: 580 }, { x: 230, y: 580 }, { x: 230, y: 720 }, { x:  80, y: 720 }] },
+  { id: 140, name: 'Canteen Storage / Pantry', type: 'RESTRICTED', color: ZONE_COLORS.RESTRICTED, dwell_alert_seconds: 0, is_active: true,
+    points: [{ x: 230, y: 490 }, { x: 340, y: 490 }, { x: 340, y: 720 }, { x: 230, y: 720 }] },
+  // ── Locker / Rest Rooms ──────────────────────────────────────────────────────
+  { id: 141, name: 'Covered Porch', type: 'LOUNGE', color: ZONE_COLORS.LOUNGE, dwell_alert_seconds: 600, is_active: true,
+    points: [{ x:  80, y:  80 }, { x: 175, y:  80 }, { x: 175, y: 200 }, { x:  80, y: 200 }] },
+  { id: 142, name: 'Locker Room', type: 'LOUNGE', color: ZONE_COLORS.LOUNGE, dwell_alert_seconds: 900, is_active: true,
+    points: [{ x: 175, y:  80 }, { x: 340, y:  80 }, { x: 340, y: 200 }, { x: 175, y: 200 }] },
+  { id: 143, name: 'Sofa / Rest Area', type: 'LOUNGE', color: ZONE_COLORS.LOUNGE, dwell_alert_seconds: 1200, is_active: true,
+    points: [{ x:  80, y: 200 }, { x: 340, y: 200 }, { x: 340, y: 340 }, { x:  80, y: 340 }] },
+  // ── Centre Toilet Block ──────────────────────────────────────────────────────
+  { id: 144, name: 'Ladies Toilet (Centre)', type: 'LOUNGE', color: ZONE_COLORS.LOUNGE, dwell_alert_seconds: 600, is_active: true,
+    points: [{ x: 340, y: 280 }, { x: 480, y: 280 }, { x: 480, y: 440 }, { x: 340, y: 440 }] },
+  { id: 145, name: 'Gents Toilet (Centre)', type: 'LOUNGE', color: ZONE_COLORS.LOUNGE, dwell_alert_seconds: 600, is_active: true,
+    points: [{ x: 480, y: 280 }, { x: 635, y: 280 }, { x: 635, y: 440 }, { x: 480, y: 440 }] },
+  { id: 146, name: 'Toilet Block Corridor', type: 'DWELL', color: ZONE_COLORS.DWELL, dwell_alert_seconds: 300, is_active: true,
+    points: [{ x: 340, y: 440 }, { x: 635, y: 440 }, { x: 635, y: 560 }, { x: 340, y: 560 }] },
+  // ── Reception & Waiting ──────────────────────────────────────────────────────
+  { id: 103, name: 'Reception Lobby', type: 'LOUNGE', color: ZONE_COLORS.LOUNGE, dwell_alert_seconds: 900, is_active: true,
+    points: [{ x: 635, y:  80 }, { x: 855, y:  80 }, { x: 855, y: 280 }, { x: 635, y: 280 }] },
+  { id: 106, name: 'Area of Stay — Waiting', type: 'DWELL', color: ZONE_COLORS.DWELL, dwell_alert_seconds: 1800, is_active: true,
+    points: [{ x: 555, y: 280 }, { x: 635, y: 280 }, { x: 635, y: 440 }, { x: 555, y: 440 }] },
+  { id: 104, name: 'Storage / Legal Room', type: 'RESTRICTED', color: ZONE_COLORS.RESTRICTED, dwell_alert_seconds: 0, is_active: true,
+    points: [{ x: 635, y: 440 }, { x: 760, y: 440 }, { x: 760, y: 560 }, { x: 635, y: 560 }] },
+  // ── Monitor / AFSB ──────────────────────────────────────────────────────────
+  { id: 147, name: 'Monitor Room', type: 'RESTRICTED', color: ZONE_COLORS.RESTRICTED, dwell_alert_seconds: 0, is_active: true,
+    points: [{ x: 760, y: 280 }, { x: 890, y: 280 }, { x: 890, y: 560 }, { x: 760, y: 560 }] },
+  { id: 110, name: 'AFSB Misc Office', type: 'RESTRICTED', color: ZONE_COLORS.RESTRICTED, dwell_alert_seconds: 0, is_active: true,
+    points: [{ x: 890, y: 560 }, { x: 1010, y: 560 }, { x: 1010, y: 720 }, { x: 890, y: 720 }] },
+  // ── Right Toilet Block ───────────────────────────────────────────────────────
+  { id: 148, name: 'Gents Toilet (East Wing)', type: 'LOUNGE', color: ZONE_COLORS.LOUNGE, dwell_alert_seconds: 600, is_active: true,
+    points: [{ x: 1010, y: 560 }, { x: 1120, y: 560 }, { x: 1120, y: 720 }, { x: 1010, y: 720 }] },
+  // ── Director Office Wing ─────────────────────────────────────────────────────
+  { id: 105, name: 'Data Office / Server Room', type: 'RESTRICTED', color: ZONE_COLORS.RESTRICTED, dwell_alert_seconds: 0, is_active: true,
+    points: [{ x: 890, y:  80 }, { x: 1010, y:  80 }, { x: 1010, y: 240 }, { x: 890, y: 240 }] },
+  { id: 149, name: 'Director Wing Reception', type: 'LOUNGE', color: ZONE_COLORS.LOUNGE, dwell_alert_seconds: 600, is_active: true,
+    points: [{ x: 1010, y:  80 }, { x: 1120, y:  80 }, { x: 1120, y: 240 }, { x: 1010, y: 240 }] },
+  { id: 150, name: 'Open Work Stations', type: 'DWELL', color: ZONE_COLORS.DWELL, dwell_alert_seconds: 2400, is_active: true,
+    points: [{ x: 890, y: 240 }, { x: 1065, y: 240 }, { x: 1065, y: 360 }, { x: 890, y: 360 }] },
+  { id: 151, name: 'Meeting Room', type: 'DWELL', color: ZONE_COLORS.DWELL, dwell_alert_seconds: 1800, is_active: true,
+    points: [{ x: 1065, y: 240 }, { x: 1120, y: 240 }, { x: 1120, y: 360 }, { x: 1065, y: 360 }] },
+  { id: 152, name: 'HR / Admin Office', type: 'RESTRICTED', color: ZONE_COLORS.RESTRICTED, dwell_alert_seconds: 0, is_active: true,
+    points: [{ x: 890, y: 360 }, { x:  945, y: 360 }, { x:  945, y: 560 }, { x: 890, y: 560 }] },
+  { id: 153, name: 'Accounts Office', type: 'RESTRICTED', color: ZONE_COLORS.RESTRICTED, dwell_alert_seconds: 0, is_active: true,
+    points: [{ x: 945, y: 360 }, { x: 1000, y: 360 }, { x: 1000, y: 560 }, { x: 945, y: 560 }] },
+  { id: 154, name: 'CODC / CS Office', type: 'RESTRICTED', color: ZONE_COLORS.RESTRICTED, dwell_alert_seconds: 0, is_active: true,
+    points: [{ x: 1000, y: 360 }, { x: 1055, y: 360 }, { x: 1055, y: 560 }, { x: 1000, y: 560 }] },
+  { id: 155, name: 'MD / Director Office', type: 'RESTRICTED', color: ZONE_COLORS.RESTRICTED, dwell_alert_seconds: 0, is_active: true,
+    points: [{ x: 1055, y: 360 }, { x: 1120, y: 360 }, { x: 1120, y: 560 }, { x: 1055, y: 560 }] },
+  // ── Tripwires ────────────────────────────────────────────────────────────────
+  { id: 107, name: 'Main Entry Tripwire', type: 'TRIPWIRE', color: ZONE_COLORS.TRIPWIRE, dwell_alert_seconds: 0, is_active: true,
+    points: [{ x:  80, y:  80 }, { x: 175, y:  80 }, { x: 175, y: 130 }, { x:  80, y: 130 }] },
+  { id: 108, name: 'South Exit Tripwire', type: 'TRIPWIRE', color: ZONE_COLORS.TRIPWIRE, dwell_alert_seconds: 0, is_active: true,
+    points: [{ x:  80, y: 670 }, { x: 175, y: 670 }, { x: 175, y: 720 }, { x:  80, y: 720 }] },
+];
+
+const SF_ROOM_ZONES: ZoneOnCanvas[] = [
+  // ── Top band — upper rooms ───────────────────────────────────────────────
+  { id: 6100, name: 'Staircase / Toilet Block', type: 'LOUNGE', color: ZONE_COLORS.LOUNGE, dwell_alert_seconds: 300, is_active: true,
+    points: [{ x: 220, y: 230 }, { x: 260, y: 230 }, { x: 260, y: 315 }, { x: 220, y: 315 }] },
+  { id: 6101, name: 'Air Maintenance Room', type: 'RESTRICTED', color: ZONE_COLORS.RESTRICTED, dwell_alert_seconds: 0, is_active: true,
+    points: [{ x: 330, y: 230 }, { x: 430, y: 230 }, { x: 430, y: 315 }, { x: 330, y: 315 }] },
+  { id: 6102, name: 'Work Rest Room', type: 'LOUNGE', color: ZONE_COLORS.LOUNGE, dwell_alert_seconds: 1200, is_active: true,
+    points: [{ x: 430, y: 230 }, { x: 510, y: 230 }, { x: 510, y: 315 }, { x: 430, y: 315 }] },
+  { id: 6103, name: 'Ladies Rest Room', type: 'LOUNGE', color: ZONE_COLORS.LOUNGE, dwell_alert_seconds: 1200, is_active: true,
+    points: [{ x: 510, y: 230 }, { x: 590, y: 230 }, { x: 590, y: 315 }, { x: 510, y: 315 }] },
+  { id: 6104, name: 'Civil / Electrical Room', type: 'RESTRICTED', color: ZONE_COLORS.RESTRICTED, dwell_alert_seconds: 0, is_active: true,
+    points: [{ x: 590, y: 230 }, { x: 720, y: 230 }, { x: 720, y: 315 }, { x: 590, y: 315 }] },
+  { id: 6105, name: 'Gents Room', type: 'LOUNGE', color: ZONE_COLORS.LOUNGE, dwell_alert_seconds: 900, is_active: true,
+    points: [{ x: 720, y: 230 }, { x: 790, y: 230 }, { x: 790, y: 315 }, { x: 720, y: 315 }] },
+  { id: 6112, name: 'Cafeteria', type: 'DWELL', color: ZONE_COLORS.DWELL, dwell_alert_seconds: 2400, is_active: true,
+    points: [{ x: 790, y: 230 }, { x: 875, y: 230 }, { x: 875, y: 315 }, { x: 790, y: 315 }] },
+  { id: 6106, name: 'Open Office (Cafeteria Wing)', type: 'DWELL', color: ZONE_COLORS.DWELL, dwell_alert_seconds: 1800, is_active: true,
+    points: [{ x: 875, y: 230 }, { x: 940, y: 230 }, { x: 940, y: 315 }, { x: 875, y: 315 }] },
+  { id: 6113, name: 'Pantry', type: 'LOUNGE', color: ZONE_COLORS.LOUNGE, dwell_alert_seconds: 600, is_active: true,
+    points: [{ x: 940, y: 230 }, { x: 980, y: 230 }, { x: 980, y: 315 }, { x: 940, y: 315 }] },
+  // ── Middle / Bottom band ──────────────────────────────────────────────────
+  { id: 6107, name: 'Server Room-1', type: 'RESTRICTED', color: ZONE_COLORS.RESTRICTED, dwell_alert_seconds: 0, is_active: true,
+    points: [{ x: 220, y: 315 }, { x: 300, y: 315 }, { x: 300, y: 570 }, { x: 220, y: 570 }] },
+  { id: 6108, name: 'Server Room-2', type: 'RESTRICTED', color: ZONE_COLORS.RESTRICTED, dwell_alert_seconds: 0, is_active: true,
+    points: [{ x: 300, y: 315 }, { x: 380, y: 315 }, { x: 380, y: 570 }, { x: 300, y: 570 }] },
+  { id: 6114, name: 'IT Store / Pantry', type: 'RESTRICTED', color: ZONE_COLORS.RESTRICTED, dwell_alert_seconds: 0, is_active: true,
+    points: [{ x: 380, y: 315 }, { x: 450, y: 315 }, { x: 450, y: 395 }, { x: 380, y: 395 }] },
+  { id: 6115, name: 'First Aid Room', type: 'LOUNGE', color: ZONE_COLORS.LOUNGE, dwell_alert_seconds: 900, is_active: true,
+    points: [{ x: 380, y: 395 }, { x: 450, y: 395 }, { x: 450, y: 470 }, { x: 380, y: 470 }] },
+  { id: 6116, name: 'Store Room', type: 'RESTRICTED', color: ZONE_COLORS.RESTRICTED, dwell_alert_seconds: 0, is_active: true,
+    points: [{ x: 380, y: 470 }, { x: 450, y: 470 }, { x: 450, y: 570 }, { x: 380, y: 570 }] },
+  { id: 6117, name: 'Ladies Toilet', type: 'LOUNGE', color: ZONE_COLORS.LOUNGE, dwell_alert_seconds: 600, is_active: true,
+    points: [{ x: 450, y: 470 }, { x: 570, y: 470 }, { x: 570, y: 570 }, { x: 450, y: 570 }] },
+  { id: 6109, name: 'Meeting Room', type: 'DWELL', color: ZONE_COLORS.DWELL, dwell_alert_seconds: 1800, is_active: true,
+    points: [{ x: 570, y: 315 }, { x: 650, y: 315 }, { x: 650, y: 470 }, { x: 570, y: 470 }] },
+  { id: 6110, name: 'Office', type: 'DWELL', color: ZONE_COLORS.DWELL, dwell_alert_seconds: 1800, is_active: true,
+    points: [{ x: 650, y: 315 }, { x: 720, y: 315 }, { x: 720, y: 470 }, { x: 650, y: 470 }] },
+  { id: 6111, name: 'Open Office (Main)', type: 'DWELL', color: ZONE_COLORS.DWELL, dwell_alert_seconds: 2400, is_active: true,
+    points: [{ x: 720, y: 315 }, { x: 980, y: 315 }, { x: 980, y: 570 }, { x: 720, y: 570 }] },
+];
+
+const FF_ROOM_ZONES: ZoneOnCanvas[] = [
+  // ── Top band — upper rooms (Training / Ops wing) ─────────────────────────
+  { id: 501, name: 'Shower / Cloak Room', type: 'LOUNGE', color: '#22c55e', dwell_alert_seconds: 600, is_active: true,
+    points: [{ x: 240, y: 240 }, { x: 312, y: 240 }, { x: 312, y: 380 }, { x: 240, y: 380 }] },
+  { id: 502, name: 'Training In-Charge Room', type: 'RESTRICTED', color: '#f59e0b', dwell_alert_seconds: 1800, is_active: true,
+    points: [{ x: 312, y: 240 }, { x: 384, y: 240 }, { x: 384, y: 380 }, { x: 312, y: 380 }] },
+  { id: 503, name: 'Training Support Room', type: 'DWELL', color: '#f59e0b', dwell_alert_seconds: 2400, is_active: true,
+    points: [{ x: 384, y: 240 }, { x: 456, y: 240 }, { x: 456, y: 380 }, { x: 384, y: 380 }] },
+  { id: 518, name: 'Training Classroom 1', type: 'DWELL', color: '#3b82f6', dwell_alert_seconds: 3600, is_active: true,
+    points: [{ x: 456, y: 240 }, { x: 528, y: 240 }, { x: 528, y: 380 }, { x: 456, y: 380 }] },
+  { id: 519, name: 'Training Classroom 2', type: 'DWELL', color: '#3b82f6', dwell_alert_seconds: 3600, is_active: true,
+    points: [{ x: 528, y: 240 }, { x: 600, y: 240 }, { x: 600, y: 380 }, { x: 528, y: 380 }] },
+  { id: 520, name: 'Server / Racks Room', type: 'RESTRICTED', color: '#ff0055', dwell_alert_seconds: 0, is_active: true,
+    points: [{ x: 600, y: 240 }, { x: 672, y: 240 }, { x: 672, y: 380 }, { x: 600, y: 380 }] },
+  { id: 504, name: 'Gents Rest Room — 1', type: 'LOUNGE', color: '#22c55e', dwell_alert_seconds: 600, is_active: true,
+    points: [{ x: 672, y: 240 }, { x: 720, y: 240 }, { x: 720, y: 380 }, { x: 672, y: 380 }] },
+  { id: 521, name: 'Gents Rest Room — 2', type: 'LOUNGE', color: '#22c55e', dwell_alert_seconds: 600, is_active: true,
+    points: [{ x: 720, y: 240 }, { x: 768, y: 240 }, { x: 768, y: 380 }, { x: 720, y: 380 }] },
+  { id: 522, name: 'Gents Rest Room — 3', type: 'LOUNGE', color: '#22c55e', dwell_alert_seconds: 600, is_active: true,
+    points: [{ x: 768, y: 240 }, { x: 816, y: 240 }, { x: 816, y: 380 }, { x: 768, y: 380 }] },
+  { id: 523, name: 'Recreation Room', type: 'LOUNGE', color: '#22c55e', dwell_alert_seconds: 1200, is_active: true,
+    points: [{ x: 816, y: 240 }, { x: 888, y: 240 }, { x: 888, y: 380 }, { x: 816, y: 380 }] },
+  { id: 505, name: 'UPS Battery Room', type: 'RESTRICTED', color: '#6b7280', dwell_alert_seconds: 0, is_active: true,
+    points: [{ x: 888, y: 240 }, { x: 960, y: 240 }, { x: 960, y: 380 }, { x: 888, y: 380 }] },
+  // ── OPS Rooms (top-band, above corridor) ────────────────────────────────
+  { id: 524, name: 'OPS Room 1', type: 'RESTRICTED', color: '#a855f7', dwell_alert_seconds: 0, is_active: true,
+    points: [{ x: 240, y: 380 }, { x: 400, y: 380 }, { x: 400, y: 420 }, { x: 240, y: 420 }] },
+  { id: 525, name: 'OPS Room 2', type: 'RESTRICTED', color: '#a855f7', dwell_alert_seconds: 0, is_active: true,
+    points: [{ x: 400, y: 380 }, { x: 560, y: 380 }, { x: 560, y: 420 }, { x: 400, y: 420 }] },
+  { id: 526, name: 'RAF/RADAR ADD EXT Interface Room', type: 'RESTRICTED', color: '#a855f7', dwell_alert_seconds: 0, is_active: true,
+    points: [{ x: 560, y: 380 }, { x: 720, y: 380 }, { x: 720, y: 420 }, { x: 560, y: 420 }] },
+  { id: 527, name: 'Reception Room', type: 'LOUNGE', color: '#22c55e', dwell_alert_seconds: 900, is_active: true,
+    points: [{ x: 720, y: 380 }, { x: 960, y: 380 }, { x: 960, y: 420 }, { x: 720, y: 420 }] },
+  // ── Bottom band — Rack / Control / STM / ACC / APP rooms ──────────────────
+  { id: 528, name: 'Janitor Room', type: 'RESTRICTED', color: '#6b7280', dwell_alert_seconds: 0, is_active: true,
+    points: [{ x: 240, y: 420 }, { x: 288, y: 420 }, { x: 288, y: 560 }, { x: 240, y: 560 }] },
+  { id: 529, name: 'Electrical Room (FF)', type: 'RESTRICTED', color: '#ff0055', dwell_alert_seconds: 0, is_active: true,
+    points: [{ x: 288, y: 420 }, { x: 360, y: 420 }, { x: 360, y: 560 }, { x: 288, y: 560 }] },
+  { id: 506, name: 'STM Telecom Room', type: 'RESTRICTED', color: '#ff0055', dwell_alert_seconds: 0, is_active: true,
+    points: [{ x: 360, y: 420 }, { x: 480, y: 420 }, { x: 480, y: 560 }, { x: 360, y: 560 }] },
+  { id: 507, name: 'ACC Room - Bay 1', type: 'RESTRICTED', color: '#ff0055', dwell_alert_seconds: 0, is_active: true,
+    points: [{ x: 480, y: 420 }, { x: 570, y: 420 }, { x: 570, y: 560 }, { x: 480, y: 560 }] },
+  { id: 508, name: 'ACC Room - Bay 2', type: 'RESTRICTED', color: '#ff0055', dwell_alert_seconds: 0, is_active: true,
+    points: [{ x: 570, y: 420 }, { x: 660, y: 420 }, { x: 660, y: 560 }, { x: 570, y: 560 }] },
+  { id: 509, name: 'ACC Room - Bay 3', type: 'RESTRICTED', color: '#ff0055', dwell_alert_seconds: 0, is_active: true,
+    points: [{ x: 660, y: 420 }, { x: 750, y: 420 }, { x: 750, y: 560 }, { x: 660, y: 560 }] },
+  { id: 510, name: 'ACC Room - Bay 4 (WSO)', type: 'RESTRICTED', color: '#ff0055', dwell_alert_seconds: 0, is_active: true,
+    points: [{ x: 750, y: 420 }, { x: 855, y: 420 }, { x: 855, y: 560 }, { x: 750, y: 560 }] },
+  { id: 511, name: 'APP Room', type: 'RESTRICTED', color: '#ff0055', dwell_alert_seconds: 0, is_active: true,
+    points: [{ x: 855, y: 420 }, { x: 960, y: 420 }, { x: 960, y: 560 }, { x: 855, y: 560 }] },
+  { id: 530, name: 'IT Store', type: 'RESTRICTED', color: '#6b7280', dwell_alert_seconds: 0, is_active: true,
+    points: [{ x: 450, y: 470 }, { x: 480, y: 470 }, { x: 480, y: 560 }, { x: 450, y: 560 }] },
 ];
 
 const FF_WALLS: WallSegment[] = [
-  { id: 601, startX: 240, startY: 240, endX: 960, endY: 240, thickness: 8, color: WALL_COLOR, label: 'North Perimeter Wall' },
-  { id: 602, startX: 240, startY: 240, endX: 240, endY: 560, thickness: 8, color: WALL_COLOR, label: 'West Perimeter Wall'  },
-  { id: 603, startX: 960, startY: 240, endX: 960, endY: 560, thickness: 8, color: WALL_COLOR, label: 'East Perimeter Wall'  },
-  { id: 604, startX: 240, startY: 560, endX: 960, endY: 560, thickness: 8, color: WALL_COLOR, label: 'South Perimeter Wall' },
-  { id: 605, startX: 240, startY: 380, endX: 960, endY: 380, thickness: 6, color: WALL_COLOR, label: 'Corridor North Wall'     },
-  { id: 606, startX: 240, startY: 420, endX: 960, endY: 420, thickness: 6, color: WALL_COLOR, label: 'Corridor South Wall'     },
-  { id: 607, startX: 384, startY: 240, endX: 384, endY: 380, thickness: 4, color: WALL_COLOR, label: 'Security Check / Training Partition' },
-  { id: 608, startX: 528, startY: 240, endX: 528, endY: 380, thickness: 4, color: WALL_COLOR, label: 'Training / Control Office Partition' },
-  { id: 609, startX: 672, startY: 240, endX: 672, endY: 380, thickness: 4, color: WALL_COLOR, label: 'Control Office / Recreation Partition' },
-  { id: 610, startX: 816, startY: 240, endX: 816, endY: 380, thickness: 4, color: WALL_COLOR, label: 'Recreation / Utility Partition' },
-  { id: 611, startX: 360, startY: 420, endX: 360, endY: 560, thickness: 4, color: WALL_COLOR, label: 'STM Telecom / ACC Bay 1 Partition' },
-  { id: 612, startX: 480, startY: 420, endX: 480, endY: 560, thickness: 4, color: WALL_COLOR, label: 'ACC Bay 1 / ACC Bay 2 Partition' },
-  { id: 613, startX: 600, startY: 420, endX: 600, endY: 560, thickness: 4, color: WALL_COLOR, label: 'ACC Bay 2 / ACC Bay 3 Partition' },
-  { id: 614, startX: 720, startY: 420, endX: 720, endY: 560, thickness: 4, color: WALL_COLOR, label: 'ACC Bay 3 / ACC Bay 4 Partition' },
-  { id: 615, startX: 840, startY: 420, endX: 840, endY: 560, thickness: 4, color: WALL_COLOR, label: 'ACC Bay 4 / APP Room Partition' },
+  // ── Outer Perimeter ─────────────────────────────────────────────────────────
+  { id: 601, startX: 240, startY: 240, endX: 960, endY: 240, thickness: 8, color: WALL_COLOR, label: 'North Perimeter Wall'            },
+  { id: 602, startX: 240, startY: 240, endX: 240, endY: 560, thickness: 8, color: WALL_COLOR, label: 'West Perimeter Wall'             },
+  { id: 603, startX: 960, startY: 240, endX: 960, endY: 560, thickness: 8, color: WALL_COLOR, label: 'East Perimeter Wall'             },
+  { id: 604, startX: 240, startY: 560, endX: 960, endY: 560, thickness: 8, color: WALL_COLOR, label: 'South Perimeter Wall'            },
+  // ── Main corridor band ───────────────────────────────────────────────────────
+  { id: 605, startX: 240, startY: 380, endX: 960, endY: 380, thickness: 6, color: WALL_COLOR, label: 'Corridor North Wall'             },
+  { id: 606, startX: 240, startY: 420, endX: 960, endY: 420, thickness: 6, color: WALL_COLOR, label: 'Corridor South Wall'             },
+  // ── Top-band partitions ───────────────────────────────────────────────────────
+  { id: 616, startX: 312, startY: 240, endX: 312, endY: 380, thickness: 4, color: WALL_COLOR, label: 'Shower / Training-IC Partition'  },
+  { id: 607, startX: 384, startY: 240, endX: 384, endY: 380, thickness: 4, color: WALL_COLOR, label: 'Training-IC / Support Partition' },
+  { id: 617, startX: 456, startY: 240, endX: 456, endY: 380, thickness: 4, color: WALL_COLOR, label: 'Support / Classroom-1 Partition' },
+  { id: 608, startX: 528, startY: 240, endX: 528, endY: 380, thickness: 4, color: WALL_COLOR, label: 'Classroom-1 / Classroom-2 Div'   },
+  { id: 618, startX: 600, startY: 240, endX: 600, endY: 380, thickness: 4, color: WALL_COLOR, label: 'Classroom-2 / Racks Partition'   },
+  { id: 609, startX: 672, startY: 240, endX: 672, endY: 380, thickness: 4, color: WALL_COLOR, label: 'Racks / Gents Rest-1 Partition'  },
+  { id: 619, startX: 720, startY: 240, endX: 720, endY: 380, thickness: 4, color: WALL_COLOR, label: 'Gents Rest-1 / Rest-2 Partition' },
+  { id: 620, startX: 768, startY: 240, endX: 768, endY: 380, thickness: 4, color: WALL_COLOR, label: 'Gents Rest-2 / Rest-3 Partition' },
+  { id: 610, startX: 816, startY: 240, endX: 816, endY: 380, thickness: 4, color: WALL_COLOR, label: 'Gents Rest-3 / Recreation Div'   },
+  { id: 621, startX: 888, startY: 240, endX: 888, endY: 380, thickness: 4, color: WALL_COLOR, label: 'Recreation / UPS Battery Div'    },
+  // ── Corridor sub-divisions (OPS / Reception) ──────────────────────────────────
+  { id: 622, startX: 400, startY: 380, endX: 400, endY: 420, thickness: 4, color: WALL_COLOR, label: 'OPS Room 1 / OPS Room 2 Div'     },
+  { id: 623, startX: 560, startY: 380, endX: 560, endY: 420, thickness: 4, color: WALL_COLOR, label: 'OPS Room 2 / RADAR Div'          },
+  { id: 624, startX: 720, startY: 380, endX: 720, endY: 420, thickness: 4, color: WALL_COLOR, label: 'RADAR / Reception Div'           },
+  // ── Bottom-band partitions ────────────────────────────────────────────────────
+  { id: 625, startX: 288, startY: 420, endX: 288, endY: 560, thickness: 4, color: WALL_COLOR, label: 'Janitor / Electrical-FF Div'     },
+  { id: 626, startX: 360, startY: 420, endX: 360, endY: 560, thickness: 4, color: WALL_COLOR, label: 'Electrical-FF / STM Telecom Div' },
+  { id: 611, startX: 480, startY: 420, endX: 480, endY: 560, thickness: 4, color: WALL_COLOR, label: 'STM Telecom / ACC Bay 1 Div'     },
+  { id: 612, startX: 570, startY: 420, endX: 570, endY: 560, thickness: 4, color: WALL_COLOR, label: 'ACC Bay 1 / ACC Bay 2 Div'       },
+  { id: 613, startX: 660, startY: 420, endX: 660, endY: 560, thickness: 4, color: WALL_COLOR, label: 'ACC Bay 2 / ACC Bay 3 Div'       },
+  { id: 614, startX: 750, startY: 420, endX: 750, endY: 560, thickness: 4, color: WALL_COLOR, label: 'ACC Bay 3 / ACC Bay 4 Div'       },
+  { id: 615, startX: 855, startY: 420, endX: 855, endY: 560, thickness: 4, color: WALL_COLOR, label: 'ACC Bay 4 / APP Room Div'        },
+  { id: 627, startX: 450, startY: 470, endX: 480, endY: 470, thickness: 4, color: WALL_COLOR, label: 'IT Store North Wall'             },
 ];
 
 const FF_ARCH_ELEMENTS: ArchElement[] = [
-  { id: 701, type: 'DOOR',        x: 350, y: 380, width: 36, rotation: 0, label: 'Security Check Door', openDirection: 'RIGHT' },
-  { id: 702, type: 'DOOR',        x: 494, y: 380, width: 36, rotation: 0, label: 'Training Area Door', openDirection: 'RIGHT' },
-  { id: 703, type: 'DOOR',        x: 638, y: 380, width: 36, rotation: 0, label: 'Control Office Door', openDirection: 'RIGHT' },
-  { id: 704, type: 'DOOR',        x: 782, y: 380, width: 36, rotation: 0, label: 'Recreation Room Door', openDirection: 'RIGHT' },
-  { id: 705, type: 'DOOR',        x: 846, y: 380, width: 36, rotation: 0, label: 'Utility Room Door', openDirection: 'LEFT' },
-  { id: 706, type: 'DOOR',        x: 330, y: 420, width: 36, rotation: 0, label: 'STM Telecom Door', openDirection: 'RIGHT' },
-  { id: 707, type: 'DOOR',        x: 390, y: 420, width: 36, rotation: 0, label: 'ACC Bay 1 Door', openDirection: 'LEFT' },
-  { id: 708, type: 'DOOR',        x: 510, y: 420, width: 36, rotation: 0, label: 'ACC Bay 2 Door', openDirection: 'LEFT' },
-  { id: 709, type: 'DOOR',        x: 630, y: 420, width: 36, rotation: 0, label: 'ACC Bay 3 Door', openDirection: 'LEFT' },
-  { id: 710, type: 'DOOR',        x: 750, y: 420, width: 36, rotation: 0, label: 'ACC Bay 4 Door', openDirection: 'LEFT' },
-  { id: 711, type: 'DOOR',        x: 870, y: 420, width: 36, rotation: 0, label: 'APP Room Door', openDirection: 'LEFT' },
-  { id: 712, type: 'ACCESS_DOOR', x: 320, y: 400, width: 16, rotation: 0, label: 'Corridor Access Point A' },
-  { id: 713, type: 'ACCESS_DOOR', x: 640, y: 400, width: 16, rotation: 0, label: 'Corridor Access Point B' },
+  // Top-band doors
+  { id: 701, type: 'DOOR',        x: 276,  y: 380, width: 36, rotation: 0, label: 'Shower Room Door',           openDirection: 'RIGHT' },
+  { id: 702, type: 'DOOR',        x: 348,  y: 380, width: 36, rotation: 0, label: 'Training In-Charge Door',    openDirection: 'RIGHT' },
+  { id: 703, type: 'DOOR',        x: 420,  y: 380, width: 36, rotation: 0, label: 'Training Support Door',      openDirection: 'RIGHT' },
+  { id: 728, type: 'DOOR',        x: 492,  y: 380, width: 36, rotation: 0, label: 'Classroom 1 Door',           openDirection: 'RIGHT' },
+  { id: 729, type: 'DOOR',        x: 564,  y: 380, width: 36, rotation: 0, label: 'Classroom 2 Door',           openDirection: 'RIGHT' },
+  { id: 730, type: 'DOOR',        x: 636,  y: 380, width: 36, rotation: 0, label: 'Server/Racks Room Door',     openDirection: 'RIGHT' },
+  { id: 704, type: 'DOOR',        x: 696,  y: 380, width: 36, rotation: 0, label: 'Gents Rest 1 Door',          openDirection: 'LEFT'  },
+  { id: 731, type: 'DOOR',        x: 744,  y: 380, width: 36, rotation: 0, label: 'Gents Rest 2 Door',          openDirection: 'LEFT'  },
+  { id: 732, type: 'DOOR',        x: 792,  y: 380, width: 36, rotation: 0, label: 'Gents Rest 3 Door',          openDirection: 'LEFT'  },
+  { id: 705, type: 'DOOR',        x: 852,  y: 380, width: 36, rotation: 0, label: 'Recreation Room Door',       openDirection: 'LEFT'  },
+  { id: 733, type: 'DOOR',        x: 924,  y: 380, width: 36, rotation: 0, label: 'UPS Battery Room Door',      openDirection: 'LEFT'  },
+  // Bottom-band doors
+  { id: 734, type: 'DOOR',        x: 260,  y: 420, width: 36, rotation: 0, label: 'Janitor Room Door',          openDirection: 'RIGHT' },
+  { id: 735, type: 'DOOR',        x: 320,  y: 420, width: 36, rotation: 0, label: 'Electrical Room (FF) Door',  openDirection: 'RIGHT' },
+  { id: 706, type: 'DOOR',        x: 410,  y: 420, width: 36, rotation: 0, label: 'STM Telecom Door',           openDirection: 'RIGHT' },
+  { id: 707, type: 'DOOR',        x: 520,  y: 420, width: 36, rotation: 0, label: 'ACC Bay 1 Door',             openDirection: 'LEFT'  },
+  { id: 708, type: 'DOOR',        x: 610,  y: 420, width: 36, rotation: 0, label: 'ACC Bay 2 Door',             openDirection: 'LEFT'  },
+  { id: 709, type: 'DOOR',        x: 700,  y: 420, width: 36, rotation: 0, label: 'ACC Bay 3 Door',             openDirection: 'LEFT'  },
+  { id: 710, type: 'DOOR',        x: 800,  y: 420, width: 36, rotation: 0, label: 'ACC Bay 4 (WSO) Door',       openDirection: 'LEFT'  },
+  { id: 711, type: 'DOOR',        x: 900,  y: 420, width: 36, rotation: 0, label: 'APP Room Door',              openDirection: 'LEFT'  },
+  // Corridor access & stairs/lift
+  { id: 712, type: 'ACCESS_DOOR', x: 320,  y: 400, width: 16, rotation: 0, label: 'Corridor Access Point A'                           },
+  { id: 713, type: 'ACCESS_DOOR', x: 640,  y: 400, width: 16, rotation: 0, label: 'Corridor Access Point B'                           },
+  { id: 714, type: 'STAIRS',      x: 246,  y: 295, width: 40, rotation: 0, label: 'Staircase FF-1'                                    },
+  { id: 736, type: 'STAIRS',      x: 900,  y: 295, width: 40, rotation: 0, label: 'Staircase FF-2'                                    },
+  { id: 737, type: 'DOOR',        x: 465,  y: 470, width: 28, rotation: 0, label: 'IT Store Door',              openDirection: 'RIGHT' },
 ];
 
 const ARCH_ELEMENT_TYPES: { type: ArchElementType; label: string; icon: string }[] = [
@@ -298,7 +753,7 @@ const distToSegment = distToSegmentShared;
 const drawWallOnCanvas = drawWallOnCanvasShared;
 const drawArchElement = drawArchElementShared;
 
-const CAMERA_RANGE = 200;
+const CAMERA_RANGE = 100;
 
 interface SurveillanceStreamProps {
   cameraId: number;
@@ -433,11 +888,10 @@ export default function LayoutEditor() {
           activeSiteId, activeBuildingId,
           setSites, setBuildings, setActiveSite, setActiveBuilding } = useStore();
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const floorPlanImgRef = useRef<HTMLImageElement | null>(null);
-  const floorPlanLoadedRef = useRef<string>('');
-  const [floorPlanVersion, setFloorPlanVersion] = useState(0);
   const campusCanvasRef = useRef<HTMLCanvasElement>(null);
   const canvasAreaRef = useRef<HTMLDivElement>(null);
+  const blueprintImageCacheRef = useRef<Record<number, HTMLImageElement>>({});
+  const [blueprintVersion, setBlueprintVersion] = useState(0);
   const [canvasSize, setCanvasSize] = useState({ width: 1200, height: 800 });
   const [activeFloor, setActiveFloor] = useState(1);
   const [tool, setTool] = useState<EditorTool>('select');
@@ -536,8 +990,34 @@ export default function LayoutEditor() {
   const [measureUnit, setMeasureUnit] = useState<MeasureUnit>('ft');
   const [pxPerFoot, setPxPerFoot] = useState(20);
   const [snapToGrid, setSnapToGrid] = useState(true);
-  const [showDimensions, setShowDimensions] = useState(true);
-  const [showCoverageHeatmap, setShowCoverageHeatmap] = useState(true);
+  const [showDimensions, setShowDimensions] = useState(false);
+  const [showCoverageHeatmap, setShowCoverageHeatmap] = useState(false);
+  const [showCameraLabels, setShowCameraLabels] = useState(false);
+  const [showZoneLabels, setShowZoneLabels] = useState(false);
+  const [showDxfLabels, setShowDxfLabels] = useState(true);
+  const [showWallsLayer, setShowWallsLayer] = useState(true);
+  const [showDoorsLayer, setShowDoorsLayer] = useState(true);
+  const [showWindowsLayer, setShowWindowsLayer] = useState(true);
+  const [showStairsLayer, setShowStairsLayer] = useState(true);
+  const [showLiftsLayer, setShowLiftsLayer] = useState(true);
+  const [showZonesLayer, setShowZonesLayer] = useState(true);
+  const [showCamerasLayer, setShowCamerasLayer] = useState(true);
+  // Default to programmatic blueprint (accurate walls from CAD trace).
+  // Toggle to Plan Image for the raw CAD photo, or enable both for overlay.
+  const [showPlanOverlay, setShowPlanOverlay] = useState(false);
+  const [showStructureOverlay, setShowStructureOverlay] = useState(true);
+
+  useEffect(() => {
+    const src = FLOOR_BLUEPRINT_IMAGES[activeFloor];
+    if (!src) return;
+    if (blueprintImageCacheRef.current[activeFloor]?.src.endsWith(src)) return;
+    const img = new Image();
+    img.src = src;
+    img.onload = () => {
+      blueprintImageCacheRef.current[activeFloor] = img;
+      setBlueprintVersion((v) => v + 1);
+    };
+  }, [activeFloor]);
   const [hoveredCamId, setHoveredCamId] = useState<number | null>(null);
 
   const coveragePercentage = useMemo(() => {
@@ -545,12 +1025,14 @@ export default function LayoutEditor() {
     const activeCams = placedCams.filter(c => c.status !== 'OFFLINE');
     if (activeCams.length === 0) return 0;
 
-    const startX = 80;
-    const endX = 1120;
-    const startY = 80;
-    const endY = 720;
-    const stepX = 26; // 40 steps across 1040px
-    const stepY = 25.6; // 25 steps across 640px
+    const bounds = getFloorBoundsShared(canvasSize.width, canvasSize.height);
+    const startX = bounds.left;
+    const endX = bounds.right;
+    const startY = bounds.top;
+    const endY = bounds.bottom;
+    const step = Math.max(8, pxPerFoot);
+    const stepX = step;
+    const stepY = step;
 
     let totalPoints = 0;
     let coveredPoints = 0;
@@ -598,7 +1080,7 @@ export default function LayoutEditor() {
     }
 
     return totalPoints > 0 ? (coveredPoints / totalPoints) * 100 : 0;
-  }, [placedCams]);
+  }, [placedCams, canvasSize.width, canvasSize.height, pxPerFoot]);
 
   // Camera Drag State
   const [draggedCamId, setDraggedCamId] = useState<number | null>(null);
@@ -641,10 +1123,258 @@ export default function LayoutEditor() {
     return getFloorBoundsShared(width, height);
   }, []);
 
+  const fittedDxfLabels = useMemo<DxfLabel[]>(() => {
+    // Level 0 = Ground Floor, Level 1 = Area A (no DXF source), Level 2 = First Floor
+    if (activeFloor === 0) {
+      return mapDxfLabelsToFittedWalls(ALPHA2_GROUND_WALLS_DXF, walls, ALPHA2_GROUND_LABELS_DXF);
+    }
+    if (activeFloor === 1) {
+      // Area A has no DXF source — hand-coded walls only, no overlay labels
+      return [];
+    }
+    // Level 2 = First Floor
+    return mapDxfLabelsToFittedWalls(ALPHA2_FIRST_WALLS_DXF, walls, ALPHA2_FIRST_LABELS_DXF);
+  }, [activeFloor, walls]);
+
   const clampToFloorBounds = useCallback((x: number, y: number, radius = 12) => {
-    const b = getFloorBounds(1200, 800);
+    const b = getFloorBounds(canvasSize.width, canvasSize.height);
     return clampToFloorBoundsShared(x, y, b, radius);
-  }, [getFloorBounds]);
+  }, [canvasSize.height, canvasSize.width, getFloorBounds]);
+
+  const optimizeCameraDirections = useCallback((
+    cams: CamOnCanvas[],
+    zonesInput: ZoneOnCanvas[],
+    bounds: FloorBounds
+  ): CamOnCanvas[] => {
+    if (cams.length === 0) return cams;
+    const zones = zonesInput.filter((z) => z.points.length >= 3 && z.is_active !== false);
+    const zoneCentroid = (z: ZoneOnCanvas) => ({
+      x: z.points.reduce((s, p) => s + p.x, 0) / z.points.length,
+      y: z.points.reduce((s, p) => s + p.y, 0) / z.points.length,
+    });
+    const normalizeDeg = (d: number) => ((d % 360) + 360) % 360;
+    const angleTo = (x1: number, y1: number, x2: number, y2: number) =>
+      normalizeDeg((Math.atan2(y2 - y1, x2 - x1) * 180) / Math.PI);
+
+    const sampleStep = Math.max(8, pxPerFoot);
+    const samples: { x: number; y: number }[] = [];
+    for (let x = bounds.left + sampleStep / 2; x < bounds.right; x += sampleStep) {
+      for (let y = bounds.top + sampleStep / 2; y < bounds.bottom; y += sampleStep) {
+        samples.push({ x, y });
+      }
+    }
+    const camCovers = (cam: CamOnCanvas, px: number, py: number) => {
+      if (cam.status === 'OFFLINE') return false;
+      const dx = px - cam.x;
+      const dy = py - cam.y;
+      const distSq = dx * dx + dy * dy;
+      if (distSq > CAMERA_RANGE * CAMERA_RANGE) return false;
+      const angleToPoint = Math.atan2(dy, dx);
+      let diff = angleToPoint - (cam.angle * Math.PI) / 180;
+      while (diff < -Math.PI) diff += Math.PI * 2;
+      while (diff > Math.PI) diff -= Math.PI * 2;
+      return Math.abs(diff) <= ((cam.fov * Math.PI) / 180) / 2;
+    };
+
+    const adjusted = cams.map((cam) => {
+      const clamped = clampToFloorBoundsShared(cam.x, cam.y, bounds, 14);
+      return { ...cam, x: clamped.x, y: clamped.y };
+    });
+
+    for (let i = 0; i < adjusted.length; i++) {
+      const cam = adjusted[i];
+      if (cam.status === 'OFFLINE') continue;
+      const containing = zones.find((z) => isPointInPolygonShared({ x: cam.x, y: cam.y }, z.points));
+      let target = { x: (bounds.left + bounds.right) / 2, y: (bounds.top + bounds.bottom) / 2 };
+      if (containing) {
+        target = zoneCentroid(containing);
+      } else if (zones.length > 0) {
+        const nearest = [...zones].sort((a, b) => {
+          const ca = zoneCentroid(a);
+          const cb = zoneCentroid(b);
+          return ((ca.x - cam.x) ** 2 + (ca.y - cam.y) ** 2) - ((cb.x - cam.x) ** 2 + (cb.y - cam.y) ** 2);
+        })[0];
+        target = zoneCentroid(nearest);
+      }
+
+      const base = angleTo(cam.x, cam.y, target.x, target.y);
+      const candidateAngles = Array.from(new Set([
+        normalizeDeg(cam.angle),
+        base,
+        normalizeDeg(base - 25),
+        normalizeDeg(base + 25),
+        normalizeDeg(base - 50),
+        normalizeDeg(base + 50),
+        normalizeDeg(base - 75),
+        normalizeDeg(base + 75),
+      ]));
+
+      const others = adjusted.filter((_, idx) => idx !== i);
+      let bestAngle = cam.angle;
+      let bestScore = -1;
+      for (const cand of candidateAngles) {
+        const candidateCam = { ...cam, angle: cand };
+        let score = 0;
+        for (const s of samples) {
+          const coveredByOthers = others.some((o) => camCovers(o, s.x, s.y));
+          if (!coveredByOthers && camCovers(candidateCam, s.x, s.y)) score++;
+        }
+        if (score > bestScore) {
+          bestScore = score;
+          bestAngle = cand;
+        }
+      }
+      adjusted[i] = { ...cam, angle: bestAngle };
+    }
+
+    return adjusted;
+  }, [pxPerFoot]);
+
+  const autoAlignCameras = useCallback((silent = false) => {
+    if (placedCams.length === 0) return;
+    const bounds = getFloorBounds(canvasSize.width, canvasSize.height);
+    const optimized = optimizeCameraDirections(placedCams, drawnZones, bounds);
+    const changed = optimized.some((c, i) => {
+      const p = placedCams[i];
+      if (!p) return true;
+      return Math.abs(c.x - p.x) > 0.5 || Math.abs(c.y - p.y) > 0.5 || Math.abs(c.angle - p.angle) > 0.5;
+    });
+    if (changed) {
+      setPlacedCams(optimized);
+      setIsDirty(true);
+      if (!silent) {
+        addToast('Cameras aligned inward and optimized for blind-spot reduction', 'success');
+      }
+    } else if (!silent) {
+      addToast('Camera directions already optimized', 'info');
+    }
+  }, [addToast, canvasSize.height, canvasSize.width, drawnZones, getFloorBounds, optimizeCameraDirections, placedCams]);
+
+  const autoPlaceCamerasNoBlindSpots = useCallback(() => {
+    const bounds = getFloorBounds(canvasSize.width, canvasSize.height);
+    const sampleStep = Math.max(20, pxPerFoot * 1.2);
+    const margin = 20;
+    const fov = 110;
+    const coverageTarget = 0.995; // 99.5%
+    const maxCams = 40;
+
+    const samples: { x: number; y: number }[] = [];
+    for (let x = bounds.left + sampleStep / 2; x < bounds.right; x += sampleStep) {
+      for (let y = bounds.top + sampleStep / 2; y < bounds.bottom; y += sampleStep) {
+        samples.push({ x, y });
+      }
+    }
+    if (samples.length === 0) {
+      addToast('Unable to sample floor for camera optimization', 'error');
+      return;
+    }
+
+    const candidateStep = Math.max(80, CAMERA_RANGE * 0.65);
+    const xs = [];
+    const ys = [];
+    for (let x = bounds.left + margin; x <= bounds.right - margin; x += candidateStep) xs.push(x);
+    for (let y = bounds.top + margin; y <= bounds.bottom - margin; y += candidateStep) ys.push(y);
+    if (xs.length === 0) xs.push((bounds.left + bounds.right) / 2);
+    if (ys.length === 0) ys.push((bounds.top + bounds.bottom) / 2);
+
+    const centerX = (bounds.left + bounds.right) / 2;
+    const centerY = (bounds.top + bounds.bottom) / 2;
+    const candidateAngles = [0, 45, 90, 135, 180, 225, 270, 315];
+    const cameraCoversPoint = (camX: number, camY: number, camAngle: number, px: number, py: number) => {
+      const dx = px - camX;
+      const dy = py - camY;
+      const distSq = dx * dx + dy * dy;
+      if (distSq > CAMERA_RANGE * CAMERA_RANGE) return false;
+      const angleToPoint = Math.atan2(dy, dx);
+      let diff = angleToPoint - (camAngle * Math.PI) / 180;
+      while (diff < -Math.PI) diff += Math.PI * 2;
+      while (diff > Math.PI) diff -= Math.PI * 2;
+      return Math.abs(diff) <= ((fov * Math.PI) / 180) / 2;
+    };
+
+    const candidates: { x: number; y: number; angle: number; covered: number[] }[] = [];
+    for (const x of xs) {
+      for (const y of ys) {
+        for (const angle of candidateAngles) {
+          const covered: number[] = [];
+          for (let i = 0; i < samples.length; i++) {
+            const s = samples[i];
+            if (cameraCoversPoint(x, y, angle, s.x, s.y)) covered.push(i);
+          }
+          if (covered.length > 0) {
+            candidates.push({ x, y, angle, covered });
+          }
+        }
+      }
+    }
+
+    if (candidates.length === 0) {
+      addToast('No valid camera candidates for optimization', 'error');
+      return;
+    }
+
+    // Greedy set cover
+    const uncovered = new Uint8Array(samples.length);
+    uncovered.fill(1);
+    let remaining = samples.length;
+    const selected: { x: number; y: number; angle: number }[] = [];
+    const used = new Uint8Array(candidates.length);
+
+    while (remaining / samples.length > (1 - coverageTarget) && selected.length < maxCams) {
+      let bestIdx = -1;
+      let bestScore = 0;
+      for (let i = 0; i < candidates.length; i++) {
+        if (used[i]) continue;
+        const cand = candidates[i];
+        let gain = 0;
+        for (const idx of cand.covered) {
+          if (uncovered[idx]) gain++;
+        }
+        // Prefer inward-facing tie-breaks
+        if (gain > bestScore) {
+          bestScore = gain;
+          bestIdx = i;
+        } else if (gain === bestScore && gain > 0 && bestIdx >= 0) {
+          const a = candidates[i];
+          const b = candidates[bestIdx];
+          const inwardA = Math.abs(Math.cos(((Math.atan2(centerY - a.y, centerX - a.x) * 180 / Math.PI - a.angle) * Math.PI) / 180));
+          const inwardB = Math.abs(Math.cos(((Math.atan2(centerY - b.y, centerX - b.x) * 180 / Math.PI - b.angle) * Math.PI) / 180));
+          if (inwardA > inwardB) bestIdx = i;
+        }
+      }
+      if (bestIdx < 0 || bestScore === 0) break;
+      used[bestIdx] = 1;
+      const best = candidates[bestIdx];
+      selected.push({ x: best.x, y: best.y, angle: best.angle });
+      for (const idx of best.covered) {
+        if (uncovered[idx]) {
+          uncovered[idx] = 0;
+          remaining--;
+        }
+      }
+    }
+
+    const autoCams: CamOnCanvas[] = selected.map((c, i) => ({
+      id: Date.now() + i,
+      x: c.x,
+      y: c.y,
+      angle: c.angle,
+      fov,
+      name: `AUTO-CAM-${String(i + 1).padStart(2, '0')}`,
+      status: 'ACTIVE',
+      rtsp_url: `rtsp://127.0.0.1:8554/auto_${Date.now()}_${i + 1}`,
+      location: `Auto placement ${i + 1}`,
+      is_overhead: true,
+    }));
+
+    const aligned = optimizeCameraDirections(autoCams, drawnZones, bounds);
+    setPlacedCams(aligned);
+    setSelectedCam(null);
+    setIsDirty(true);
+
+    const finalCoverage = ((samples.length - remaining) / samples.length) * 100;
+    addToast(`Auto placed ${aligned.length} cameras • Coverage ${finalCoverage.toFixed(1)}%`, finalCoverage >= 99 ? 'success' : 'info');
+  }, [addToast, canvasSize.height, canvasSize.width, drawnZones, getFloorBounds, optimizeCameraDirections, pxPerFoot]);
 
   // Apply grid snapping
   const snapPos = useCallback((x: number, y: number): { x: number; y: number } => {
@@ -666,16 +1396,33 @@ export default function LayoutEditor() {
 
   // Sync with store cameras/zones on floor change or initial loading
   useEffect(() => {
-    // Populate walls and archElements regardless of token
+    // Always reset to CAD-first view on floor switch so DXF conversion is clearly visible.
+    setShowPlanOverlay(false);
+    setShowStructureOverlay(true);
+    setShowDxfLabels(true);
+    setShowDimensions(false);
+    setShowWallsLayer(true);
+    setShowDoorsLayer(true);
+    setShowWindowsLayer(true);
+    setShowStairsLayer(true);
+    setShowLiftsLayer(true);
+    setShowZonesLayer(true);
+    setShowCamerasLayer(true);
+
+    // Populate walls and archElements — use pixel-accurate blueprint data traced from CAD images.
+    // Level mapping: 0 = Ground Floor, 1 = Area A (Intermediate), 2 = First Floor
     if (activeFloor === 0) {
-      setWalls(GF_WALLS);
-      setArchElements(GF_ARCH_ELEMENTS);
+      setWalls(GF_WALLS_ACCURATE.map((wall) => ({ ...wall })));
+      setArchElements(GF_ARCH_ACCURATE.map((el) => ({ ...el })));
     } else if (activeFloor === 1) {
-      setWalls(AA_WALLS);
-      setArchElements(AA_ARCH_ELEMENTS);
+      setWalls(AA_WALLS_ACCURATE.map((wall) => ({ ...wall })));
+      setArchElements(AA_ARCH_ACCURATE.map((el) => ({ ...el })));
     } else if (activeFloor === 2) {
-      setWalls(FF_WALLS);
-      setArchElements(FF_ARCH_ELEMENTS);
+      setWalls(FF_WALLS_ACCURATE.map((wall) => ({ ...wall })));
+      setArchElements(FF_ARCH_ACCURATE.map((el) => ({ ...el })));
+    } else {
+      setWalls(GF_WALLS_ACCURATE.map((wall) => ({ ...wall })));
+      setArchElements(GF_ARCH_ACCURATE.map((el) => ({ ...el })));
     }
 
     if (token && token !== 'demo-token') {
@@ -709,125 +1456,81 @@ export default function LayoutEditor() {
       setDrawnZones(floorZones);
       setIsDirty(false);
     } else {
-      // ── Demo fallback: Alpha-2 ATS Complex, Kempegowda International Airport (BIAL) ────
-      // Floor plan source: Location Maps.pdf  |  Scale: 41 m × 25 m → ~25 px/m
-      // Canvas origin (80,80), right edge 1120, bottom edge 720
-
+      // Demo mode — seed accurate room zones and default CCTV cameras.
       if (activeFloor === 0) {
-        // ════════════════════════════════════════════════════════════════
-        //  GROUND FLOOR ALPHA-2
-        //  Key areas: Canteen, Lobby/Lift, Electrical Room, Toilets,
-        //  Reception, Area of Stay, Storage/Legal, Monitor Room, Director Offices
-        // ════════════════════════════════════════════════════════════════
-        setPlacedCams(KEMPEGOWDA_CAMERAS.map(c => ({
-          id: c.id, x: c.x, y: c.y, angle: c.angle, fov: c.fov,
-          name: c.name, status: c.status,
-          rtsp_url: `rtsp://10.0.1.${c.id - 9000}:554/stream1`,
-          location: c.location, is_overhead: c.is_overhead,
-        })));
-        setDrawnZones([
-          { id: 101, name: 'LT MCC HV Electrical Room', type: 'RESTRICTED', color: ZONE_COLORS.RESTRICTED, dwell_alert_seconds: 0, is_active: true,
-            points: [{ x: 340, y:  80 }, { x: 555, y:  80 }, { x: 555, y: 280 }, { x: 340, y: 280 }] },
-          { id: 102, name: 'BIAL Canteen — Dining Area', type: 'DWELL', color: ZONE_COLORS.DWELL, dwell_alert_seconds: 3600, is_active: true,
-            points: [{ x:  80, y: 340 }, { x: 340, y: 340 }, { x: 340, y: 720 }, { x:  80, y: 720 }] },
-          { id: 103, name: 'Reception Lobby', type: 'LOUNGE', color: ZONE_COLORS.LOUNGE, dwell_alert_seconds: 900, is_active: true,
-            points: [{ x: 635, y:  80 }, { x: 855, y:  80 }, { x: 855, y: 280 }, { x: 635, y: 280 }] },
-          { id: 104, name: 'Storage / Legal Room', type: 'RESTRICTED', color: ZONE_COLORS.RESTRICTED, dwell_alert_seconds: 0, is_active: true,
-            points: [{ x: 635, y: 440 }, { x: 760, y: 440 }, { x: 760, y: 560 }, { x: 635, y: 560 }] },
-          { id: 105, name: 'Data Office', type: 'RESTRICTED', color: ZONE_COLORS.RESTRICTED, dwell_alert_seconds: 0, is_active: true,
-            points: [{ x: 890, y:  80 }, { x: 1010, y:  80 }, { x: 1010, y: 400 }, { x: 890, y: 400 }] },
-          { id: 106, name: 'Area of Stay — Waiting', type: 'DWELL', color: ZONE_COLORS.DWELL, dwell_alert_seconds: 1800, is_active: true,
-            points: [{ x: 555, y: 280 }, { x: 635, y: 280 }, { x: 635, y: 440 }, { x: 555, y: 440 }] },
-          { id: 107, name: 'Main Entry Tripwire', type: 'TRIPWIRE', color: ZONE_COLORS.TRIPWIRE, dwell_alert_seconds: 0, is_active: true,
-            points: [{ x:  80, y:  80 }, { x: 200, y:  80 }, { x: 200, y: 140 }, { x:  80, y: 140 }] },
-          { id: 108, name: 'South Exit Tripwire', type: 'TRIPWIRE', color: ZONE_COLORS.TRIPWIRE, dwell_alert_seconds: 0, is_active: true,
-            points: [{ x:  80, y: 660 }, { x: 200, y: 660 }, { x: 200, y: 720 }, { x:  80, y: 720 }] },
-          { id: 109, name: 'Airport Director Offices', type: 'RESTRICTED', color: ZONE_COLORS.RESTRICTED, dwell_alert_seconds: 0, is_active: true,
-            points: [{ x: 1010, y:  80 }, { x: 1120, y:  80 }, { x: 1120, y: 400 }, { x: 1010, y: 400 }] },
-          { id: 110, name: 'AFSB Misc Office', type: 'RESTRICTED', color: ZONE_COLORS.RESTRICTED, dwell_alert_seconds: 0, is_active: true,
-            points: [{ x: 890, y: 400 }, { x: 1010, y: 400 }, { x: 1010, y: 560 }, { x: 890, y: 560 }] },
-          { id: 111, name: 'Right Toilets block', type: 'DWELL', color: ZONE_COLORS.DWELL, dwell_alert_seconds: 600, is_active: true,
-            points: [{ x: 1010, y: 400 }, { x: 1120, y: 400 }, { x: 1120, y: 560 }, { x: 1010, y: 560 }] },
-          { id: 112, name: 'Director Entry & Corridor', type: 'DWELL', color: ZONE_COLORS.DWELL, dwell_alert_seconds: 900, is_active: true,
-            points: [{ x: 890, y: 560 }, { x: 1120, y: 560 }, { x: 1120, y: 720 }, { x: 890, y: 720 }] }
-        ]);
+        setPlacedCams(GF_CAMERAS_DEFAULT.map(c => ({ ...c })));
+        setDrawnZones(GF_ZONES_ACCURATE.map(z => ({ ...z })));
       } else if (activeFloor === 1) {
-        // ════════════════════════════════════════════════════════════════
-        //  AREA A — INTERMEDIATE FLOOR
-        // ════════════════════════════════════════════════════════════════
-        setPlacedCams(ALPHA2_AREA_A_CAMERAS.map(c => ({
-          id: c.id, x: c.x, y: c.y, angle: c.angle, fov: c.fov,
-          name: c.name, status: c.status,
-          rtsp_url: `rtsp://10.0.2.${c.id - 9100}:554/stream1`,
-          location: c.location, is_overhead: c.is_overhead,
-        })));
-        setDrawnZones([
-          { id: 301, name: 'CMS Server Room', type: 'RESTRICTED', color: ZONE_COLORS.RESTRICTED, dwell_alert_seconds: 0, is_active: true,
-            points: [{ x:  80, y: 300 }, { x: 340, y: 300 }, { x: 340, y: 490 }, { x:  80, y: 490 }] },
-          { id: 302, name: 'Automation Server Room (AMS)', type: 'RESTRICTED', color: ZONE_COLORS.RESTRICTED, dwell_alert_seconds: 0, is_active: true,
-            points: [{ x:  80, y: 490 }, { x: 255, y: 490 }, { x: 255, y: 720 }, { x:  80, y: 720 }] },
-          { id: 303, name: 'Cyber Security & AMS TAC Room', type: 'RESTRICTED', color: ZONE_COLORS.RESTRICTED, dwell_alert_seconds: 0, is_active: true,
-            points: [{ x: 255, y: 490 }, { x: 440, y: 490 }, { x: 440, y: 720 }, { x: 255, y: 720 }] },
-          { id: 304, name: 'UHF/VCS/Data/GTR Room', type: 'RESTRICTED', color: ZONE_COLORS.RESTRICTED, dwell_alert_seconds: 0, is_active: true,
-            points: [{ x: 440, y: 490 }, { x: 590, y: 490 }, { x: 590, y: 720 }, { x: 440, y: 720 }] },
-          { id: 305, name: 'Battery Room', type: 'RESTRICTED', color: ZONE_COLORS.RESTRICTED, dwell_alert_seconds: 0, is_active: true,
-            points: [{ x: 590, y: 490 }, { x: 740, y: 490 }, { x: 740, y: 720 }, { x: 590, y: 720 }] },
-          { id: 306, name: 'Fallback Servers Room', type: 'RESTRICTED', color: ZONE_COLORS.RESTRICTED, dwell_alert_seconds: 0, is_active: true,
-            points: [{ x: 890, y: 490 }, { x: 1120, y: 490 }, { x: 1120, y: 720 }, { x: 890, y: 720 }] },
-          { id: 307, name: 'CHS Executives Room', type: 'RESTRICTED', color: ZONE_COLORS.RESTRICTED, dwell_alert_seconds: 0, is_active: true,
-            points: [{ x: 620, y:  80 }, { x: 860, y:  80 }, { x: 860, y: 300 }, { x: 620, y: 300 }] },
-          { id: 308, name: 'Commercial Zone', type: 'LOUNGE', color: ZONE_COLORS.LOUNGE, dwell_alert_seconds: 1200, is_active: true,
-            points: [{ x:  80, y:  80 }, { x: 340, y:  80 }, { x: 340, y: 170 }, { x:  80, y: 170 }] },
-          { id: 309, name: 'Area A Entry Tripwire', type: 'TRIPWIRE', color: ZONE_COLORS.TRIPWIRE, dwell_alert_seconds: 0, is_active: true,
-            points: [{ x:  80, y:  80 }, { x: 200, y:  80 }, { x: 200, y: 140 }, { x:  80, y: 140 }] },
-        ]);
+        setPlacedCams(AA_CAMERAS_DEFAULT.map(c => ({ ...c })));
+        setDrawnZones(AA_ZONES_ACCURATE.map(z => ({ ...z })));
       } else if (activeFloor === 2) {
-        // ════════════════════════════════════════════════════════════════
-        //  FIRST FLOOR ALPHA-2
-        // ════════════════════════════════════════════════════════════════
-        setPlacedCams(ALPHA2_FF_CAMERAS.map(c => ({
-          id: c.id, x: c.x, y: c.y, angle: c.angle, fov: c.fov,
-          name: c.name, status: c.status,
-          rtsp_url: `rtsp://10.0.3.${c.id - 9200}:554/stream1`,
-          location: c.location, is_overhead: c.is_overhead,
-        })));
-        setDrawnZones([
-          { id: 501, name: 'Security Check Area', type: 'LOUNGE', color: '#22c55e', dwell_alert_seconds: 1200, is_active: true,
-            points: [{ x: 240, y: 240 }, { x: 384, y: 240 }, { x: 384, y: 380 }, { x: 240, y: 380 }] },
-          { id: 502, name: 'Training Area', type: 'DWELL', color: '#f59e0b', dwell_alert_seconds: 3600, is_active: true,
-            points: [{ x: 384, y: 240 }, { x: 528, y: 240 }, { x: 528, y: 380 }, { x: 384, y: 380 }] },
-          { id: 503, name: 'Control Office', type: 'DWELL', color: '#3b82f6', dwell_alert_seconds: 1800, is_active: true,
-            points: [{ x: 528, y: 240 }, { x: 672, y: 240 }, { x: 672, y: 380 }, { x: 528, y: 380 }] },
-          { id: 504, name: 'Recreation Room', type: 'LOUNGE', color: '#22c55e', dwell_alert_seconds: 1200, is_active: true,
-            points: [{ x: 672, y: 240 }, { x: 816, y: 240 }, { x: 816, y: 380 }, { x: 672, y: 380 }] },
-          { id: 505, name: 'Utility Room', type: 'DWELL', color: '#6b7280', dwell_alert_seconds: 900, is_active: true,
-            points: [{ x: 816, y: 240 }, { x: 960, y: 240 }, { x: 960, y: 380 }, { x: 816, y: 380 }] },
-          { id: 506, name: 'STM Telecom Room', type: 'RESTRICTED', color: '#ff0055', dwell_alert_seconds: 0, is_active: true,
-            points: [{ x: 240, y: 420 }, { x: 360, y: 420 }, { x: 360, y: 560 }, { x: 240, y: 560 }] },
-          { id: 507, name: 'ACC Room - Bay 1', type: 'RESTRICTED', color: '#ff0055', dwell_alert_seconds: 0, is_active: true,
-            points: [{ x: 360, y: 420 }, { x: 480, y: 420 }, { x: 480, y: 560 }, { x: 360, y: 560 }] },
-          { id: 508, name: 'ACC Room - Bay 2', type: 'RESTRICTED', color: '#ff0055', dwell_alert_seconds: 0, is_active: true,
-            points: [{ x: 480, y: 420 }, { x: 600, y: 420 }, { x: 600, y: 560 }, { x: 480, y: 560 }] },
-          { id: 509, name: 'ACC Room - Bay 3', type: 'RESTRICTED', color: '#ff0055', dwell_alert_seconds: 0, is_active: true,
-            points: [{ x: 600, y: 420 }, { x: 720, y: 420 }, { x: 720, y: 560 }, { x: 600, y: 560 }] },
-          { id: 510, name: 'ACC Room - Bay 4 (WSO)', type: 'RESTRICTED', color: '#ff0055', dwell_alert_seconds: 0, is_active: true,
-            points: [{ x: 720, y: 420 }, { x: 840, y: 420 }, { x: 840, y: 560 }, { x: 720, y: 560 }] },
-          { id: 511, name: 'APP Room', type: 'RESTRICTED', color: '#ff0055', dwell_alert_seconds: 0, is_active: true,
-            points: [{ x: 840, y: 420 }, { x: 960, y: 420 }, { x: 960, y: 560 }, { x: 840, y: 560 }] },
-        ]);
+        setPlacedCams(FF_CAMERAS_DEFAULT.map(c => ({ ...c })));
+        setDrawnZones(FF_ZONES_ACCURATE.map(z => ({ ...z })));
+      } else {
+        setPlacedCams(GF_CAMERAS_DEFAULT.map(c => ({ ...c })));
+        setDrawnZones(GF_ZONES_ACCURATE.map(z => ({ ...z })));
       }
       setIsDirty(false);
     }
     clearSelections();
   }, [activeFloor, token, cameras, zones, clearSelections, currentBuildingId]);
 
+  // Keep built-in plan templates fitted accurately to the dynamic floor bounds.
+  // NOTE: The accurate blueprint data (GF/AA/FF_WALLS_ACCURATE) is already positioned
+  // in the correct canvas coordinate space, so the fit function must NOT be applied —
+  // it would rescale/shift the walls to wrong positions.
+  useEffect(() => {
+    // Accurate data has walls from ~(80,80) to ~(1120,720) matching canvas bounds already.
+    // Detect accurate data: our perimeter walls always have id >= 1001.
+    const isAccurateData = walls.length > 0 && walls[0].id >= 1001;
+    if (isAccurateData) return; // Skip rescaling — already correct
+
+    const bounds = getFloorBounds(canvasSize.width, canvasSize.height);
+    const fitted = fitLayoutTemplateToBoundsShared(walls, archElements, bounds);
+
+    const wallShift =
+      fitted.walls.length !== walls.length ||
+      fitted.walls.some((w, i) => {
+        const cur = walls[i];
+        return !cur || Math.abs(w.startX - cur.startX) > 0.5 || Math.abs(w.endX - cur.endX) > 0.5 || Math.abs(w.startY - cur.startY) > 0.5 || Math.abs(w.endY - cur.endY) > 0.5;
+      });
+    if (wallShift) setWalls(fitted.walls);
+
+    const archShift =
+      fitted.archElements.length !== archElements.length ||
+      fitted.archElements.some((a, i) => {
+        const cur = archElements[i];
+        return !cur || Math.abs(a.x - cur.x) > 0.5 || Math.abs(a.y - cur.y) > 0.5 || Math.abs(a.width - cur.width) > 0.5;
+      });
+    if (archShift) setArchElements(fitted.archElements);
+  }, [activeFloor, archElements, canvasSize.height, canvasSize.width, getFloorBounds, walls]);
+
   const liveTracks = useStore((state) => state.tracks);
 
   // spawnAgents now accepts either inline (from HUD presets) or spawns default agents
   const spawnAgents = useCallback((freshAgents?: SimulatorAgent[]) => {
+    let minX = canvasSize.width * 0.1;
+    let maxX = canvasSize.width * 0.9;
+    let minY = canvasSize.height * 0.1;
+    let maxY = canvasSize.height * 0.9;
+
     const floorBounds = getFloorBounds(canvasSize.width, canvasSize.height);
-    const width = floorBounds.right - floorBounds.left;
-    const height = floorBounds.bottom - floorBounds.top;
+    if (floorBounds) {
+      minX = floorBounds.left;
+      maxX = floorBounds.right;
+      minY = floorBounds.top;
+      maxY = floorBounds.bottom;
+    }
+
+    if (walls.length > 0) {
+      minX = Math.min(...walls.map(w => Math.min(w.startX, w.endX)));
+      maxX = Math.max(...walls.map(w => Math.max(w.startX, w.endX)));
+      minY = Math.min(...walls.map(w => Math.min(w.startY, w.endY)));
+      maxY = Math.max(...walls.map(w => Math.max(w.startY, w.endY)));
+    }
+
+    const width = maxX - minX;
+    const height = maxY - minY;
     if (freshAgents) {
       // From HUD preset — just load them
       setSimulatorAgents(freshAgents);
@@ -838,12 +1541,13 @@ export default function LayoutEditor() {
     const base = Date.now();
     const count = Math.max(1, Math.min(64, spawnCount));
     const fresh: SimulatorAgent[] = Array.from({ length: count }).map((_, i) => {
-      const x = floorBounds.left + ((i + 1) / (count + 1)) * width;
-      const y = floorBounds.top + ((i * 73) % Math.max(60, Math.floor(height))) + 20;
+      // Spawn inside the bounding box of the walls (plus a slight inset so they are inside)
+      const x = minX + 20 + ((i + 1) / (count + 1)) * Math.max(20, width - 40);
+      const y = minY + 20 + ((i * 73) % Math.max(40, Math.floor(height - 40)));
       return {
         id: `sim-agent-${base + i}`,
         x,
-        y: Math.min(floorBounds.bottom - 20, y),
+        y: Math.min(maxY - 20, y),
         vx: 0, vy: 0,
         speed: 40 + (i % 5) * 8,
         behavior: spawnBehavior,
@@ -855,7 +1559,9 @@ export default function LayoutEditor() {
     setSimulatorAgents(fresh);
     setSimulatorTick(0);
     addToast(`Spawned ${fresh.length} simulation agents`, 'success');
-  }, [addToast, canvasSize.height, canvasSize.width, getFloorBounds, setSimulatorAgents, setSimulatorTick, spawnBehavior, spawnCount]);
+  }, [addToast, canvasSize.height, canvasSize.width, getFloorBounds, setSimulatorAgents, setSimulatorTick, spawnBehavior, spawnCount, walls]);
+
+
 
   const runSimulationTick = useCallback(async () => {
     if (!isSimulatorActive) return;
@@ -1134,9 +1840,9 @@ export default function LayoutEditor() {
       const isSelected = b.id === campusSelectedId;
       const isDragging = b.id === campusDragId;
       const typeColors: Record<string, { bg: string; border: string; accent: string }> = {
-        INDOOR:  { bg: 'rgba(99, 102, 241, 0.12)', border: '#6366f1', accent: '#818cf8' },
-        OUTDOOR: { bg: 'rgba(34, 197, 94, 0.12)',  border: '#22c55e', accent: '#4ade80' },
-        MIXED:   { bg: 'rgba(245, 158, 11, 0.12)', border: '#f59e0b', accent: '#fbbf24' },
+        INDOOR:  { bg: 'rgba(255, 107, 0, 0.15)',  border: '#FF6B00', accent: '#FF8C33' },
+        OUTDOOR: { bg: 'rgba(78, 205, 196, 0.15)', border: '#4ECDC4', accent: '#8cece5' },
+        MIXED:   { bg: 'rgba(200, 255, 0, 0.12)',  border: '#C8FF00', accent: '#d4ff33' },
       };
       const colors = typeColors[b.building_type] || typeColors.INDOOR;
       const typeIcon = b.building_type === 'OUTDOOR' ? '🌿' : b.building_type === 'MIXED' ? '🏗' : '🏢';
@@ -1294,38 +2000,53 @@ export default function LayoutEditor() {
     ctx.translate(panX, panY);
     ctx.scale(zoom, zoom);
 
-    // 0. Floor Plan Background Image
-    const floorPlanSrc = activeFloor === 0
-      ? '/floorplans/alpha2-1.png'
-      : activeFloor === 1
-      ? '/floorplans/alpha2-2.png'
-      : '/floorplans/alpha2-3.png';
+    const floorBounds = getFloorBounds(canvas.width, canvas.height);
 
-    const drawFloorPlan = (img: HTMLImageElement) => {
-      const destX = 80, destY = 80, destW = 1040, destH = 640;
+    // 0.3. Floor blueprint image — the real CAD floor plan (primary accurate source).
+    const floorPlanImg = blueprintImageCacheRef.current[activeFloor];
+    if (showPlanOverlay && floorPlanImg && floorPlanImg.complete) {
+      const crop = FLOOR_BLUEPRINT_CROP[activeFloor] ?? { x: 0, y: 0, w: 1, h: 1 };
+      const sx = Math.floor(floorPlanImg.width * crop.x);
+      const sy = Math.floor(floorPlanImg.height * crop.y);
+      const sw = Math.floor(floorPlanImg.width * crop.w);
+      const sh = Math.floor(floorPlanImg.height * crop.h);
+
+      // Stretch-fill to the entire floor bounds rectangle so the plan fills
+      // the workspace without any letterbox gaps.
+      const drawX = floorBounds.left;
+      const drawY = floorBounds.top;
+      const drawW = floorBounds.right - floorBounds.left;
+      const drawH = floorBounds.bottom - floorBounds.top;
+
       ctx.save();
-      ctx.globalAlpha = 0.95;
-      ctx.drawImage(img, destX, destY, destW, destH);
+      // White foundation so image whites are crisp
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(drawX, drawY, drawW, drawH);
+      ctx.drawImage(floorPlanImg, sx, sy, sw, sh, drawX, drawY, drawW, drawH);
       ctx.restore();
-    };
-
-    if (floorPlanLoadedRef.current === floorPlanSrc && floorPlanImgRef.current) {
-      drawFloorPlan(floorPlanImgRef.current);
-    } else {
-      const img = new Image();
-      img.onload = () => {
-        floorPlanImgRef.current = img;
-        floorPlanLoadedRef.current = floorPlanSrc;
-        setFloorPlanVersion(v => v + 1);
-      };
-      img.src = floorPlanSrc;
     }
 
     // 0.5. Coverage Heatmap (Blind Spot Detection)
     if (showCoverageHeatmap) {
       // Draw semi-transparent red over the entire building footprint (representing blind spots by default)
-      ctx.fillStyle = 'rgba(239, 68, 68, 0.08)'; // nice soft red for blind spots
-      ctx.fillRect(80, 80, 1040, 640);
+      let minX = floorBounds.left;
+      let maxX = floorBounds.right;
+      let minY = floorBounds.top;
+      let maxY = floorBounds.bottom;
+      if (walls.length > 0) {
+        minX = Math.min(...walls.map(w => Math.min(w.startX, w.endX)));
+        maxX = Math.max(...walls.map(w => Math.max(w.startX, w.endX)));
+        minY = Math.min(...walls.map(w => Math.min(w.startY, w.endY)));
+        maxY = Math.max(...walls.map(w => Math.max(w.startY, w.endY)));
+      }
+
+      ctx.fillStyle = 'rgba(239, 68, 68, 0.05)';
+      ctx.fillRect(
+        minX,
+        minY,
+        maxX - minX,
+        maxY - minY
+      );
 
       // Draw semi-transparent green cones for each active camera's FOV
       placedCams.forEach((cam) => {
@@ -1341,8 +2062,8 @@ export default function LayoutEditor() {
         ctx.closePath();
 
         const grad = ctx.createRadialGradient(0, 0, 0, 0, 0, CAMERA_RANGE);
-        grad.addColorStop(0, 'rgba(34, 197, 94, 0.28)'); // bright green near camera
-        grad.addColorStop(1, 'rgba(34, 197, 94, 0.02)'); // fades out
+        grad.addColorStop(0, 'rgba(34, 197, 94, 0.22)');
+        grad.addColorStop(1, 'rgba(34, 197, 94, 0.01)');
         ctx.fillStyle = grad;
         ctx.fill();
 
@@ -1350,89 +2071,104 @@ export default function LayoutEditor() {
       });
     }
 
-    // 1. Professional Blueprint Grid
-    ctx.strokeStyle = 'rgba(0, 0, 0, 0.04)';
-    ctx.lineWidth = 1;
-    for (let x = 0; x < canvas.width; x += 50) {
-      ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, canvas.height); ctx.stroke();
-    }
-    for (let y = 0; y < canvas.height; y += 50) {
-      ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(canvas.width, y); ctx.stroke();
-    }
-    // Major grid lines
-    ctx.strokeStyle = 'rgba(0, 0, 0, 0.08)';
-    for (let x = 0; x < canvas.width; x += 250) {
-      ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, canvas.height); ctx.stroke();
-    }
-    for (let y = 0; y < canvas.height; y += 250) {
-      ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(canvas.width, y); ctx.stroke();
+    // Engineering grid removed from layout to keep layout clean
+
+    // Floor boundary border removed to keep the layout clean
+
+    // 2) Draw structure overlay — only when plan image is hidden.
+    // When the real CAD image is the backdrop, suppress all vector walls/arch/labels
+    // so only ONE blueprint is ever visible at a time.
+    if (!showPlanOverlay && showStructureOverlay && showWallsLayer) {
+      walls.forEach((wall) => {
+        drawWallOnCanvas(ctx, wall, selectedWall === wall.id, pxPerFoot, measureUnit, showDimensions);
+      });
     }
 
-    // 2. Draw walls (replaces hardcoded architectural lines)
-    walls.forEach((wall) => {
-      drawWallOnCanvas(ctx, wall, selectedWall === wall.id, pxPerFoot, measureUnit, showDimensions);
-    });
-
-    const floorBounds = getFloorBounds(canvas.width, canvas.height);
-    const floorWidth = floorBounds.right - floorBounds.left;
-    const floorHeight = floorBounds.bottom - floorBounds.top;
-    const floorCenterX = floorBounds.left + floorWidth / 2;
-    const floorCenterY = floorBounds.top + floorHeight / 2;
-
-    // Security Gates / Scanners label (if demo security walls exist)
-    if (walls.some(w => w.label === 'Security Wall N') && walls.some(w => w.label === 'Security Wall S')) {
-      ctx.fillStyle = 'rgba(0, 0, 0, 0.03)';
-      const gateW = Math.max(24, Math.floor(floorWidth * 0.04));
-      const gateH = Math.max(80, Math.floor(floorHeight * 0.26));
-      const gateX = floorBounds.left + floorWidth * 0.3;
-      const gateY = floorCenterY - gateH / 2;
-      ctx.fillRect(gateX, gateY, gateW, gateH);
-      ctx.fillStyle = 'rgba(0, 0, 0, 0.35)';
-      ctx.font = '8px Outfit'; ctx.textAlign = 'center';
-      ctx.fillText('X-RAY SCANNERS', gateX + gateW / 2, gateY + gateH / 2);
+    // 3. Draw Architectural Elements (only in structure-overlay mode)
+    if (!showPlanOverlay && showStructureOverlay) {
+      archElements.forEach((el) => {
+        if (el.type === 'DOOR' || el.type === 'DOUBLE_DOOR' || el.type === 'ACCESS_DOOR') {
+          if (!showDoorsLayer) return;
+        }
+        if (el.type === 'WINDOW') {
+          if (!showWindowsLayer) return;
+        }
+        if (el.type === 'STAIRS') {
+          if (!showStairsLayer) return;
+        }
+        if (el.type === 'ELEVATOR') {
+          if (!showLiftsLayer) return;
+        }
+        drawArchElement(ctx, el, selectedArch === el.id);
+      });
     }
 
-    // Architectural Labels
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.08)';
-    const titleSize = Math.max(18, Math.min(32, Math.floor(floorWidth * 0.04)));
-    ctx.font = `bold ${titleSize}px Outfit`;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    const titleY = floorBounds.top + Math.max(24, Math.floor(floorHeight * 0.08));
-    ctx.fillText('DEPARTURES', floorBounds.left + floorWidth * 0.18, titleY);
-    ctx.fillText('SECURITY CLEARANCE', floorCenterX, titleY);
-    ctx.fillText('TERMINAL GATES', floorBounds.left + floorWidth * 0.82, titleY);
+    // 3.5 Draw DXF labels (only in structure-overlay mode)
+    if (!showPlanOverlay && showStructureOverlay && showDxfLabels && zoom >= 0.85) {
+      ctx.textAlign = 'left';
+      fittedDxfLabels.forEach((label) => {
+        ctx.font = `600 ${Math.min(12, Math.max(9, label.height * 0.85))}px Inter, sans-serif`;
+        ctx.fillStyle = 'rgba(31, 41, 55, 0.62)';
+        ctx.fillText(label.text, label.x, label.y);
+      });
+    }
 
-    // 3. Draw Architectural Elements
-    archElements.forEach((el) => {
-      drawArchElement(ctx, el, selectedArch === el.id);
-    });
-
-    // 4. Draw Zones
-    drawnZones.forEach((zone) => {
+    // 4. Draw Zones — very light tint + dashed border so walls are the primary visual.
+    // Zone fills intentionally near-transparent so the programmatic wall geometry
+    // reads as the true floor plan — zones are just coloured room identifiers.
+    if (showZonesLayer) drawnZones.forEach((zone) => {
       if (zone.points.length < 2) return;
       ctx.beginPath();
       ctx.moveTo(zone.points[0].x, zone.points[0].y);
       zone.points.forEach((p) => ctx.lineTo(p.x, p.y));
       ctx.closePath();
-      ctx.fillStyle = zone.color + '22';
+
+      // Nearly invisible fill — only a subtle room tint
+      ctx.fillStyle = zone.color + '14';   // ~8 % opacity
       ctx.fill();
 
       const isSelected = selectedZone === zone.id;
-      ctx.strokeStyle = isSelected ? '#f59e0b' : (zone.color + 'aa');
-      ctx.lineWidth = isSelected ? 4 : 2;
-      ctx.setLineDash([]);
+      if (isSelected) {
+        // Solid orange highlight for selected zone
+        ctx.strokeStyle = '#f59e0b';
+        ctx.lineWidth = 3;
+        ctx.setLineDash([]);
+      } else {
+        // Thin dashed coloured border so room boundaries are clear
+        ctx.strokeStyle = zone.color + 'bb';
+        ctx.lineWidth = 1.5;
+        ctx.setLineDash([6, 5]);
+      }
       ctx.stroke();
+      ctx.setLineDash([]);
 
+      // Always show room name label so each area is identifiable
       const cx = zone.points.reduce((s, p) => s + p.x, 0) / zone.points.length;
       const cy = zone.points.reduce((s, p) => s + p.y, 0) / zone.points.length;
-      ctx.fillStyle = isSelected ? '#000000' : zone.color;
-      ctx.font = 'bold 11px Outfit, sans-serif';
+      // Measure available width to pick font size
+      const xs = zone.points.map(p => p.x);
+      const ys = zone.points.map(p => p.y);
+      const roomW = Math.max(...xs) - Math.min(...xs);
+      const roomH = Math.max(...ys) - Math.min(...ys);
+      const fontSize = Math.min(11, Math.max(7, Math.min(roomW, roomH) * 0.11));
+
+      // Background chip for readability
+      ctx.font = `600 ${fontSize}px Outfit, sans-serif`;
+      const labelW = ctx.measureText(zone.name).width;
+      ctx.fillStyle = 'rgba(255,255,255,0.82)';
+      ctx.fillRect(cx - labelW / 2 - 3, cy - fontSize - 2, labelW + 6, fontSize + 5);
+
+      // Room name in zone colour
+      ctx.fillStyle = isSelected ? '#f59e0b' : zone.color;
       ctx.textAlign = 'center';
-      ctx.fillText(zone.name, cx, cy - 6);
-      ctx.font = '10px Inter, sans-serif';
-      ctx.fillStyle = isSelected ? 'rgba(0,0,0,0.6)' : (zone.color + 'aa');
-      ctx.fillText(zone.type, cx, cy + 8);
+      ctx.fillText(zone.name, cx, cy);
+
+      // Zone type sub-label (dimmed)
+      if (showZoneLabels || isSelected) {
+        ctx.font = `${Math.max(6, fontSize - 2)}px Inter, sans-serif`;
+        ctx.fillStyle = 'rgba(60,60,60,0.55)';
+        ctx.fillText(zone.type, cx, cy + fontSize + 2);
+      }
     });
 
     // Drawing zone in progress
@@ -1493,10 +2229,10 @@ export default function LayoutEditor() {
     }
 
     // 5. Draw Cameras
-    placedCams.forEach((cam) => {
+    if (showCamerasLayer) placedCams.forEach((cam) => {
       const isSelected = selectedCam === cam.id;
       const isOffline = cam.status === 'OFFLINE';
-      const color = isOffline ? '#ff0055' : '#00f0ff';
+      const color = isOffline ? '#dc2626' : '#0ea5e9';
 
       // FoV cone
       const fovRad = (cam.fov * Math.PI) / 180;
@@ -1553,11 +2289,13 @@ export default function LayoutEditor() {
       }
 
       // Name
-      ctx.fillStyle = isSelected ? '#ffffff' : 'rgba(255,255,255,0.7)';
-      ctx.font = isSelected ? 'bold 11px Outfit' : '10px Outfit';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'top';
-      ctx.fillText(cam.name, cam.x, cam.y + 14);
+      if (showCameraLabels || isSelected || hoveredCamId === cam.id) {
+        ctx.fillStyle = '#111111';
+        ctx.font = 'bold 10px Outfit';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'top';
+        ctx.fillText(cam.name, cam.x, cam.y + 14);
+      }
     });
 
     // 6. Simulator overlays
@@ -1854,7 +2592,7 @@ export default function LayoutEditor() {
       }
     }
 
-  }, [placedCams, drawnZones, selectedCam, selectedZone, selectedWall, selectedArch, zoom, panX, panY, drawingZone, zoneType, tool, activeFloor, liveTracks, walls, archElements, drawingWall, wallPreviewEnd, pxPerFoot, measureUnit, showDimensions, getFloorBounds, isSimulatorActive, simulatorAgents, showCoverageHeatmap, floorPlanVersion]);
+  }, [placedCams, drawnZones, selectedCam, selectedZone, selectedWall, selectedArch, zoom, panX, panY, drawingZone, zoneType, tool, activeFloor, liveTracks, walls, archElements, drawingWall, wallPreviewEnd, pxPerFoot, measureUnit, showDimensions, getFloorBounds, isSimulatorActive, simulatorAgents, showCoverageHeatmap, showCameraLabels, showZoneLabels, hoveredCamId, blueprintVersion, showPlanOverlay, showStructureOverlay, showDxfLabels, fittedDxfLabels, showWallsLayer, showDoorsLayer, showWindowsLayer, showStairsLayer, showLiftsLayer, showZonesLayer, showCamerasLayer]);
 
 
 
@@ -2617,8 +3355,8 @@ export default function LayoutEditor() {
                     </div>
                     <div style={{
                       fontSize: 9, padding: '1px 5px', borderRadius: 4, fontWeight: 700,
-                      background: b.building_type === 'OUTDOOR' ? 'rgba(34,197,94,0.15)' : b.building_type === 'MIXED' ? 'rgba(245,158,11,0.15)' : 'rgba(99,102,241,0.15)',
-                      color: b.building_type === 'OUTDOOR' ? '#22c55e' : b.building_type === 'MIXED' ? '#f59e0b' : '#6366f1',
+                      background: b.building_type === 'OUTDOOR' ? 'rgba(78,205,196,0.15)' : b.building_type === 'MIXED' ? 'rgba(200,255,0,0.12)' : 'rgba(255,107,0,0.15)',
+                      color: b.building_type === 'OUTDOOR' ? '#4ECDC4' : b.building_type === 'MIXED' ? '#C8FF00' : '#FF6B00',
                     }}>
                       {b.building_type}
                     </div>
@@ -3021,6 +3759,106 @@ export default function LayoutEditor() {
                 </label>
               </div>
 
+              <div className="scale-config-row">
+                <span className="scale-config-label">Plan Image</span>
+                <label className="toggle-switch">
+                  <input type="checkbox" checked={showPlanOverlay} onChange={(e) => setShowPlanOverlay(e.target.checked)} />
+                  <span className="toggle-slider" />
+                </label>
+              </div>
+              <div className="scale-config-row">
+                <span className="scale-config-label">Structure Overlay</span>
+                <label className="toggle-switch">
+                  <input type="checkbox" checked={showStructureOverlay} onChange={(e) => setShowStructureOverlay(e.target.checked)} />
+                  <span className="toggle-slider" />
+                </label>
+              </div>
+              <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: -2 }}>
+                Plan Image = accurate CAD blueprint. Structure Overlay = editable vector walls.
+              </div>
+              <div className="scale-config-row">
+                <span className="scale-config-label">Camera Labels</span>
+                <label className="toggle-switch">
+                  <input type="checkbox" checked={showCameraLabels} onChange={(e) => setShowCameraLabels(e.target.checked)} />
+                  <span className="toggle-slider" />
+                </label>
+              </div>
+              <div className="scale-config-row">
+                <span className="scale-config-label">Zone Labels</span>
+                <label className="toggle-switch">
+                  <input type="checkbox" checked={showZoneLabels} onChange={(e) => setShowZoneLabels(e.target.checked)} />
+                  <span className="toggle-slider" />
+                </label>
+              </div>
+              <div className="scale-config-row">
+                <span className="scale-config-label">DXF Labels</span>
+                <label className="toggle-switch">
+                  <input type="checkbox" checked={showDxfLabels} onChange={(e) => setShowDxfLabels(e.target.checked)} />
+                  <span className="toggle-slider" />
+                </label>
+              </div>
+              <div className="scale-config-row">
+                <span className="scale-config-label">Layer Walls</span>
+                <label className="toggle-switch">
+                  <input type="checkbox" checked={showWallsLayer} onChange={(e) => setShowWallsLayer(e.target.checked)} />
+                  <span className="toggle-slider" />
+                </label>
+              </div>
+              <div className="scale-config-row">
+                <span className="scale-config-label">Layer Doors</span>
+                <label className="toggle-switch">
+                  <input type="checkbox" checked={showDoorsLayer} onChange={(e) => setShowDoorsLayer(e.target.checked)} />
+                  <span className="toggle-slider" />
+                </label>
+              </div>
+              <div className="scale-config-row">
+                <span className="scale-config-label">Layer Windows</span>
+                <label className="toggle-switch">
+                  <input type="checkbox" checked={showWindowsLayer} onChange={(e) => setShowWindowsLayer(e.target.checked)} />
+                  <span className="toggle-slider" />
+                </label>
+              </div>
+              <div className="scale-config-row">
+                <span className="scale-config-label">Layer Stairs</span>
+                <label className="toggle-switch">
+                  <input type="checkbox" checked={showStairsLayer} onChange={(e) => setShowStairsLayer(e.target.checked)} />
+                  <span className="toggle-slider" />
+                </label>
+              </div>
+              <div className="scale-config-row">
+                <span className="scale-config-label">Layer Lifts</span>
+                <label className="toggle-switch">
+                  <input type="checkbox" checked={showLiftsLayer} onChange={(e) => setShowLiftsLayer(e.target.checked)} />
+                  <span className="toggle-slider" />
+                </label>
+              </div>
+              <div className="scale-config-row">
+                <span className="scale-config-label">Layer Cameras</span>
+                <label className="toggle-switch">
+                  <input type="checkbox" checked={showCamerasLayer} onChange={(e) => setShowCamerasLayer(e.target.checked)} />
+                  <span className="toggle-slider" />
+                </label>
+              </div>
+              <div className="scale-config-row">
+                <span className="scale-config-label">Layer Zones</span>
+                <label className="toggle-switch">
+                  <input type="checkbox" checked={showZonesLayer} onChange={(e) => setShowZonesLayer(e.target.checked)} />
+                  <span className="toggle-slider" />
+                </label>
+              </div>
+              <div className="scale-config-row">
+                <span className="scale-config-label">Auto Align Cameras</span>
+                <button className="btn btn-ghost btn-sm" onClick={() => autoAlignCameras(false)}>
+                  Align
+                </button>
+              </div>
+              <div className="scale-config-row">
+                <span className="scale-config-label">Auto Place (No Blind Spot)</span>
+                <button className="btn btn-primary btn-sm" onClick={autoPlaceCamerasNoBlindSpots}>
+                  Generate
+                </button>
+              </div>
+
               <div className="scale-config-row" style={{ borderTop: '1px solid rgba(0,240,255,0.1)', paddingTop: 8, marginTop: 4 }}>
                 <span className="scale-config-label">Coverage Heatmap</span>
                 <label className="toggle-switch">
@@ -3046,6 +3884,11 @@ export default function LayoutEditor() {
                   <div style={{ width: '100%', height: 4, background: 'rgba(255,255,255,0.05)', borderRadius: 2, overflow: 'hidden', marginTop: 2 }}>
                     <div style={{ width: `${coveragePercentage}%`, height: '100%', background: coveragePercentage >= 99 ? 'var(--green-bright)' : 'var(--amber-bright)', borderRadius: 2, transition: 'width 0.3s ease' }} />
                   </div>
+                </div>
+              )}
+              {!showCoverageHeatmap && (
+                <div style={{ marginTop: 6, fontSize: 10, color: 'var(--text-ghost)' }}>
+                  Coverage overlay hidden for clean view.
                 </div>
               )}
             </div>

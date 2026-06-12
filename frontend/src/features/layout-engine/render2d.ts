@@ -18,18 +18,29 @@ export function drawWallOnCanvas(
   const ny = dx / len;
   const halfT = thickness / 2;
 
+  // Draw wall as a solid filled polygon — CAD blueprint style
   ctx.beginPath();
   ctx.moveTo(startX + nx * halfT, startY + ny * halfT);
   ctx.lineTo(endX + nx * halfT, endY + ny * halfT);
   ctx.lineTo(endX - nx * halfT, endY - ny * halfT);
   ctx.lineTo(startX - nx * halfT, startY - ny * halfT);
   ctx.closePath();
-  ctx.fillStyle = isSelected ? 'rgba(245, 158, 11, 0.15)' : 'rgba(30, 41, 59, 0.05)';
+
+  if (isSelected) {
+    // Selected: amber glow fill
+    ctx.fillStyle = 'rgba(245, 158, 11, 0.85)';
+  } else {
+    // Outer / thick walls → solid black; partitions → dark slate
+    ctx.fillStyle = thickness >= 6 ? '#111111' : (color || '#2d3748');
+  }
   ctx.fill();
-  ctx.strokeStyle = isSelected ? '#f59e0b' : '#000000';
-  ctx.lineWidth = isSelected ? 2.5 : 2;
+
+  // Thin outline to crisp up edges
+  ctx.strokeStyle = isSelected ? '#f59e0b' : 'rgba(0,0,0,0.4)';
+  ctx.lineWidth = 0.5;
   ctx.stroke();
 
+  // Endpoint handles when selected
   if (isSelected) {
     for (const [hx, hy] of [[startX, startY], [endX, endY]] as [number, number][]) {
       ctx.beginPath();
@@ -40,9 +51,8 @@ export function drawWallOnCanvas(
       ctx.lineWidth = 1.5;
       ctx.stroke();
     }
-
     ctx.shadowColor = '#f59e0b';
-    ctx.shadowBlur = 12;
+    ctx.shadowBlur = 10;
     ctx.beginPath();
     ctx.moveTo(startX, startY);
     ctx.lineTo(endX, endY);
@@ -51,6 +61,7 @@ export function drawWallOnCanvas(
     ctx.stroke();
     ctx.shadowBlur = 0;
   }
+
 
   if (showDimensions && len > 30) {
     const midX = (startX + endX) / 2;

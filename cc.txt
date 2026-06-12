@@ -21,3 +21,5 @@ When you run the deployment, Docker will automatically download and start these 
 Environment Variables (.env file): Setting up secure passwords for PostgreSQL, Redis, MinIO, and JWT authentication secrets before starting the containers.
 Deployment Command: Running docker-compose -f docker-compose.yml -f docker-compose.gpu.yml up --build -d to launch the entire stack.
 
+
+
