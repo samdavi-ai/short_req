@@ -175,6 +175,7 @@ def process_video_loop(video_path: str, camera_id: int):
     frame_count = 0
 
     while processing_active:
+        loop_start_time = time.time()
         ret, frame = cap.read()
         if not ret:
             print("Video completed. Looping back...")
@@ -287,8 +288,11 @@ def process_video_loop(video_path: str, camera_id: int):
         _, buffer = cv2.imencode('.jpg', annotated_frame)
         latest_processed_frame = buffer.tobytes()
 
-        # Simulate real-time stream processing interval
-        time.sleep(0.04)
+        # Dynamic sleep to target 120ms per processed frame (which is ~8 processed frames per second)
+        # Since we skip 3 frames, this targets real-time video playback rate (~24fps)
+        elapsed = time.time() - loop_start_time
+        sleep_time = max(0.01, 0.12 - elapsed)
+        time.sleep(sleep_time)
 
     cap.release()
 
