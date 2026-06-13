@@ -54,6 +54,8 @@ class GlobalTracker:
             return 0.0
         a = np.asarray(v1, dtype=np.float32)
         b = np.asarray(v2, dtype=np.float32)
+        if a.shape != b.shape:
+            return 0.0
         dot = np.dot(a, b)
         norm = np.linalg.norm(a) * np.linalg.norm(b) + 1e-12
         return float(dot / norm)

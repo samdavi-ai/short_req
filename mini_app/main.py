@@ -118,6 +118,8 @@ def cosine_similarity(v1, v2):
         return 0.0
     a = np.array(v1, dtype=np.float32)
     b = np.array(v2, dtype=np.float32)
+    if a.shape != b.shape:
+        return 0.0
     return float(np.dot(a, b) / (np.linalg.norm(a) * np.linalg.norm(b) + 1e-12))
 
 # ── SEARCH REGISTRY ──────────────────────────────────────────────────────────
@@ -461,6 +463,11 @@ def identify_track(req: IdentifyRequest):
 
     # Inform the runtime tracker of the name
     tracker.set_identity(req.global_id, "VISITOR", person_name=req.name)
+    
+    # Update active_tracks directly for instant responsiveness
+    if req.global_id in active_tracks:
+        active_tracks[req.global_id]["matched_name"] = req.name
+        active_tracks[req.global_id]["identity_type"] = "VISITOR"
     
     # Log the event
     with get_db() as conn:

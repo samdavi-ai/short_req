@@ -13,11 +13,11 @@ from ultralytics import YOLO
 
 class PersonDetector:
     # Production-grade thresholds
-    CONF_THRESHOLD = 0.45   # minimum detection confidence
+    CONF_THRESHOLD = 0.35   # minimum detection confidence (lowered to catch far-away targets)
     IOU_THRESHOLD  = 0.50   # NMS IoU for deduplication
-    MIN_BOX_AREA   = 1200   # reject tiny false-positive boxes (px²)
+    MIN_BOX_AREA   = 800    # reject tiny false-positive boxes (px²) (lowered to catch smaller targets)
 
-    def __init__(self, model_path: str = 'yolov8n.pt', use_gpu: bool = False):
+    def __init__(self, model_path: str = 'yolov8s.pt', use_gpu: bool = False):
         self.model_path = model_path
         self.use_gpu = use_gpu
         self.device = 0 if use_gpu else 'cpu'
