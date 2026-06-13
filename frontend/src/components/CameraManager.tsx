@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Camera, Plus, Trash2, Edit3, Wifi, WifiOff, RefreshCw, X } from 'lucide-react';
+import { Camera, Plus, Trash2, Edit3, Wifi, WifiOff, RefreshCw, X, Play, Pause } from 'lucide-react';
 import { useStore, type Camera as AppCamera } from '../stores/appStore';
 import { api } from '../hooks/api';
 
@@ -57,8 +57,21 @@ export default function CameraManager() {
     setShowModal(true);
   };
 
+  const handleTogglePause = async (cam: AppCamera) => {
+    const newStatus = cam.status === 'PAUSED' ? 'ACTIVE' : 'PAUSED';
+    try {
+      await api.updateCamera(token || '', cam.id, { status: newStatus });
+      const updated = await api.getCameras(token || '');
+      setCameras(updated);
+      addToast(`Camera "${cam.name}" ${newStatus === 'PAUSED' ? 'paused' : 'resumed'} successfully`, 'success');
+    } catch (err) {
+      addToast('Failed to change camera status', 'error');
+    }
+  };
+
   const online  = cameras.filter((c) => c.status === 'ACTIVE').length;
   const offline = cameras.filter((c) => c.status === 'OFFLINE').length;
+  const paused  = cameras.filter((c) => c.status === 'PAUSED').length;
   const maint   = cameras.filter((c) => c.status === 'MAINTENANCE').length;
 
   return (
@@ -76,6 +89,10 @@ export default function CameraManager() {
           <div style={{ padding: '8px 16px', background: 'var(--red-dim)', border: '1px solid var(--border-red)', borderRadius: 'var(--radius-md)' }}>
             <span style={{ fontSize: 20, fontWeight: 800, color: 'var(--red-bright)' }}>{offline}</span>
             <span style={{ fontSize: 11, color: 'var(--red-bright)', marginLeft: 6 }}>Offline</span>
+          </div>
+          <div style={{ padding: '8px 16px', background: 'var(--surface-3)', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)' }}>
+            <span style={{ fontSize: 20, fontWeight: 800, color: 'var(--text-ghost)' }}>{paused}</span>
+            <span style={{ fontSize: 11, color: 'var(--text-ghost)', marginLeft: 6 }}>Paused</span>
           </div>
           <div style={{ padding: '8px 16px', background: 'var(--surface-3)', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)' }}>
             <span style={{ fontSize: 20, fontWeight: 800, color: 'var(--text-primary)' }}>{cameras.length}</span>
@@ -113,6 +130,8 @@ export default function CameraManager() {
                           <><Wifi size={13} color="var(--green-bright)" /><span className="badge badge-green"><span className="badge-dot" />Online</span></>
                         ) : cam.status === 'OFFLINE' ? (
                           <><WifiOff size={13} color="var(--red-bright)" /><span className="badge badge-red"><span className="badge-dot" />Offline</span></>
+                        ) : cam.status === 'PAUSED' ? (
+                          <><Pause size={13} color="var(--text-ghost)" /><span className="badge badge-gray"><span className="badge-dot" />Paused</span></>
                         ) : (
                           <span className="badge badge-amber">Maintenance</span>
                         )}
@@ -141,6 +160,10 @@ export default function CameraManager() {
                     <td style={{ fontFamily: 'monospace', fontSize: 12 }}>{cam.angle}°</td>
                     <td>
                       <div style={{ display: 'flex', gap: 6 }}>
+                        <button className="icon-btn" title={cam.status === 'PAUSED' ? "Resume Camera" : "Pause Camera"}
+                          onClick={() => handleTogglePause(cam)}>
+                          {cam.status === 'PAUSED' ? <Play size={13} color="var(--green-bright)" /> : <Pause size={13} />}
+                        </button>
                         <button className="icon-btn" title="Edit" onClick={() => openEdit(cam)}>
                           <Edit3 size={13} />
                         </button>

@@ -12,7 +12,7 @@ export interface Camera {
   y_coord: number;
   angle: number;
   fov?: number;
-  status: 'ACTIVE' | 'OFFLINE' | 'MAINTENANCE';
+  status: 'ACTIVE' | 'OFFLINE' | 'MAINTENANCE' | 'PAUSED';
   is_overhead: boolean;
 }
 

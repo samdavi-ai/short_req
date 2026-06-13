@@ -28,6 +28,7 @@ class CameraStatus(str, enum.Enum):
     ACTIVE = "ACTIVE"
     OFFLINE = "OFFLINE"
     MAINTENANCE = "MAINTENANCE"
+    PAUSED = "PAUSED"
 
 class VisitorStatus(str, enum.Enum):
     WHITELISTED = "WHITELISTED"

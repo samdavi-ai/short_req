@@ -165,6 +165,8 @@ class CameraPipeline:
         # ── Camera metadata from DB ───────────────────────────────────────
         self.floor = 1
         self.camera_name = f"Camera {self.camera_id}"
+        self.status = "ACTIVE"
+        self._last_status_check_time = 0.0
         self._load_camera_config()
 
         # ── Track persistence batch buffer ────────────────────────────────
@@ -177,13 +179,14 @@ class CameraPipeline:
         self._load_zones()
 
     def _load_camera_config(self):
-        """Load camera floor and name from DB."""
+        """Load camera floor, name, and status from DB."""
         db = SessionLocal()
         try:
             camera = db.query(Camera).filter(Camera.id == self.camera_id).first()
             if camera:
                 self.floor = camera.floor
                 self.camera_name = camera.name
+                self.status = camera.status.value if hasattr(camera.status, 'value') else str(camera.status)
         except Exception as e:
             logger.error("Failed to query camera config: %s", e)
         finally:
@@ -255,6 +258,34 @@ class CameraPipeline:
         Process a single video frame through the full pipeline.
         Called by both `run()` (live) and `run_video.py` (test).
         """
+        # Periodic status check
+        now = time.time()
+        if now - self._last_status_check_time > 2.0:
+            db = SessionLocal()
+            try:
+                camera = db.query(Camera).filter(Camera.id == self.camera_id).first()
+                if camera:
+                    new_status = camera.status.value if hasattr(camera.status, 'value') else str(camera.status)
+                    if new_status == "PAUSED" and self.status != "PAUSED":
+                        # Transitioned to PAUSED: mark active tracks as inactive in DB
+                        from app.models.models import ActiveTrack
+                        db.query(ActiveTrack).filter(
+                            ActiveTrack.camera_id == self.camera_id,
+                            ActiveTrack.is_active == True,
+                        ).update({"is_active": False}, synchronize_session=False)
+                        db.commit()
+                        self._track_buffer.clear()
+                        logger.info("[Camera %d] Paused. Marked all active tracks as inactive.", self.camera_id)
+                    self.status = new_status
+            except Exception as e:
+                logger.error("Failed to check camera status during process_frame: %s", e)
+            finally:
+                db.close()
+            self._last_status_check_time = now
+
+        if self.status == "PAUSED":
+            return
+
         h, w = frame.shape[:2]
 
         # ── 1. Person detection + ByteTrack ───────────────────────────────

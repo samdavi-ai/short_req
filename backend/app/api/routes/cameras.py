@@ -119,7 +119,7 @@ def update_camera_positions(
 @router.patch("/{camera_id}/status", response_model=CameraResponse)
 def set_camera_status(
     camera_id: int,
-    status: str = Query(..., description="New status: ACTIVE | OFFLINE | MAINTENANCE"),
+    status: str = Query(..., description="New status: ACTIVE | OFFLINE | MAINTENANCE | PAUSED"),
     db: Session = Depends(get_db),
 ):
     """Quick status update for a camera (e.g., mark as offline)."""

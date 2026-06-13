@@ -13,6 +13,7 @@ class CameraStatus(str, Enum):
     ACTIVE = "ACTIVE"
     OFFLINE = "OFFLINE"
     MAINTENANCE = "MAINTENANCE"
+    PAUSED = "PAUSED"
 
 class VisitorStatus(str, Enum):
     WHITELISTED = "WHITELISTED"
