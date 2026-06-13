@@ -109,11 +109,17 @@
 
         .main-layout {
             display: grid;
-            grid-template-columns: 880px 1fr;
+            grid-template-columns: 880px 1fr 1fr;
             gap: 24px;
         }
 
-        @media (max-width: 1400px) {
+        @media (max-width: 1600px) {
+            .main-layout {
+                grid-template-columns: 880px 1fr;
+            }
+        }
+
+        @media (max-width: 1200px) {
             .main-layout {
                 grid-template-columns: 1fr;
             }
@@ -245,6 +251,18 @@
         .btn-secondary:hover {
             background: rgba(255, 255, 255, 0.08);
             border-color: var(--text-muted);
+        }
+
+        .btn-danger {
+            background: rgba(239, 68, 68, 0.12) !important;
+            border: 1px solid rgba(239, 68, 68, 0.25) !important;
+            color: #ef4444 !important;
+        }
+
+        .btn-danger:hover {
+            background: rgba(239, 68, 68, 0.22) !important;
+            border-color: #ef4444 !important;
+            box-shadow: 0 0 8px rgba(239, 68, 68, 0.15);
         }
 
         /* Active tracking grid */
@@ -492,7 +510,7 @@
                 </div>
             </div>
 
-            <!-- Right Column: Tracking Dashboard -->
+            <!-- Middle Column: Tracking Dashboard -->
             <div class="panel" style="max-height: 620px;">
                 <div class="panel-header">
                     <h2>👤 Active Person Tracking (Where They Are Now)</h2>
@@ -500,6 +518,18 @@
                 <div class="active-grid" id="active-tracks-container">
                     <div style="grid-column: 1/-1; text-align:center; color:var(--text-ghost); font-size:12px; padding:40px 0;">
                         No active tracks. Start video stream to begin tracking.
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right Column: Registered Enrolled Database -->
+            <div class="panel" style="max-height: 620px;">
+                <div class="panel-header">
+                    <h2>🗂️ Enrolled Registry (Registered Persons)</h2>
+                </div>
+                <div class="active-grid" id="enrolled-registry-container">
+                    <div style="grid-column: 1/-1; text-align:center; color:var(--text-ghost); font-size:12px; padding:40px 0;">
+                        No enrolled identities. Name a person in the stream to register them.
                     </div>
                 </div>
             </div>
@@ -595,6 +625,18 @@
             }
         }
         fetchPreloadedVideos();
+        
+        // Fetch enrolled registry on mount
+        async function pollEnrolled() {
+            try {
+                const res = await fetch('/identities');
+                const data = await res.json();
+                renderEnrolledRegistry(data);
+            } catch (err) {
+                console.error("Error polling enrolled registry:", err);
+            }
+        }
+        pollEnrolled();
 
         // Start processing video
         btnStart.addEventListener('click', async () => {
@@ -750,12 +792,30 @@
                 if (data.status === 'enrolled') {
                     namingModal.classList.remove('active');
                     pollState(); // refresh lists immediately
+                    pollEnrolled(); // refresh enrolled database list immediately
                 }
             } catch (err) {
                 alert("Enrolling track failed.");
                 console.error(err);
             }
         });
+
+        // Delete identity registry
+        async function deleteIdentity(name) {
+            if (!confirm(`Are you sure you want to delete '${name}' from the registry?`)) return;
+            try {
+                const res = await fetch(`/identities/${encodeURIComponent(name)}`, {
+                    method: 'DELETE'
+                });
+                const data = await res.json();
+                if (data.status === 'deleted') {
+                    pollEnrolled();
+                }
+            } catch (err) {
+                alert("Failed to delete identity.");
+                console.error(err);
+            }
+        }
 
         // Poll Active and History states
         async function pollState() {
@@ -770,6 +830,9 @@
                 const historyRes = await fetch('/tracks/history');
                 const historyData = await historyRes.json();
                 renderHistoryLog(historyData);
+                
+                // 3. Poll enrolled database periodically during analysis to catch matches
+                pollEnrolled();
             } catch (err) {
                 console.error("Polling state error:", err);
             }
@@ -837,6 +900,36 @@
                     </tr>
                 `;
                 historyLogBody.insertAdjacentHTML('beforeend', tr);
+            });
+        }
+
+        // Render Enrolled Registry Grid
+        function renderEnrolledRegistry(identities) {
+            const container = document.getElementById('enrolled-registry-container');
+            if (identities.length === 0) {
+                container.innerHTML = `
+                    <div style="grid-column: 1/-1; text-align:center; color:var(--text-ghost); font-size:12px; padding:40px 0;">
+                        No enrolled identities. Name a person in the stream to register them.
+                    </div>
+                `;
+                return;
+            }
+
+            container.innerHTML = '';
+            identities.forEach(id => {
+                const dateStr = new Date(id.timestamp * 1000).toLocaleDateString();
+                const card = `
+                    <div class="active-card" style="cursor: default;">
+                        <img class="card-crop" src="${id.photo_path}?t=${Date.now()}" onerror="this.src='https://placehold.co/150x110/050811/fff?text=No+Photo'">
+                        <div class="card-details">
+                            <span class="card-name" title="${id.name}">${id.name}</span>
+                            <span class="card-id">Enrolled: ${dateStr}</span>
+                            <span class="card-status status-visitor">Enrolled</span>
+                            <button class="btn btn-secondary btn-danger" onclick="deleteIdentity('${id.name.replace(/'/g, "\\'")}')" style="font-size: 10px; padding: 4px 8px; width: 100%; justify-content: center; margin-top: 6px;">🗑️ Delete</button>
+                        </div>
+                    </div>
+                `;
+                container.insertAdjacentHTML('beforeend', card);
             });
         }
     </script>

@@ -487,6 +487,29 @@ def get_tracks_history():
         ).fetchall()
         return [dict(r) for r in rows]
 
+@app.get("/identities")
+def get_enrolled_identities():
+    """Returns a list of all enrolled identities in the database."""
+    with get_db() as conn:
+        rows = conn.execute("SELECT name, photo_path, timestamp FROM enrolled_identities ORDER BY timestamp DESC").fetchall()
+        return [dict(r) for r in rows]
+
+@app.delete("/identities/{name}")
+def delete_identity(name: str):
+    """Deletes an identity from the database registry."""
+    with get_db() as conn:
+        conn.execute("DELETE FROM enrolled_identities WHERE name = ?", (name,))
+        conn.commit()
+    # Also delete the photo if it exists
+    photo_path = f"mini_app/assets/enrolled/{name}.jpg"
+    if os.path.exists(photo_path):
+        try:
+            os.remove(photo_path)
+        except Exception:
+            pass
+    return {"status": "deleted"}
+
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="127.0.0.1", port=8080)
