@@ -130,26 +130,28 @@ def search_registry(face_vec, body_vec):
 
     with get_db() as conn:
         rows = conn.execute("SELECT name, face_vector, body_vector FROM enrolled_identities").fetchall()
-        for row in rows:
-            name = row["name"]
-            
-            # 1. Try Face Match (high accuracy)
-            if face_vec is not None and row["face_vector"]:
-                db_face = json.loads(row["face_vector"])
-                sim = cosine_similarity(face_vec, db_face)
-                if sim > 0.68 and sim > best_sim:
-                    best_sim = sim
-                    best_name = name
-                    matched_via = "face"
+        
+        # 1. Try Face Match (high accuracy) across all enrolled identities
+        if face_vec is not None:
+            for row in rows:
+                if row["face_vector"]:
+                    db_face = json.loads(row["face_vector"])
+                    sim = cosine_similarity(face_vec, db_face)
+                    if sim > 0.68 and sim > best_sim:
+                        best_sim = sim
+                        best_name = row["name"]
+                        matched_via = "face"
 
-            # 2. Try Body Re-ID Match (fallback)
-            if row["body_vector"] and body_vec is not None and best_name is None:
-                db_body = json.loads(row["body_vector"])
-                sim = cosine_similarity(body_vec, db_body)
-                if sim > 0.72 and sim > best_sim:
-                    best_sim = sim
-                    best_name = name
-                    matched_via = "body"
+        # 2. Try Body Re-ID Match (fallback) across all enrolled identities, only if no face match was found
+        if best_name is None and body_vec is not None:
+            for row in rows:
+                if row["body_vector"]:
+                    db_body = json.loads(row["body_vector"])
+                    sim = cosine_similarity(body_vec, db_body)
+                    if sim > 0.72 and sim > best_sim:
+                        best_sim = sim
+                        best_name = row["name"]
+                        matched_via = "body"
 
     return best_name, best_sim, matched_via
 
