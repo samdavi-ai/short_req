@@ -17,6 +17,9 @@ env/
 .env.local
 backend/venv/
 backend/.venv/
+backend/venv_new/
+venv_new/
+frontend/public/videos/
 
 # ─── Environment / Secrets ───────────────────────────────────────────
 # Keep .env.example but NEVER commit real .env
@@ -26,8 +29,10 @@ backend/.venv/
 
 # ─── Database ────────────────────────────────────────────────────────
 *.db
+*.db-journal
 *.sqlite
 *.sqlite3
+*.sqlite3-journal
 
 # ─── Alembic ─────────────────────────────────────────────────────────
 # Keep migrations but ignore auto-generated temp files

@@ -1,20 +1,10 @@
 import React, { useState } from 'react';
 import { Camera, Plus, Trash2, Edit3, Wifi, WifiOff, RefreshCw, X } from 'lucide-react';
-import { useStore } from '../stores/appStore';
+import { useStore, type Camera as AppCamera } from '../stores/appStore';
 import { api } from '../hooks/api';
 
-const DEMO_CAMERAS = [
-  { id: 1, name: 'Gate A1 — Entrance', rtsp_url: 'rtsp://192.168.1.10:554/stream1', location: 'Terminal 1 Entry',    floor: 1, status: 'ACTIVE', is_overhead: true,  x_coord: 120, y_coord: 150, angle: 45 },
-  { id: 2, name: 'Security Checkpoint', rtsp_url: 'rtsp://192.168.1.11:554/stream1', location: 'Main Security',       floor: 1, status: 'ACTIVE', is_overhead: false, x_coord: 380, y_coord: 220, angle: 135 },
-  { id: 3, name: 'Baggage Claim B',     rtsp_url: 'rtsp://192.168.1.12:554/stream1', location: 'Arrivals Hall',       floor: 1, status: 'ACTIVE', is_overhead: true,  x_coord: 600, y_coord: 130, angle: 270 },
-  { id: 4, name: 'Gate B3 Restricted',  rtsp_url: 'rtsp://192.168.1.13:554/stream1', location: 'Boarding Gate B3',   floor: 2, status: 'OFFLINE', is_overhead: true, x_coord: 250, y_coord: 380, angle: 90 },
-  { id: 5, name: 'Retail Zone East',    rtsp_url: 'rtsp://192.168.1.14:554/stream1', location: 'Shopping Corridor',  floor: 2, status: 'ACTIVE', is_overhead: true,  x_coord: 480, y_coord: 200, angle: 0 },
-  { id: 6, name: 'Elevator Lobby F1',   rtsp_url: 'rtsp://192.168.1.15:554/stream1', location: 'Elevator Bank',      floor: 1, status: 'ACTIVE', is_overhead: false, x_coord: 150, y_coord: 400, angle: 180 },
-];
-
 export default function CameraManager() {
-  const { cameras: storeCams, token, addToast, setCameras } = useStore();
-  const cameras = storeCams.length > 0 ? storeCams : DEMO_CAMERAS;
+  const { cameras, token, addToast, setCameras } = useStore();
 
   const [showModal, setShowModal] = useState(false);
   const [editId, setEditId] = useState<number | null>(null);
@@ -24,7 +14,7 @@ export default function CameraManager() {
 
   const handleDelete = async (id: number) => {
     if (!window.confirm('Delete this camera?')) return;
-    if (token && token !== 'demo-token') {
+    if (token) {
       try {
         await api.deleteCamera(token, id);
         const updated = await api.getCameras(token);
@@ -33,14 +23,12 @@ export default function CameraManager() {
       } catch (err) {
         addToast('Failed to delete camera', 'error');
       }
-    } else {
-      addToast('Camera deleted (demo)', 'info');
     }
   };
 
   const handleSave = async () => {
     if (!form.name || !form.rtsp_url) { addToast('Name and RTSP URL required', 'error'); return; }
-    if (token && token !== 'demo-token') {
+    if (token) {
       try {
         if (editId) {
           await api.updateCamera(token, editId, form);
@@ -53,15 +41,13 @@ export default function CameraManager() {
       } catch (err) {
         addToast('Failed to save camera', 'error');
       }
-    } else {
-      addToast(`Camera ${editId ? 'updated' : 'added'} successfully (demo)`, 'success');
     }
     setShowModal(false);
     setEditId(null);
     setForm({ name: '', rtsp_url: '', location: '', floor: 1, is_overhead: true, angle: 0, x_coord: 0, y_coord: 0 });
   };
 
-  const openEdit = (cam: typeof DEMO_CAMERAS[0]) => {
+  const openEdit = (cam: AppCamera) => {
     setForm({
       name: cam.name, rtsp_url: cam.rtsp_url, location: cam.location,
       floor: cam.floor, is_overhead: cam.is_overhead,
@@ -155,7 +141,7 @@ export default function CameraManager() {
                     <td style={{ fontFamily: 'monospace', fontSize: 12 }}>{cam.angle}°</td>
                     <td>
                       <div style={{ display: 'flex', gap: 6 }}>
-                        <button className="icon-btn" title="Edit" onClick={() => openEdit(cam as typeof DEMO_CAMERAS[0])}>
+                        <button className="icon-btn" title="Edit" onClick={() => openEdit(cam)}>
                           <Edit3 size={13} />
                         </button>
                         <button className="icon-btn" title="Delete"

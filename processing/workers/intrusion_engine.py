@@ -37,12 +37,19 @@ def is_point_in_polygon(x: float, y: float, poly: list) -> bool:
 
 
 class IntrusionEngine:
+    # Cooldown: suppress repeated alerts for the same track+zone for this many seconds
+    ALERT_COOLDOWN_SECONDS = 120
+    # Zone-level rate limit: max 1 alert per zone per this many seconds
+    ZONE_RATE_LIMIT_SECONDS = 30
+
     def __init__(self, redis_client):
         self.redis_client = redis_client
-        # Track active alarms to prevent multiple notifications per track
-        self.active_restricted_alerts = set() # (global_id, zone_id)
-        self.active_dwell_timers = {} # (global_id, zone_id) -> entry_time
-        self.active_dwell_alerts = set() # (global_id, zone_id)
+        # Dedup by stable key: (camera_id, track_id, zone_id) -> timestamp of last alert
+        self._restricted_alert_times = {}   # key -> last_alert_epoch
+        self._dwell_entry_times = {}        # (camera_id, track_id, zone_id) -> entry_time
+        self._dwell_alert_times = {}        # key -> last_alert_epoch
+        # Zone-level rate limiter: zone_id -> last_alert_epoch
+        self._zone_last_alert = {}
 
     def evaluate_person(self, global_id: str, track_id: int, camera_id: int, floor: int, x: float, y: float):
         """
@@ -50,23 +57,25 @@ class IntrusionEngine:
         Trigger and persist DB alerts + WebSocket pub/sub events.
         """
         db: Session = SessionLocal()
+        now = time.time()
         try:
             # Get all active zones on this floor
             zones = db.query(Zone).filter(Zone.floor == floor, Zone.is_active == True).all()
             
             for zone in zones:
-                # Layout coordinate bounds are normalized 0-100% or absolute pixels.
-                # Since x, y are scaled to 0-1000 or relative percentages on the layout,
-                # we match them based on pointPolygonTest.
-                # Canvas layout maps coordinates normalized relative to the background (0 to 1000 usually)
                 is_inside = is_point_in_polygon(x, y, zone.coordinates)
-                alert_key = (global_id, zone.id)
+                # Use stable dedup key: camera_id + ByteTrack track_id + zone_id
+                dedup_key = (camera_id, track_id, zone.id)
                 
                 if is_inside:
                     # 1. Handle Restricted Area Intrusion
                     if zone.zone_type == ZoneType.RESTRICTED:
-                        if alert_key not in self.active_restricted_alerts:
-                            self.active_restricted_alerts.add(alert_key)
+                        last_alert = self._restricted_alert_times.get(dedup_key, 0)
+                        zone_last = self._zone_last_alert.get(zone.id, 0)
+                        if (now - last_alert > self.ALERT_COOLDOWN_SECONDS and
+                                now - zone_last > self.ZONE_RATE_LIMIT_SECONDS):
+                            self._restricted_alert_times[dedup_key] = now
+                            self._zone_last_alert[zone.id] = now
                             self._trigger_alert(
                                 db=db,
                                 camera_id=camera_id,
@@ -74,18 +83,23 @@ class IntrusionEngine:
                                 global_id=global_id,
                                 alert_type=AlertType.RESTRICTED_ZONE,
                                 severity=AlertSeverity.CRITICAL,
-                                description=f"Security Intrusion: Track #{global_id} entered Restricted Zone '{zone.name}'",
+                                description=f"Security Intrusion: Track #{track_id} entered Restricted Zone '{zone.name}'",
                                 zone_id=zone.id
                             )
                             
                     # 2. Handle Loitering / Dwell Alert
                     elif zone.zone_type == ZoneType.DWELL:
-                        if alert_key not in self.active_dwell_timers:
-                            self.active_dwell_timers[alert_key] = time.time()
+                        if dedup_key not in self._dwell_entry_times:
+                            self._dwell_entry_times[dedup_key] = now
                         else:
-                            elapsed = time.time() - self.active_dwell_timers[alert_key]
-                            if elapsed > zone.dwell_alert_seconds and alert_key not in self.active_dwell_alerts:
-                                self.active_dwell_alerts.add(alert_key)
+                            elapsed = now - self._dwell_entry_times[dedup_key]
+                            last_dwell_alert = self._dwell_alert_times.get(dedup_key, 0)
+                            zone_last = self._zone_last_alert.get(zone.id, 0)
+                            if (elapsed > zone.dwell_alert_seconds and
+                                    now - last_dwell_alert > self.ALERT_COOLDOWN_SECONDS and
+                                    now - zone_last > self.ZONE_RATE_LIMIT_SECONDS):
+                                self._dwell_alert_times[dedup_key] = now
+                                self._zone_last_alert[zone.id] = now
                                 self._trigger_alert(
                                     db=db,
                                     camera_id=camera_id,
@@ -93,22 +107,39 @@ class IntrusionEngine:
                                     global_id=global_id,
                                     alert_type=AlertType.DWELL_EXCEEDED,
                                     severity=AlertSeverity.HIGH,
-                                    description=f"Dwell Exceeded: Track #{global_id} loitering in '{zone.name}' for {int(elapsed)}s",
+                                    description=f"Dwell Exceeded: Track #{track_id} loitering in '{zone.name}' for {int(elapsed)}s",
                                     zone_id=zone.id
                                 )
                                 
                 else:
                     # Reset states when they leave the polygon
                     if zone.zone_type == ZoneType.RESTRICTED:
-                        self.active_restricted_alerts.discard(alert_key)
+                        self._restricted_alert_times.pop(dedup_key, None)
                     elif zone.zone_type == ZoneType.DWELL:
-                        self.active_dwell_timers.pop(alert_key, None)
-                        self.active_dwell_alerts.discard(alert_key)
-                        
+                        self._dwell_entry_times.pop(dedup_key, None)
+                        self._dwell_alert_times.pop(dedup_key, None)
+
         except Exception as e:
             logger.error("Error evaluating intrusion: %s", e)
         finally:
             db.close()
+
+        # Periodically clean up old entries to prevent memory growth
+        if int(now) % 60 == 0:
+            self._cleanup_stale(now)
+
+    def _cleanup_stale(self, now):
+        """Remove dedup entries older than 10 minutes to prevent unbounded memory growth."""
+        cutoff = now - 600
+        self._restricted_alert_times = {
+            k: v for k, v in self._restricted_alert_times.items() if v > cutoff
+        }
+        self._dwell_entry_times = {
+            k: v for k, v in self._dwell_entry_times.items() if v > cutoff
+        }
+        self._dwell_alert_times = {
+            k: v for k, v in self._dwell_alert_times.items() if v > cutoff
+        }
 
     def _trigger_alert(self, db: Session, camera_id: int, track_id: str, global_id: str,
                        alert_type: AlertType, severity: AlertSeverity, description: str, zone_id: int):
@@ -147,3 +178,4 @@ class IntrusionEngine:
             
         except Exception as e:
             logger.error("Failed to commit alert: %s", e)
+

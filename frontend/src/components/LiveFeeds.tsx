@@ -1,62 +1,207 @@
 import React, { useState } from 'react';
 import { Camera, Grid, WifiOff } from 'lucide-react';
 import { useStore, Camera as CameraType } from '../stores/appStore';
+import PersonJourney from './PersonJourney';
 
-// Fallback demo cameras shown only when no cameras are in the database
-const DEMO_CAMERAS: CameraType[] = [
-  { id: 1, name: 'Gate A1 — Entrance', floor: 1, status: 'ACTIVE', location: 'Terminal 1 Entry', rtsp_url: '', x_coord: 0, y_coord: 0, angle: 0, is_overhead: true },
-  { id: 2, name: 'Security Checkpoint', floor: 1, status: 'ACTIVE', location: 'Main Security', rtsp_url: '', x_coord: 0, y_coord: 0, angle: 0, is_overhead: true },
-  { id: 3, name: 'Baggage Claim B', floor: 1, status: 'ACTIVE', location: 'Arrivals Hall', rtsp_url: '', x_coord: 0, y_coord: 0, angle: 0, is_overhead: true },
-  { id: 4, name: 'Gate B3 — Restricted', floor: 2, status: 'OFFLINE', location: 'Boarding Gate B3', rtsp_url: '', x_coord: 0, y_coord: 0, angle: 0, is_overhead: true },
-  { id: 5, name: 'Retail Zone East', floor: 2, status: 'ACTIVE', location: 'Shopping Corridor', rtsp_url: '', x_coord: 0, y_coord: 0, angle: 0, is_overhead: true },
-  { id: 6, name: 'Elevator Lobby F1', floor: 1, status: 'ACTIVE', location: 'Elevator Bank', rtsp_url: '', x_coord: 0, y_coord: 0, angle: 0, is_overhead: true },
-  { id: 7, name: 'Tarmac Camera 1', floor: 0, status: 'ACTIVE', location: 'Tarmac North', rtsp_url: '', x_coord: 0, y_coord: 0, angle: 0, is_overhead: true },
-  { id: 8, name: 'Parking Level 2', floor: -1, status: 'MAINTENANCE', location: 'Multi-Storey Parking', rtsp_url: '', x_coord: 0, y_coord: 0, angle: 0, is_overhead: true },
-];
+// ─── CameraFeedCard ────────────────────────────────────────────────────────────
 
-function CameraFeedCard({ cam, selected, onClick }: {
+function CameraFeedCard({ cam, selected, onClick, onSelectTrack }: {
   cam: CameraType;
   selected: boolean;
   onClick: () => void;
+  onSelectTrack: (globalId: string) => void;
 }) {
   const tracks = useStore((state) => state.tracks);
-  const token = useStore((state) => state.token);
-  const isDemoMode = !token || token === 'demo-token';
   const isOffline = cam.status === 'OFFLINE';
-  const isMaint = cam.status === 'MAINTENANCE';
-  const videoRef = React.useRef<HTMLVideoElement | null>(null);
+  const isMaint  = cam.status === 'MAINTENANCE';
+
+  const videoRef  = React.useRef<HTMLVideoElement | null>(null);
   const streamRef = React.useRef<MediaStream | null>(null);
 
+  // Store video natural dimensions set by onLoadedMetadata
+  const [videoSize, setVideoSize] = React.useState<{ w: number; h: number } | null>(null);
+
+  // Force re-render every 150ms so bounding boxes track in real time
+  const [, forceRender] = React.useReducer((n) => n + 1, 0);
   React.useEffect(() => {
-    const stopCurrentStream = () => {
+    const id = setInterval(forceRender, 150);
+    return () => clearInterval(id);
+  }, []);
+
+  // Resolve video source — must match run_all_videos.py exactly so detections align
+  const videoSrc = React.useMemo(() => {
+    if (cam.rtsp_url && cam.rtsp_url.endsWith('.mp4')) {
+      const parts = cam.rtsp_url.split('/');
+      return `/videos/${parts[parts.length - 1]}`;
+    }
+    // Camera ID → video file mapping (mirrors processing/run_all_videos.py)
+    const mapping: Record<number, string> = {
+      1:  '/videos/SS1.mp4',
+      2:  '/videos/SS2.mp4',
+      3:  '/videos/SS3.mp4',
+      4:  '/videos/test_video.mp4',
+      13: '/videos/MS1.mp4',
+      14: '/videos/MS2.mp4',
+      15: '/videos/MS3.mp4',
+    };
+    return mapping[cam.id] || null;
+  }, [cam]);
+
+  // Start / stop video stream when selected state changes
+  React.useEffect(() => {
+    const stopStream = () => {
       if (streamRef.current) {
-        streamRef.current.getTracks().forEach((track) => track.stop());
+        streamRef.current.getTracks().forEach((t) => t.stop());
         streamRef.current = null;
       }
-      if (videoRef.current) videoRef.current.srcObject = null;
+      if (videoRef.current) {
+        videoRef.current.srcObject = null;
+        videoRef.current.src = '';
+      }
+      setVideoSize(null);
     };
 
     if (!selected || isOffline || isMaint) {
-      stopCurrentStream();
+      stopStream();
       return;
     }
 
-    navigator.mediaDevices.getUserMedia({ video: { width: 640, height: 360 } })
-      .then((s) => {
-        stopCurrentStream();
-        streamRef.current = s;
-        if (videoRef.current) {
-          videoRef.current.srcObject = s;
-        }
-      })
-      .catch((err) => {
-        console.error("Webcam access error:", err);
-      });
+    if (videoSrc) {
+      stopStream();
+      if (videoRef.current) {
+        videoRef.current.src = videoSrc;
+        videoRef.current.loop = true;
+        videoRef.current.play().catch((err) => console.error('Video play error:', err));
+      }
+      return;
+    }
 
-    return () => {
-      stopCurrentStream();
-    };
-  }, [selected, isOffline, isMaint]);
+    // Fallback: webcam
+    navigator.mediaDevices
+      .getUserMedia({ video: { width: 640, height: 360 } })
+      .then((s) => {
+        stopStream();
+        streamRef.current = s;
+        if (videoRef.current) videoRef.current.srcObject = s;
+      })
+      .catch((err) => console.error('Webcam access error:', err));
+
+    return stopStream;
+  }, [selected, isOffline, isMaint, videoSrc]);
+
+  // ── Real-time overlay: compute pixel coords from WS track bbox ──────────────
+  const activeTracks = React.useMemo(() => {
+    const now = Date.now() / 1000;
+    return Object.values(tracks || {}).filter(
+      (t: any) => t.camera_id === cam.id && now - t.timestamp < 1.5
+    );
+  }, [tracks, cam.id]);
+
+  const renderOverlayBox = (track: any) => {
+    if (!videoSize || !videoRef.current) return null;
+    const vid    = videoRef.current;
+    const frameW = videoSize.w;
+    const frameH = videoSize.h;
+    const elemW  = vid.clientWidth  || 1;
+    const elemH  = vid.clientHeight || 1;
+    if (!frameW || !frameH) return null;
+
+    // Compute letterbox / pillarbox offsets for objectFit:contain
+    const vidAspect  = frameW / frameH;
+    const elemAspect = elemW  / elemH;
+    let renderW: number, renderH: number, offX: number, offY: number;
+    if (vidAspect > elemAspect) {
+      // wider video → letterbox (black bars top/bottom)
+      renderW = elemW;
+      renderH = elemW / vidAspect;
+      offX    = 0;
+      offY    = (elemH - renderH) / 2;
+    } else {
+      // taller video → pillarbox (black bars left/right)
+      renderH = elemH;
+      renderW = elemH * vidAspect;
+      offX    = (elemW - renderW) / 2;
+      offY    = 0;
+    }
+
+    const [x1, y1, x2, y2] = track.bbox;
+    const left   = offX + (x1 / frameW) * renderW;
+    const top    = offY + (y1 / frameH) * renderH;
+    const width  = ((x2 - x1) / frameW) * renderW;
+    const height = ((y2 - y1) / frameH) * renderH;
+
+    if (width < 4 || height < 4) return null;
+
+    const color =
+      track.identity_type === 'BLACKLISTED' || track.identity_type === 'WATCHLIST_MATCH'
+        ? '#ef4444'
+        : track.has_face
+        ? '#3b82f6'
+        : '#22c55e';
+
+    const label = track.matched_name
+      ? `${track.matched_name} #${track.track_id}`
+      : `#${track.track_id}`;
+
+    return (
+      <div
+        key={track.global_id}
+        onClick={(e) => { e.stopPropagation(); onSelectTrack(track.global_id); }}
+        title={`Click to trace ${label} across all cameras`}
+        style={{
+          position: 'absolute',
+          left,
+          top,
+          width,
+          height,
+          border: `2px solid ${color}`,
+          borderRadius: 3,
+          boxShadow: `0 0 10px ${color}55`,
+          pointerEvents: 'auto',
+          cursor: 'pointer',
+          zIndex: 10,
+        }}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.background = `${color}18`;
+          e.currentTarget.style.borderWidth = '3px';
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.background = 'transparent';
+          e.currentTarget.style.borderWidth = '2px';
+        }}
+      >
+        {/* Label chip above the box */}
+        <span style={{
+          position: 'absolute',
+          top: -20,
+          left: 0,
+          background: color,
+          color: '#fff',
+          fontSize: 10,
+          fontWeight: 700,
+          padding: '1px 5px',
+          borderRadius: 3,
+          whiteSpace: 'nowrap',
+          pointerEvents: 'none',
+        }}>
+          {label}
+        </span>
+        {/* Confidence dot */}
+        {track.has_face && (
+          <span style={{
+            position: 'absolute',
+            bottom: 2,
+            right: 4,
+            fontSize: 8,
+            color,
+            fontWeight: 700,
+          }}>
+            FACE
+          </span>
+        )}
+      </div>
+    );
+  };
 
   return (
     <div
@@ -64,11 +209,16 @@ function CameraFeedCard({ cam, selected, onClick }: {
       onClick={onClick}
       style={{ cursor: 'pointer' }}
     >
-      <div className="camera-feed-placeholder" style={{
-        background: isOffline ? 'var(--black-80)' :
-          `linear-gradient(135deg, var(--surface-2) 0%, var(--surface-3) 100%)`,
-        position: 'relative',
-      }}>
+      <div
+        className="camera-feed-placeholder"
+        style={{
+          background: isOffline
+            ? 'var(--black-80)'
+            : `linear-gradient(135deg, var(--surface-2) 0%, var(--surface-3) 100%)`,
+          position: 'relative',
+          overflow: 'hidden',
+        }}
+      >
         {isOffline ? (
           <>
             <WifiOff size={28} color="var(--red-bright)" />
@@ -80,70 +230,43 @@ function CameraFeedCard({ cam, selected, onClick }: {
             <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--amber-bright)' }}>MAINTENANCE</span>
           </>
         ) : selected ? (
+          // ── Live video + real-time detection overlay ──────────────────────
           <div style={{ position: 'relative', width: '100%', height: '100%' }}>
             <video
               ref={videoRef}
               autoPlay
               playsInline
               muted
-              style={{ width: '100%', height: '100%', objectFit: 'cover', transform: 'scaleX(-1)' }}
+              style={{
+                width: '100%',
+                height: '100%',
+                objectFit: 'contain',
+                background: '#000',
+                display: 'block',
+              }}
+              onLoadedMetadata={(e) => {
+                const v = e.currentTarget;
+                setVideoSize({ w: v.videoWidth, h: v.videoHeight });
+              }}
             />
-            {/* Real-time Bounding Boxes Overlay */}
-            {Object.values(tracks || {})
-              .filter((t: any) => t.camera_id === cam.id && (Date.now() / 1000 - t.timestamp) < 2.0)
-              .map((track: any) => {
-                // Approximate coordinate mapping to the video element bounds (assuming 640x360 standard)
-                const left = (track.bbox[0] / 640) * 100;
-                const top = (track.bbox[1] / 360) * 100;
-                const width = ((track.bbox[2] - track.bbox[0]) / 640) * 100;
-                const height = ((track.bbox[3] - track.bbox[1]) / 360) * 100;
-                return (
-                  <div
-                    key={track.global_id}
-                    style={{
-                      position: 'absolute',
-                      left: `${left}%`,
-                      top: `${top}%`,
-                      width: `${width}%`,
-                      height: `${height}%`,
-                      border: `2px solid ${track.has_face ? '#3b82f6' : '#22c55e'}`,
-                      boxShadow: '0 0 10px rgba(0,0,0,0.5)',
-                      pointerEvents: 'none'
-                    }}
-                  >
-                    <span style={{
-                      position: 'absolute', top: -18, left: -2, background: track.has_face ? '#3b82f6' : '#22c55e', 
-                      color: '#fff', fontSize: 10, padding: '2px 4px', fontWeight: 'bold'
-                    }}>
-                      ID: {track.track_id}
-                    </span>
-                  </div>
-                );
-            })}
+            {/* Detection overlay — only after video dimensions are known */}
+            <div
+              style={{
+                position: 'absolute',
+                inset: 0,
+                pointerEvents: 'none',
+              }}
+            >
+              {activeTracks.map(renderOverlayBox)}
+            </div>
           </div>
         ) : (
+          // ── Idle thumbnail ────────────────────────────────────────────────
           <>
-            {/* Animated scan lines for "live" feel */}
-            <div style={{
-              position: 'absolute', inset: 0,
-              backgroundImage: 'repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.08) 2px, rgba(0,0,0,0.08) 4px)',
-              pointerEvents: 'none',
-            }} />
-            {/* Real movement dots via Websocket Tracks (Wait, this is LiveFeeds... We just show a dummy stream if not active.) */}
-            {isDemoMode && (
-              <svg style={{ position: 'absolute', inset: 0, width: '100%', height: '100%' }}>
-                {Array.from({ length: Math.max(1, (cam.id * 3) % 12) }, (_, i) => ({
-                  id: i,
-                  x: ((cam.id * 17 + i * 31) % 80) + 10,
-                  y: ((cam.id * 23 + i * 13) % 80) + 10,
-                  color: (cam.id + i) % 10 === 0 ? '#ef4444' : '#22c55e',
-                })).map((dot) => (
-                  <circle key={dot.id} cx={`${dot.x}%`} cy={`${dot.y}%`} r="3" fill={dot.color} opacity={0.8} />
-                ))}
-              </svg>
-            )}
             <Camera size={20} color="rgba(255,255,255,0.15)" />
-            <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.2)' }}>CLICK TO STREAM WEBCAM</span>
+            <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.25)' }}>
+              CLICK TO STREAM
+            </span>
           </>
         )}
       </div>
@@ -164,17 +287,23 @@ function CameraFeedCard({ cam, selected, onClick }: {
   );
 }
 
+// ─── LiveFeeds Page ────────────────────────────────────────────────────────────
+
 export default function LiveFeeds() {
   const { cameras } = useStore();
-  const displayCams = cameras.length > 0 ? cameras : DEMO_CAMERAS;
-  const [cols, setCols] = useState<1 | 2 | 3 | 4>(3);
-  const [selectedCam, setSelectedCam] = useState<number | null>(null);
-  const [floorFilter, setFloorFilter] = useState<number | null>(null);
+  const [cols, setCols]           = useState<1 | 2 | 3 | 4>(3);
+  const [selectedCam, setSelectedCam]     = useState<number | null>(null);
+  const [floorFilter, setFloorFilter]     = useState<number | null>(null);
+  const [selectedTrackId, setSelectedTrackId] = useState<string | null>(null);
 
-  const floors = [...new Set(displayCams.map((c) => c.floor))].sort((a, b) => b - a);
-  const filtered = floorFilter !== null ? displayCams.filter((c) => c.floor === floorFilter) : displayCams;
+  // Show nothing until cameras are loaded from the API
+  const displayCams = cameras;
+  const floors  = [...new Set(displayCams.map((c) => c.floor))].sort((a, b) => b - a);
+  const filtered = floorFilter !== null
+    ? displayCams.filter((c) => c.floor === floorFilter)
+    : displayCams;
 
-  const online = displayCams.filter((c) => c.status === 'ACTIVE').length;
+  const online  = displayCams.filter((c) => c.status === 'ACTIVE').length;
   const offline = displayCams.filter((c) => c.status !== 'ACTIVE').length;
 
   return (
@@ -231,7 +360,7 @@ export default function LiveFeeds() {
         </div>
       </div>
 
-      {/* Grid */}
+      {/* Camera Grid */}
       <div style={{ flex: 1, overflow: 'auto', padding: 2 }}>
         <div className={`camera-grid cols-${cols}`}>
           {filtered.map((cam) => (
@@ -240,13 +369,18 @@ export default function LiveFeeds() {
               cam={cam}
               selected={selectedCam === cam.id}
               onClick={() => setSelectedCam(selectedCam === cam.id ? null : cam.id)}
+              onSelectTrack={setSelectedTrackId}
             />
           ))}
         </div>
         {filtered.length === 0 && (
           <div className="empty-state">
             <div className="empty-icon"><Camera size={28} /></div>
-            <div style={{ fontWeight: 600 }}>No cameras on this floor</div>
+            <div style={{ fontWeight: 600 }}>
+              {displayCams.length === 0
+                ? 'No cameras in database — check backend connection'
+                : 'No cameras on this floor'}
+            </div>
           </div>
         )}
       </div>
@@ -267,10 +401,15 @@ export default function LiveFeeds() {
         <span>·</span>
         <span style={{ color: 'var(--green-bright)' }}>● {online} streaming</span>
         {offline > 0 && <><span>·</span><span style={{ color: 'var(--red-bright)' }}>● {offline} offline</span></>}
-        <span style={{ marginLeft: 'auto' }}>
-          Click camera to start/stop preview
-        </span>
+        <span style={{ marginLeft: 'auto' }}>Click camera to start/stop preview</span>
       </div>
+
+      {selectedTrackId && (
+        <PersonJourney
+          globalId={selectedTrackId}
+          onClose={() => setSelectedTrackId(null)}
+        />
+      )}
     </div>
   );
 }

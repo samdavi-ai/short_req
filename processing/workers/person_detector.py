@@ -12,6 +12,11 @@ torch.load = _custom_load
 from ultralytics import YOLO
 
 class PersonDetector:
+    # Production-grade thresholds
+    CONF_THRESHOLD = 0.45   # minimum detection confidence
+    IOU_THRESHOLD  = 0.50   # NMS IoU for deduplication
+    MIN_BOX_AREA   = 1200   # reject tiny false-positive boxes (px²)
+
     def __init__(self, model_path: str = 'yolov8n.pt', use_gpu: bool = False):
         self.model_path = model_path
         self.use_gpu = use_gpu
@@ -28,7 +33,16 @@ class PersonDetector:
             list of dict: [{"track_id": int, "bbox": [x1, y1, x2, y2], "conf": float}]
         """
         # Run tracking with ByteTrack, persist=True is required to keep tracks across frames
-        results = self.model.track(frame, classes=[0], device=self.device, persist=True, verbose=False, tracker="bytetrack.yaml")
+        results = self.model.track(
+            frame,
+            classes=[0],
+            device=self.device,
+            persist=True,
+            verbose=False,
+            tracker="bytetrack.yaml",
+            conf=self.CONF_THRESHOLD,
+            iou=self.IOU_THRESHOLD,
+        )
         
         tracked_objects = []
         for result in results:
@@ -41,7 +55,9 @@ class PersonDetector:
                 conf = float(box.conf[0])
                 track_id = int(boxes.id[i])
                 
-                if conf > 0.25:
+                # Reject tiny boxes (noise / partial body parts at frame edge)
+                box_area = (x2 - x1) * (y2 - y1)
+                if conf > self.CONF_THRESHOLD and box_area > self.MIN_BOX_AREA:
                     tracked_objects.append({
                         "track_id": track_id,
                         "bbox": [int(x1), int(y1), int(x2), int(y2)],
@@ -49,3 +65,4 @@ class PersonDetector:
                     })
                     
         return tracked_objects
+

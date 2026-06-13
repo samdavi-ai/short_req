@@ -6,7 +6,7 @@ const BASE = getApiBaseUrl();
 function authHeaders(token: string | null) {
   return {
     'Content-Type': 'application/json',
-    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    ...(token && token.length > 0 ? { Authorization: `Bearer ${token}` } : {}),
   };
 }
 

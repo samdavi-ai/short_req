@@ -43,13 +43,13 @@ if __name__ == "__main__":
     tests_dir = os.path.join(project_dir, "tests")
     
     video_map = [
-        (101, os.path.join(tests_dir, "SS1.mp4")),
-        (102, os.path.join(tests_dir, "SS2.mp4")),
-        (103, os.path.join(tests_dir, "SS3.mp4")),
-        (201, os.path.join(tests_dir, "MS1.mp4")),
-        (202, os.path.join(tests_dir, "MS2.mp4")),
-        (203, os.path.join(tests_dir, "MS3.mp4")),
-        (204, os.path.join(base_dir, "test_video.mp4")),
+        (1, os.path.join(tests_dir, "SS1.mp4")),
+        (2, os.path.join(tests_dir, "SS2.mp4")),
+        (3, os.path.join(tests_dir, "SS3.mp4")),
+        (13, os.path.join(tests_dir, "MS1.mp4")),
+        (14, os.path.join(tests_dir, "MS2.mp4")),
+        (15, os.path.join(tests_dir, "MS3.mp4")),
+        (4, os.path.join(base_dir, "test_video.mp4")),
     ]
     
     processes = []

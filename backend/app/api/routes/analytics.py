@@ -23,7 +23,10 @@ def _get_system_stats(db: Session) -> SystemStats:
     total_cameras = db.query(Camera).count()
     active_cameras = db.query(Camera).filter(Camera.status == CameraStatusEnum.ACTIVE).count()
     offline_cameras = db.query(Camera).filter(Camera.status == CameraStatusEnum.OFFLINE).count()
-    active_tracks = db.query(ActiveTrack).filter(ActiveTrack.is_active == True).count()
+    active_tracks = db.query(ActiveTrack).filter(
+        ActiveTrack.is_active == True,
+        ActiveTrack.last_seen >= datetime.now(timezone.utc) - timedelta(seconds=10),
+    ).count()
 
     total_visitors = db.query(Visitor).count()
     blacklisted = db.query(Visitor).filter(Visitor.status == VisitorStatusEnum.BLACKLISTED).count()

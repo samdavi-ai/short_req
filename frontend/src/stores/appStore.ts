@@ -330,19 +330,19 @@ export const useStore = create<AppStore>((set) => ({
       set({ reconnectTimeoutId: timeoutId, websocket: null });
     };
 
-    // Purge stale tracks every 10 seconds
+    // Purge stale tracks every 2 seconds
     const cleanupId = setInterval(() => {
       const now = Date.now() / 1000;
       set((state) => {
         const fresh: Record<string, LiveTrack> = {};
         for (const [gid, track] of Object.entries(state.tracks)) {
-          if (now - track.timestamp < 30) {
+          if (now - track.timestamp < 3) {
             fresh[gid] = track;
           }
         }
         return { tracks: fresh };
       });
-    }, 10000);
+    }, 2000);
     set({ trackCleanupIntervalId: cleanupId });
   }
 }));

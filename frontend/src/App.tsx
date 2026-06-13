@@ -44,10 +44,10 @@ export default function App() {
 
   // Initialize data on login
   useEffect(() => {
-    if (token && token !== 'demo-token') {
+    if (token) {
       useStore.getState().initWebSocket();
       const { setCameras, setAlerts, setVisitors, setEmployees, setZones } = useStore.getState();
-      const headers = { Authorization: `Bearer ${token}` };
+      const headers = token !== 'demo-token' ? { Authorization: `Bearer ${token}` } : {};
       const base = getApiBaseUrl();
       Promise.all([
         fetch(`${base}/cameras/`,             { headers }).then(r => r.ok ? r.json() : []),

@@ -63,16 +63,17 @@ export default function Topbar({ onOpenPalette }: { onOpenPalette?: () => void }
   const systemHealth = threatLevel === 'high' ? 'critical' : threatLevel === 'elevated' ? 'degraded' : 'good';
 
   const fetchAll = useCallback(async () => {
-    if (!token || token === 'demo-token') return;
     setRefreshing(true);
     try {
+      // Backend routes are unauthenticated — token is optional
+      const t = token || '';
       const [a, v, e, z, c, s] = await Promise.all([
-        api.getAlerts(token),
-        api.getVisitors(token),
-        api.getEmployees(token),
-        api.getZones(token),
-        api.getCameras(token),
-        api.getStats(token),
+        api.getAlerts(t),
+        api.getVisitors(t),
+        api.getEmployees(t),
+        api.getZones(t),
+        api.getCameras(t),
+        api.getStats(t),
       ]);
       if (Array.isArray(a)) setAlerts(a);
       if (Array.isArray(v)) setVisitors(v);

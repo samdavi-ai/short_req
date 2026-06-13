@@ -20,4 +20,4 @@ COPY processing/ .
 COPY backend/app ./app
 
 # Run the camera pipeline coordinator as the main entrypoint
-CMD ["python3", "-m", "pipeline.camera_pipeline"]
+CMD ["python3", "-m", "pipeline.pipeline_manager"]

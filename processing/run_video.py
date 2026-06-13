@@ -3,6 +3,8 @@ import sys
 
 # Add processing dir to path
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+# Add backend dir to path for app imports
+sys.path.append(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "backend"))
 
 from pipeline.camera_pipeline import CameraPipeline
 import cv2
@@ -35,14 +37,18 @@ def run():
                 continue
                 
             frame_count += 1
-            if frame_count % 30 == 0:
+            # Skip frames to reduce CPU load — process every 3rd frame
+            if frame_count % 3 != 0:
+                continue
+
+            if frame_count % 90 == 0:
                 print(f"Processing frame {frame_count}...")
             
             # Send to pipeline (this detects, tracks, and publishes to Redis)
             pipeline.process_frame(frame)
             
-            # Small sleep to simulate real-time stream (30fps ~ 33ms)
-            time.sleep(0.033)
+            # Pace to ~10fps effective processing
+            time.sleep(0.03)
             
     except KeyboardInterrupt:
         print("\nStopping processing...")

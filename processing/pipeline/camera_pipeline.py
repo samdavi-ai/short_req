@@ -132,9 +132,9 @@ def _parse_stored_vector(embedding_id_or_json):
 
 
 class CameraPipeline:
-    # Layout canvas reference dimensions (matches frontend LayoutEditor)
-    LAYOUT_WIDTH = 900
-    LAYOUT_HEIGHT = 600
+    # Layout canvas reference dimensions (matches frontend LayoutEditor and seed_alpha2 zone coords)
+    LAYOUT_WIDTH = 1200
+    LAYOUT_HEIGHT = 800
     # Track persistence batch interval (seconds)
     PERSIST_INTERVAL = 5.0
 
@@ -410,7 +410,10 @@ class CameraPipeline:
         db = SessionLocal()
         try:
             from app.models.models import ActiveTrack
-            from datetime import datetime, timezone
+            from datetime import datetime, timezone, timedelta
+
+            now = datetime.now(timezone.utc)
+            stale_cutoff = now - timedelta(seconds=5)
 
             # Deduplicate buffer, keeping only the latest update for each unique track_id
             unique_tracks = {}
@@ -418,11 +421,18 @@ class CameraPipeline:
                 track_id = f"cam_{t['camera_id']}_track_{t['track_id']}"
                 unique_tracks[track_id] = t
 
+            # Mark stale tracks for THIS camera as inactive first
+            db.query(ActiveTrack).filter(
+                ActiveTrack.camera_id == self.camera_id,
+                ActiveTrack.is_active == True,
+                ActiveTrack.last_seen < stale_cutoff,
+            ).update({"is_active": False}, synchronize_session=False)
+
             for track_id, t in unique_tracks.items():
                 existing = db.query(ActiveTrack).filter(ActiveTrack.id == track_id).first()
 
                 if existing:
-                    existing.last_seen = datetime.now(timezone.utc)
+                    existing.last_seen = now
                     existing.last_x = t["x"]
                     existing.last_y = t["y"]
                     existing.is_active = True
@@ -453,3 +463,4 @@ class CameraPipeline:
         finally:
             db.close()
             self._track_buffer.clear()
+
