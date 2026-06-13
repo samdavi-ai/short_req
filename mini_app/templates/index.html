@@ -267,6 +267,7 @@
             gap: 8px;
             transition: all 0.2s;
             position: relative;
+            cursor: pointer;
         }
 
         .active-card:hover {
@@ -720,6 +721,14 @@
             namingModal.classList.remove('active');
         });
 
+        // Open naming modal manually
+        window.openNamingModal = function(globalId, currentName) {
+            modalGlobalId.value = globalId;
+            modalNameInput.value = (currentName === "Unknown Identity" || currentName === "Unknown") ? "" : currentName;
+            namingModal.classList.add('active');
+            modalNameInput.focus();
+        };
+
         // Save name
         modalSave.addEventListener('click', async () => {
             const globalId = modalGlobalId.value;
@@ -782,10 +791,11 @@
                 const name = t.matched_name || "Unknown Identity";
                 const isKnownClass = t.matched_name ? 'status-visitor' : 'status-unknown';
                 const labelStatus = t.matched_name ? 'Visitor' : 'Unknown';
+                const buttonText = t.matched_name ? "🏷️ Rename" : "🏷️ Identify";
 
                 // Add random timestamp query parameter to crop image to break browser caching
                 const card = `
-                    <div class="active-card">
+                    <div class="active-card" onclick="openNamingModal('${t.global_id}', '${name.replace(/'/g, "\\'")}')">
                         <img class="card-crop" src="${t.crop_url}?t=${Date.now()}" onerror="this.src='https://placehold.co/150x110/050811/fff?text=Person'">
                         <div class="card-details">
                             <span class="card-name" title="${name}">${name}</span>
@@ -794,6 +804,7 @@
                             <div class="card-location">
                                 <span>📹 Camera ${t.camera_id}</span>
                             </div>
+                            <button class="btn btn-secondary" style="font-size: 10px; padding: 4px 8px; width: 100%; justify-content: center; margin-top: 6px;">${buttonText}</button>
                         </div>
                     </div>
                 `;
