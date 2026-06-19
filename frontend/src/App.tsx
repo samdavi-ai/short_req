@@ -20,12 +20,14 @@ import AnalyticsPage from './components/AnalyticsPage';
 import CameraManager from './components/CameraManager';
 import SettingsPage from './components/SettingsPage';
 import PersonLookupPage from './components/PersonLookupPage';
+import TrackingMap from './components/TrackingMap';
 import { getApiBaseUrl } from './config/runtime';
 
 function renderPage(page: string): React.ReactElement {
   switch (page) {
     case 'dashboard':      return <Dashboard />;
     case 'live':           return <LiveFeeds />;
+    case 'tracking-map':   return <TrackingMap />;
     case 'layout':         return <LayoutEditor />;
     case 'alerts':         return <AlertsPage />;
     case 'visitors':       return <VisitorsPage />;

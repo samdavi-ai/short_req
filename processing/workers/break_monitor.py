@@ -1,13 +1,15 @@
 """
-EmployeeBreakMonitor — Real-time break compliance tracking.
+EmployeeBreakMonitor — Real-time break compliance tracking with DB persistence.
 
 Tracks when identified employees enter/leave LOUNGE zones.
 Triggers BREAK_VIOLATION alerts if an employee goes too long without a break.
+Persists all break records to the employee_breaks DB table for audit trail.
 """
 
 import time
 import json
 import logging
+from datetime import datetime, timezone
 from typing import Optional, Dict
 
 logger = logging.getLogger(__name__)
@@ -27,7 +29,7 @@ class EmployeeBreakMonitor:
         self.default_interval_minutes = 120     # must take break every 2 hours
         self.default_min_duration_minutes = 15  # minimum 15 min break
 
-        logger.info("EmployeeBreakMonitor initialized.")
+        logger.info("EmployeeBreakMonitor initialized (with DB persistence).")
 
     def update_employee_status(self, employee_id: int, in_lounge_zone: bool,
                                camera_id: int = 0,
@@ -78,12 +80,15 @@ class EmployeeBreakMonitor:
             is_on_break = False
             break_duration = 0.0
 
-            # If they were just on break, record end time
+            # If they were just on break, record end time and persist to DB
             if employee_id in self.current_break_start:
-                ended_break_duration = now - self.current_break_start[employee_id]
+                break_start_epoch = self.current_break_start[employee_id]
+                ended_break_duration = now - break_start_epoch
                 del self.current_break_start[employee_id]
 
-                if ended_break_duration >= min_duration:
+                is_valid = ended_break_duration >= min_duration
+
+                if is_valid:
                     # Valid break — reset the timer
                     self.last_break_end[employee_id] = now
                     self.alert_fired[employee_id] = False
@@ -92,6 +97,15 @@ class EmployeeBreakMonitor:
                 else:
                     logger.info("Employee %d left lounge early (%.0fs < %.0fs required).",
                                 employee_id, ended_break_duration, min_duration)
+
+                # Persist break record to DB regardless of validity
+                self._persist_break_record(
+                    employee_id=employee_id,
+                    start_epoch=break_start_epoch,
+                    end_epoch=now,
+                    duration_seconds=int(ended_break_duration),
+                    compliant=is_valid,
+                )
 
             time_since_break = now - self.last_break_end[employee_id]
 
@@ -112,6 +126,35 @@ class EmployeeBreakMonitor:
             "overdue_by": round(overdue_by, 1),
             "break_duration": round(break_duration, 1),
         }
+
+    def _persist_break_record(self, employee_id: int, start_epoch: float,
+                              end_epoch: float, duration_seconds: int,
+                              compliant: bool):
+        """Write a break record to the employee_breaks DB table for audit trail."""
+        try:
+            from app.core.database import SessionLocal
+            from app.models.models import EmployeeBreak
+
+            db = SessionLocal()
+            try:
+                record = EmployeeBreak(
+                    employee_id=employee_id,
+                    start_time=datetime.fromtimestamp(start_epoch, tz=timezone.utc),
+                    end_time=datetime.fromtimestamp(end_epoch, tz=timezone.utc),
+                    duration_seconds=duration_seconds,
+                    compliant=compliant,
+                )
+                db.add(record)
+                db.commit()
+                logger.debug("Persisted break record for employee %d (%.0fs, compliant=%s).",
+                             employee_id, duration_seconds, compliant)
+            except Exception as e:
+                logger.error("Failed to persist break record: %s", e)
+                db.rollback()
+            finally:
+                db.close()
+        except ImportError:
+            logger.warning("Could not import DB models for break persistence.")
 
     def _fire_break_alert(self, employee_id: int, camera_id: int,
                           time_since: float, overdue_by: float):

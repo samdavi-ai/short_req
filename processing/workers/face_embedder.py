@@ -1,46 +1,33 @@
 """
-FaceEmbedder — Real face feature extraction using ResNet50 proxy.
+FaceEmbedder — Real face feature extraction using ArcFace (w600k_r50.onnx) from InsightFace buffalo_l pack.
 
 Produces a 512-dimensional L2-normalized embedding vector from a face crop.
-In production this would use ArcFace/FaceNet; here we use a ResNet50
-backbone with a dimensionality reduction head to produce a stable 512-d vector.
+Uses the FaceDetector instance's cache to avoid re-running models on the same crop.
 """
 
 import numpy as np
 import cv2
 import logging
-import torch
-import torchvision.transforms as T
-from torchvision.models import resnet50, ResNet50_Weights
+from workers.face_detector import get_shared_face_analysis
 
 logger = logging.getLogger(__name__)
 
 
 class FaceEmbedder:
-    def __init__(self, model_path: str = None, use_gpu: bool = False):
-        self.device = torch.device('cuda' if use_gpu and torch.cuda.is_available() else 'cpu')
-
-        # Load a pre-trained ResNet50 as a proxy for ArcFace
-        base_model = resnet50(weights=ResNet50_Weights.IMAGENET1K_V1)
-
-        # Replace classifier with a 2048 → 512 projection head
-        base_model.fc = torch.nn.Sequential(
-            torch.nn.Linear(2048, 512),
-            torch.nn.BatchNorm1d(512),
-        )
-        self.model = base_model
-        self.model.to(self.device)
-        self.model.eval()
-
-        # Standard face preprocessing (112x112 crop, ImageNet normalization)
-        self.transform = T.Compose([
-            T.ToPILImage(),
-            T.Resize((112, 112)),
-            T.ToTensor(),
-            T.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
-        ])
-
-        logger.info("FaceEmbedder ResNet50-proxy loaded ✓ (Device: %s, Dim: 512)", self.device)
+    def __init__(self, model_path: str = None, use_gpu: bool = False,
+                 face_detector=None):
+        """
+        Args:
+            face_detector: Optional FaceDetector instance to share cached face data.
+                           This avoids re-running the model on the same person crop.
+        """
+        self._face_detector = face_detector
+        # Warm up shared app
+        try:
+            get_shared_face_analysis()
+            logger.info("FaceEmbedder successfully initialized using ArcFace from InsightFace buffalo_l.")
+        except Exception as e:
+            logger.error("Failed to initialize FaceEmbedder: %s", e)
 
     def extract_embedding(self, face_crop: np.ndarray):
         """
@@ -51,19 +38,26 @@ class FaceEmbedder:
             return np.zeros(512).tolist()
 
         try:
-            # Convert BGR → RGB
-            crop_rgb = cv2.cvtColor(face_crop, cv2.COLOR_BGR2RGB)
+            # Check if there is a cached face embedding from the last detect_faces run
+            last_faces = self._face_detector.last_faces if self._face_detector else []
+            if last_faces:
+                # Return the embedding of the largest detected face
+                faces_sorted = sorted(last_faces, key=lambda f: (f.bbox[2]-f.bbox[0])*(f.bbox[3]-f.bbox[1]), reverse=True)
+                embedding = faces_sorted[0].embedding
+                norm = np.linalg.norm(embedding) + 1e-12
+                return (embedding / norm).tolist()
 
-            input_tensor = self.transform(crop_rgb).unsqueeze(0).to(self.device)
-
-            with torch.no_grad():
-                features = self.model(input_tensor)
-
-            vec = features.squeeze().cpu().numpy()
-            # L2 normalize
-            vec_norm = vec / (np.linalg.norm(vec) + 1e-12)
-            return vec_norm.tolist()
+            # Fallback: if face_crop is passed directly (e.g. during manual visitor enrollment),
+            # run FaceAnalysis on the face crop itself
+            app = get_shared_face_analysis()
+            faces = app.get(face_crop)
+            if faces:
+                faces_sorted = sorted(faces, key=lambda f: (f.bbox[2]-f.bbox[0])*(f.bbox[3]-f.bbox[1]), reverse=True)
+                embedding = faces_sorted[0].embedding
+                norm = np.linalg.norm(embedding) + 1e-12
+                return (embedding / norm).tolist()
 
         except Exception as e:
             logger.warning("FaceEmbedder extraction failed: %s", e)
-            return np.zeros(512).tolist()
+
+        return np.zeros(512).tolist()

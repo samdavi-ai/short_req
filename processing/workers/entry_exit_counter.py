@@ -4,8 +4,13 @@ EntryExitCounter — Real tripwire line-crossing detection.
 Uses line-segment intersection math to detect when a tracked person
 crosses a virtual tripwire line, and determines direction (IN / OUT)
 based on which side of the line the centroid moved from/to.
+
+Supports bidirectional crossing: a person can enter (IN) and later
+exit (OUT) through the same tripwire. Same-direction consecutive
+crossings are suppressed with a cooldown to prevent double-counting.
 """
 
+import time
 import logging
 from typing import Optional, Tuple, Dict
 
@@ -13,11 +18,14 @@ logger = logging.getLogger(__name__)
 
 
 class EntryExitCounter:
+    # Cooldown: suppress same-direction re-crossing for this many seconds
+    DIRECTION_COOLDOWN_S = 3.0
+
     def __init__(self):
         # track_id → last known centroid position
         self.prev_positions: Dict[str, Tuple[float, float]] = {}
-        # track_id → set of crossed tripwire zone_ids (prevents double-count)
-        self.crossed_tracks: Dict[str, set] = {}
+        # (track_id, zone_id) → {"direction": "IN"/"OUT", "timestamp": float}
+        self._last_crossing: Dict[Tuple[str, int], dict] = {}
         # zone_id → {"in": int, "out": int}
         self.zone_counts: Dict[int, Dict[str, int]] = {}
 
@@ -43,12 +51,6 @@ class EntryExitCounter:
         if prev_pos is None:
             return None
 
-        # Check if we already counted this track for this zone
-        if track_id not in self.crossed_tracks:
-            self.crossed_tracks[track_id] = set()
-        if zone_id in self.crossed_tracks[track_id]:
-            return None
-
         lx1, ly1, lx2, ly2 = tripwire_line
         px1, py1 = prev_pos
         px2, py2 = current_pos
@@ -60,11 +62,20 @@ class EntryExitCounter:
             return None
 
         # Determine direction based on cross product sign
-        # Cross product of tripwire vector and movement vector
         direction = self._compute_direction(px1, py1, px2, py2, lx1, ly1, lx2, ly2)
 
-        # Mark as crossed
-        self.crossed_tracks[track_id].add(zone_id)
+        # Check directional cooldown — only suppress SAME direction re-crossing
+        now = time.time()
+        crossing_key = (track_id, zone_id)
+        last = self._last_crossing.get(crossing_key)
+
+        if last is not None:
+            if last["direction"] == direction and (now - last["timestamp"]) < self.DIRECTION_COOLDOWN_S:
+                # Same direction within cooldown → jitter/double-count, suppress
+                return None
+
+        # Record this crossing
+        self._last_crossing[crossing_key] = {"direction": direction, "timestamp": now}
 
         # Update zone counts
         if zone_id not in self.zone_counts:
@@ -123,6 +134,11 @@ class EntryExitCounter:
         """Get current IN/OUT counts for a zone."""
         return self.zone_counts.get(zone_id, {"in": 0, "out": 0})
 
+    def get_zone_occupancy(self, zone_id: int) -> int:
+        """Get net occupancy (in - out) for a zone."""
+        counts = self.get_zone_counts(zone_id)
+        return max(0, counts["in"] - counts["out"])
+
     def reset_zone_counts(self, zone_id: int):
         """Reset counts for a zone (e.g., at end of shift)."""
         self.zone_counts[zone_id] = {"in": 0, "out": 0}
@@ -130,4 +146,7 @@ class EntryExitCounter:
     def cleanup_track(self, track_id: str):
         """Remove tracking data for a deregistered track."""
         self.prev_positions.pop(track_id, None)
-        self.crossed_tracks.pop(track_id, None)
+        # Clean up all crossing records for this track
+        keys_to_remove = [k for k in self._last_crossing if k[0] == track_id]
+        for k in keys_to_remove:
+            del self._last_crossing[k]

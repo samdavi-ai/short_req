@@ -37,6 +37,7 @@ from workers.identity_resolver import IdentityResolver
 from workers.intrusion_engine import IntrusionEngine
 from workers.entry_exit_counter import EntryExitCounter
 from workers.break_monitor import EmployeeBreakMonitor
+import utils.database_logger as db_log
 
 from app.core.database import SessionLocal
 from app.models.models import Camera, Zone, ZoneType
@@ -150,7 +151,7 @@ class CameraPipeline:
         self.detector = PersonDetector()
         self.tracker = SingleCameraTracker()
         self.face_detector = FaceDetector()
-        self.face_embedder = FaceEmbedder()
+        self.face_embedder = FaceEmbedder(face_detector=self.face_detector)
         self.body_reid = BodyReIDEmbedder()
         self.head_embedder = HeadTopEmbedder()
         self.intrusion_engine = IntrusionEngine(self.redis_client)
@@ -166,6 +167,7 @@ class CameraPipeline:
         self.floor = 1
         self.camera_name = f"Camera {self.camera_id}"
         self.status = "ACTIVE"
+        self.is_overhead = True  # default: overhead-first design
         self._last_status_check_time = 0.0
         self._load_camera_config()
 
@@ -179,7 +181,7 @@ class CameraPipeline:
         self._load_zones()
 
     def _load_camera_config(self):
-        """Load camera floor, name, and status from DB."""
+        """Load camera floor, name, status, and is_overhead from DB."""
         db = SessionLocal()
         try:
             camera = db.query(Camera).filter(Camera.id == self.camera_id).first()
@@ -187,6 +189,7 @@ class CameraPipeline:
                 self.floor = camera.floor
                 self.camera_name = camera.name
                 self.status = camera.status.value if hasattr(camera.status, 'value') else str(camera.status)
+                self.is_overhead = camera.is_overhead if camera.is_overhead is not None else True
         except Exception as e:
             logger.error("Failed to query camera config: %s", e)
         finally:
@@ -328,6 +331,7 @@ class CameraPipeline:
                 head_vector=head_vector,
                 camera_id=self.camera_id,
                 floor=self.floor,
+                is_overhead=self.is_overhead,
             )
 
             # ── 7. Identity resolution (known/unknown/watchlist) ──────────
@@ -338,6 +342,50 @@ class CameraPipeline:
                 head_vector=head_vector,
                 camera_id=self.camera_id,
                 floor=self.floor,
+            )
+
+            # ── 7.1 Save face crop and log detection to database.db with accuracy metrics ──
+            face_bbox_list = None
+            landmarks_2d_list = None
+            landmarks_3d_list = None
+            pose_list = None
+            gender_val = None
+            age_val = None
+            
+            if has_face:
+                last_faces = self.face_detector.last_faces
+                if last_faces:
+                    # Sort faces to find the largest face
+                    f = sorted(last_faces, key=lambda face: (face.bbox[2]-face.bbox[0])*(face.bbox[3]-face.bbox[1]), reverse=True)[0]
+                    fx1, fy1, fx2, fy2 = int(f.bbox[0]), int(f.bbox[1]), int(f.bbox[2]), int(f.bbox[3])
+                    face_crop = crop[fy1:fy2, fx1:fx2]
+                    
+                    if face_crop.size > 0:
+                        # Save the face crop to static/cropped_faces/
+                        face_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "static", "cropped_faces")
+                        os.makedirs(face_dir, exist_ok=True)
+                        face_crop_path = os.path.join(face_dir, f"{global_id}.jpg")
+                        cv2.imwrite(face_crop_path, face_crop)
+                        
+                    face_bbox_list = [fx1, fy1, fx2, fy2]
+                    landmarks_2d_list = f.landmark_2d_106.tolist() if hasattr(f, "landmark_2d_106") and f.landmark_2d_106 is not None else None
+                    landmarks_3d_list = f.landmark_3d_68.tolist() if hasattr(f, "landmark_3d_68") and f.landmark_3d_68 is not None else None
+                    pose_list = f.pose.tolist() if hasattr(f, "pose") and f.pose is not None else None
+                    gender_val = int(f.gender) if hasattr(f, "gender") and f.gender is not None else None
+                    age_val = int(f.age) if hasattr(f, "age") and f.age is not None else None
+
+            # Log to database.db
+            db_log.log_detection(
+                camera_id=self.camera_id,
+                global_id=global_id,
+                body_bbox=[x1, y1, x2, y2],
+                face_bbox=face_bbox_list,
+                face_landmarks_2d=landmarks_2d_list,
+                face_landmarks_3d=landmarks_3d_list,
+                pose=pose_list,
+                gender=gender_val,
+                age=age_val,
+                match_similarity=identity.get("similarity")
             )
 
             # ── 8. Map coordinates to layout canvas ───────────────────────

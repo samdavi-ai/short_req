@@ -41,6 +41,8 @@ class IntrusionEngine:
     ALERT_COOLDOWN_SECONDS = 120
     # Zone-level rate limit: max 1 alert per zone per this many seconds
     ZONE_RATE_LIMIT_SECONDS = 30
+    # Dwell update publishing interval (seconds) — prevents flooding Redis
+    DWELL_UPDATE_INTERVAL = 10
 
     def __init__(self, redis_client):
         self.redis_client = redis_client
@@ -50,6 +52,8 @@ class IntrusionEngine:
         self._dwell_alert_times = {}        # key -> last_alert_epoch
         # Zone-level rate limiter: zone_id -> last_alert_epoch
         self._zone_last_alert = {}
+        # Dwell update publishing rate limiter: dedup_key -> last_publish_epoch
+        self._dwell_update_times = {}
 
     def evaluate_person(self, global_id: str, track_id: int, camera_id: int, floor: int, x: float, y: float):
         """
@@ -93,6 +97,20 @@ class IntrusionEngine:
                             self._dwell_entry_times[dedup_key] = now
                         else:
                             elapsed = now - self._dwell_entry_times[dedup_key]
+
+                            # Publish DWELL_UPDATE for frontend heatmap (rate-limited)
+                            last_dwell_pub = self._dwell_update_times.get(dedup_key, 0)
+                            if now - last_dwell_pub > self.DWELL_UPDATE_INTERVAL:
+                                self._dwell_update_times[dedup_key] = now
+                                self._publish_dwell_update(
+                                    global_id=global_id,
+                                    zone_id=zone.id,
+                                    zone_name=zone.name,
+                                    dwell_seconds=elapsed,
+                                    camera_id=camera_id,
+                                )
+
+                            # Trigger alert if dwell exceeds threshold
                             last_dwell_alert = self._dwell_alert_times.get(dedup_key, 0)
                             zone_last = self._zone_last_alert.get(zone.id, 0)
                             if (elapsed > zone.dwell_alert_seconds and
@@ -128,6 +146,26 @@ class IntrusionEngine:
         if int(now) % 60 == 0:
             self._cleanup_stale(now)
 
+    def _publish_dwell_update(self, global_id: str, zone_id: int,
+                              zone_name: str, dwell_seconds: float,
+                              camera_id: int):
+        """Publish a DWELL_UPDATE event to Redis for frontend heatmap."""
+        event = {
+            "type": "DWELL_UPDATE",
+            "camera_id": camera_id,
+            "data": {
+                "global_id": global_id,
+                "zone_id": zone_id,
+                "zone_name": zone_name,
+                "dwell_seconds": round(dwell_seconds, 1),
+                "timestamp": str(time.time()),
+            }
+        }
+        try:
+            self.redis_client.publish("ws_events", json.dumps(event, default=str))
+        except Exception as e:
+            logger.error("Failed to publish DWELL_UPDATE: %s", e)
+
     def _cleanup_stale(self, now):
         """Remove dedup entries older than 10 minutes to prevent unbounded memory growth."""
         cutoff = now - 600
@@ -139,6 +177,9 @@ class IntrusionEngine:
         }
         self._dwell_alert_times = {
             k: v for k, v in self._dwell_alert_times.items() if v > cutoff
+        }
+        self._dwell_update_times = {
+            k: v for k, v in self._dwell_update_times.items() if v > cutoff
         }
 
     def _trigger_alert(self, db: Session, camera_id: int, track_id: str, global_id: str,

@@ -38,16 +38,22 @@ class Settings(BaseSettings):
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 1440  # 24 hours
 
-    # --- CORS ---
-    # In production, set ALLOWED_ORIGINS to your actual frontend domain(s)
-    ALLOWED_ORIGINS: list[str] = ["http://localhost:5173", "http://localhost:80"]
+    ALLOWED_ORIGINS: list[str] = [
+        "http://localhost:5173",
+        "http://localhost:5174",
+        "http://localhost:5175",
+        "http://localhost:80",
+        "http://127.0.0.1:5173",
+        "http://127.0.0.1:5174",
+        "http://127.0.0.1:5175",
+    ]
 
     # --- Camera Pipeline ---
     MAX_CAMERAS: int = 32
     INFERENCE_BATCH_SIZE: int = 4
     DETECTION_THRESHOLD: float = 0.5
     REID_THRESHOLD: float = 0.72
-    FACE_MATCH_THRESHOLD: float = 0.68
+    FACE_MATCH_THRESHOLD: float = 0.48
 
     # --- Vector Storage ---
     REID_COLLECTION_NAME: str = "airport_reid_vectors"

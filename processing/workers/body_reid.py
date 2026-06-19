@@ -39,10 +39,17 @@ class BodyReIDEmbedder:
         if h_stripe == 0:
             h_stripe = 1
             
+        # Focus on the center 60% of the width to reduce background color dominance
+        x_start = int(w * 0.20)
+        x_end = int(w * 0.80)
+        if x_end <= x_start:
+            x_start = 0
+            x_end = w
+            
         stripes = [
-            person_crop[0:h_stripe, :],
-            person_crop[h_stripe:2*h_stripe, :],
-            person_crop[2*h_stripe:h, :]
+            person_crop[0:h_stripe, x_start:x_end],
+            person_crop[h_stripe:2*h_stripe, x_start:x_end],
+            person_crop[2*h_stripe:h, x_start:x_end]
         ]
         
         hist_features = []
@@ -95,9 +102,9 @@ class BodyReIDEmbedder:
         # 2. Extract Spatial Color Histogram
         color_vec = self._extract_spatial_color_histogram(person_crop)
         
-        # 3. Fuse embeddings: 70% color pattern, 30% ResNet deep texture/geometry
-        w_color = 0.70
-        w_resnet = 0.30
+        # 3. Fuse embeddings: 50% color pattern, 50% ResNet deep texture/geometry
+        w_color = 0.50
+        w_resnet = 0.50
         
         combined_vec = np.concatenate([
             np.sqrt(w_color) * color_vec,

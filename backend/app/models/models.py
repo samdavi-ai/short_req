@@ -289,6 +289,23 @@ class ActiveTrack(Base):
     camera = relationship("Camera", back_populates="tracks")
 
 
+# ─── Test Runs Logging ────────────────────────────────────────────────────────
+
+class TestRunTrack(Base):
+    __tablename__ = "test_run_tracks"
+
+    id             = Column(Integer, primary_key=True, autoincrement=True)
+    video_name     = Column(String(100), nullable=False, index=True)
+    camera_id      = Column(Integer, ForeignKey("cameras.id", ondelete="SET NULL"))
+    global_id      = Column(String(100), nullable=False, index=True)
+    local_track_id = Column(Integer)
+    last_x         = Column(Float)
+    last_y         = Column(Float)
+    timestamp      = Column(DateTime(timezone=True), server_default=func.now())
+
+    camera = relationship("Camera")
+
+
 # ─── Alerts ───────────────────────────────────────────────────────────────────
 
 class Alert(Base):

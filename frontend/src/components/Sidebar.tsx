@@ -1,13 +1,14 @@
 import React, { useState } from 'react';
 import {
   LayoutDashboard, Camera, MapPin, ShieldAlert, Users,
-  UserCheck, BarChart3, Settings, LogOut, Pin, PinOff, Fingerprint,
+  UserCheck, BarChart3, Settings, LogOut, Pin, PinOff, Fingerprint, Map,
 } from 'lucide-react';
 import { useStore } from '../stores/appStore';
 
 const NAV = [
   { id: 'dashboard',     label: 'Dashboard',       icon: LayoutDashboard, section: 'MONITOR' },
   { id: 'live',          label: 'Live Feeds',       icon: Camera,          section: 'MONITOR' },
+  { id: 'tracking-map',  label: 'Tracking Map',     icon: Map,             section: 'MONITOR' },
   { id: 'layout',        label: 'Layout Editor',    icon: MapPin,          section: 'MONITOR' },
   { id: 'alerts',        label: 'Alerts',           icon: ShieldAlert,     section: 'OPS',    badge: true },
   { id: 'visitors',      label: 'Visitors',         icon: Users,           section: 'OPS' },

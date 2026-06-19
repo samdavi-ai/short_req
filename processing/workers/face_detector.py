@@ -1,71 +1,83 @@
+"""
+FaceDetector — Face detection using RetinaFace (det_10g.onnx) from InsightFace buffalo_l pack.
+
+Uses instance-level caching to ensure thread/process safety when multiple
+CameraPipeline instances run concurrently. Each FaceDetector instance
+maintains its own cache of last-processed faces.
+"""
+
 import numpy as np
 import cv2
+import logging
+from insightface.app import FaceAnalysis
+
+logger = logging.getLogger(__name__)
+
+# Shared FaceAnalysis model (loaded once, safe to share — the model is stateless)
+_shared_face_analysis = None
+
+
+def get_shared_face_analysis():
+    global _shared_face_analysis
+    if _shared_face_analysis is None:
+        logger.info("Initializing InsightFace buffalo_l pack on ONNX Runtime (CPU) ...")
+        # Run strictly on CPU using CPUExecutionProvider as specified by cc.txt
+        _shared_face_analysis = FaceAnalysis(name='buffalo_l', providers=['CPUExecutionProvider'])
+        # det_size=(320, 320) is standard for person crop detection
+        _shared_face_analysis.prepare(ctx_id=-1, det_size=(320, 320))
+        logger.info("InsightFace buffalo_l pack loaded successfully ✓")
+    return _shared_face_analysis
+
 
 class FaceDetector:
     def __init__(self, model_path: str = None):
         self.model_path = model_path
-        # Load the built-in Haar Cascade classifiers from OpenCV data
-        self.face_cascade_default = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
-        self.face_cascade_alt = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_alt.xml')
-        self.face_cascade_alt2 = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_alt2.xml')
-        self.profile_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_profileface.xml')
-        
-        # Backward compatibility alias
-        self.face_cascade = self.face_cascade_default
-        print("Initializing CPU-optimized Multi-Cascade Combinational Face Detector (Frontal + Alt + Alt2 + Left/Right Profile) ✓")
-        
+        # Per-instance cache — ensures each CameraPipeline gets its own face data
+        self._last_crop_id = None
+        self._last_faces = []
+        # Warm up shared app
+        try:
+            get_shared_face_analysis()
+            logger.info("FaceDetector successfully initialized using InsightFace buffalo_l pack.")
+        except Exception as e:
+            logger.error("Failed to initialize FaceDetector with InsightFace: %s. Falling back to stub.", e)
+
+    @property
+    def last_faces(self):
+        """Return the last detected faces for this detector instance."""
+        return self._last_faces
+
     def detect_faces(self, person_crop: np.ndarray):
         """
-        Detect a face inside the crop of a person using a custom combinational cascade pipeline.
+        Detect a face inside the crop of a person using det_10g (RetinaFace) via InsightFace.
+        Results are cached per-instance to allow FaceEmbedder to reuse them.
+
         Returns:
             list: [fx1, fy1, fx2, fy2] relative to the person crop, or None
         """
         if person_crop is None or person_crop.size == 0:
             return None
-            
-        # Convert to grayscale
-        gray = cv2.cvtColor(person_crop, cv2.COLOR_BGR2GRAY)
-        
-        # Face bounding box candidates list
-        faces = []
 
-        # 1. Try Frontal Default (fastest, standard frontal view)
-        faces_def = self.face_cascade_default.detectMultiScale(gray, scaleFactor=1.08, minNeighbors=4, minSize=(24, 24))
-        if len(faces_def) > 0:
-            faces = faces_def
-        
-        # 2. Try Frontal Alt (robust to lighting, slight angle variations)
-        if len(faces) == 0:
-            faces_alt = self.face_cascade_alt.detectMultiScale(gray, scaleFactor=1.08, minNeighbors=4, minSize=(24, 24))
-            if len(faces_alt) > 0:
-                faces = faces_alt
-                
-        # 3. Try Frontal Alt2
-        if len(faces) == 0:
-            faces_alt2 = self.face_cascade_alt2.detectMultiScale(gray, scaleFactor=1.08, minNeighbors=4, minSize=(24, 24))
-            if len(faces_alt2) > 0:
-                faces = faces_alt2
-
-        # 4. Try Profile Face (essential for side profiles in surveillance)
-        if len(faces) == 0:
-            faces_prof = self.profile_cascade.detectMultiScale(gray, scaleFactor=1.08, minNeighbors=4, minSize=(24, 24))
-            if len(faces_prof) > 0:
-                faces = faces_prof
+        try:
+            # Use image object id and shape as a cache key
+            crop_id = (id(person_crop), person_crop.shape)
+            if crop_id == self._last_crop_id:
+                faces = self._last_faces
             else:
-                # 5. Flip horizontally to detect profiles facing the other direction
-                flipped_gray = cv2.flip(gray, 1)
-                flipped_faces = self.profile_cascade.detectMultiScale(flipped_gray, scaleFactor=1.08, minNeighbors=4, minSize=(24, 24))
-                if len(flipped_faces) > 0:
-                    fx, fy, fw, fh = flipped_faces[0]
-                    # Map x back to original coordinate system
-                    original_x = gray.shape[1] - fx - fw
-                    faces = [[original_x, fy, fw, fh]]
+                app = get_shared_face_analysis()
+                faces = app.get(person_crop)
+                self._last_crop_id = crop_id
+                self._last_faces = faces
 
-        if len(faces) > 0:
-            # Return the first/largest detected face inside the bounding box
-            # Sort by area descending so the largest face is selected first
-            faces = sorted(faces, key=lambda f: f[2] * f[3], reverse=True)
-            x, y, w, h = faces[0]
-            return [int(x), int(y), int(x + w), int(y + h)]
-            
+            if faces:
+                # Sort by bbox area descending to get the largest face
+                faces = sorted(faces, key=lambda f: (f.bbox[2]-f.bbox[0])*(f.bbox[3]-f.bbox[1]), reverse=True)
+                bbox = faces[0].bbox
+                # Ensure coordinates are within image bounds
+                h, w = person_crop.shape[:2]
+                fx1, fy1, fx2, fy2 = int(bbox[0]), int(bbox[1]), int(bbox[2]), int(bbox[3])
+                return [max(0, fx1), max(0, fy1), min(w, fx2), min(h, fy2)]
+        except Exception as e:
+            logger.warning("FaceDetector RetinaFace detection failed: %s", e)
+
         return None

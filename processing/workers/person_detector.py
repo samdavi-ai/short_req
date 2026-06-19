@@ -13,7 +13,7 @@ from ultralytics import YOLO
 
 class PersonDetector:
     # Production-grade thresholds
-    CONF_THRESHOLD = 0.35   # minimum detection confidence (lowered to catch far-away targets)
+    CONF_THRESHOLD = 0.38   # minimum detection confidence (restored to capture moving targets)
     IOU_THRESHOLD  = 0.50   # NMS IoU for deduplication
     MIN_BOX_AREA   = 800    # reject tiny false-positive boxes (px²) (lowered to catch smaller targets)
 
@@ -50,10 +50,12 @@ class PersonDetector:
             if boxes.id is None:
                 continue
             
-            for i, box in enumerate(boxes):
+            for box in boxes:
+                if box.id is None:
+                    continue
                 x1, y1, x2, y2 = box.xyxy[0].tolist()
                 conf = float(box.conf[0])
-                track_id = int(boxes.id[i])
+                track_id = int(box.id[0])
                 
                 # Reject tiny boxes (noise / partial body parts at frame edge)
                 box_area = (x2 - x1) * (y2 - y1)

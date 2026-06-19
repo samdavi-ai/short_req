@@ -30,7 +30,7 @@ class PersonRecord:
 
 
 class WatchlistMatcher:
-    FACE_MATCH_THRESHOLD = 0.60       # cosine sim >= this = positive match
+    FACE_MATCH_THRESHOLD = 0.48       # cosine sim >= this = positive match
     BODY_MATCH_THRESHOLD = 0.55       # body ReID fallback threshold
     REFRESH_INTERVAL = 60             # seconds between DB re-syncs
 
