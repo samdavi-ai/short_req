@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { UserCheck, Clock, AlertTriangle, CheckCircle, Plus, Search, X, MapPin, Activity } from 'lucide-react';
+import { UserCheck, Clock, AlertTriangle, CheckCircle, Plus, Search, X, MapPin, Activity, Camera } from 'lucide-react';
 import { useStore, Employee } from '../stores/appStore';
 import { api } from '../hooks/api';
 import { PersonDetailModal, PersonDetailEmployee } from './PersonDetailModal';
@@ -21,6 +21,76 @@ export default function EmployeesPage() {
   const [form, setForm] = useState({
     employee_code: '', fullname: '', department: '', break_interval_minutes: 120, break_duration_minutes: 15,
   });
+  const [faceFile, setFaceFile] = useState<File | null>(null);
+  const [facePreview, setFacePreview] = useState<string | null>(null);
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
+
+  const [webcamActive, setWebcamActive] = useState(false);
+  const [webcamStream, setWebcamStream] = useState<MediaStream | null>(null);
+  const videoRef = React.useRef<HTMLVideoElement>(null);
+
+  const startWebcam = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: 640, height: 480 } });
+      setWebcamStream(stream);
+      setWebcamActive(true);
+      setTimeout(() => {
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream;
+        }
+      }, 100);
+    } catch (err) {
+      addToast('Could not access webcam. Ensure permissions are granted.', 'error');
+    }
+  };
+
+  const stopWebcam = () => {
+    if (webcamStream) {
+      webcamStream.getTracks().forEach(track => track.stop());
+      setWebcamStream(null);
+    }
+    setWebcamActive(false);
+  };
+
+  const takeSnapshot = () => {
+    if (videoRef.current) {
+      const video = videoRef.current;
+      const canvas = document.createElement('canvas');
+      canvas.width = video.videoWidth || 640;
+      canvas.height = video.videoHeight || 480;
+      const ctx = canvas.getContext('2d');
+      if (ctx) {
+        ctx.translate(canvas.width, 0);
+        ctx.scale(-1, 1);
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+        
+        const dataUrl = canvas.toDataURL('image/jpeg');
+        setFacePreview(dataUrl);
+        
+        fetch(dataUrl)
+          .then(res => res.blob())
+          .then(blob => {
+            const file = new File([blob], 'snapshot.jpg', { type: 'image/jpeg' });
+            setFaceFile(file);
+            addToast('Face snapshot captured successfully!', 'success');
+          });
+      }
+      stopWebcam();
+    }
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setFaceFile(file);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setFacePreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+      addToast('Face photo loaded successfully.', 'success');
+    }
+  };
 
   const depts = [...new Set(employees.map((e) => e.department))];
 
@@ -43,13 +113,26 @@ export default function EmployeesPage() {
       addToast('Break interval and duration must be positive', 'error');
       return;
     }
+    let newEmpId = null;
     if (token && token !== 'demo-token') {
       try {
-        await api.createEmployee(token, form);
+        const created = await api.createEmployee(token, form);
+        newEmpId = created.id;
       } catch {
         addToast('Failed to create employee', 'error');
         return;
       }
+      
+      if (newEmpId && faceFile) {
+        try {
+          addToast('Uploading face photo...', 'info');
+          await api.enrollEmployeeFace(token, newEmpId, faceFile);
+          addToast('Face photo enrolled successfully', 'success');
+        } catch (err: any) {
+          addToast(`Employee created, but face upload failed: ${err.message}`, 'error');
+        }
+      }
+
       try {
         const updated = await api.getEmployees(token);
         setEmployees(updated);
@@ -60,6 +143,9 @@ export default function EmployeesPage() {
     addToast(`Employee "${form.fullname}" added`, 'success');
     setShowModal(false);
     setForm({ employee_code: '', fullname: '', department: '', break_interval_minutes: 120, break_duration_minutes: 15 });
+    setFaceFile(null);
+    setFacePreview(null);
+    stopWebcam();
   };
 
   const selectedEmployee = employees.find(e => e.id === selectedEmployeeId);
@@ -197,11 +283,11 @@ export default function EmployeesPage() {
 
       {/* Add Employee Modal */}
       {showModal && (
-        <div className="modal-backdrop" onClick={() => setShowModal(false)}>
+        <div className="modal-backdrop" onClick={() => { setShowModal(false); setFaceFile(null); }}>
           <div className="modal" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
               <span className="modal-title">Add New Employee</span>
-              <button className="icon-btn" onClick={() => setShowModal(false)}><X size={16} /></button>
+              <button className="icon-btn" onClick={() => { setShowModal(false); setFaceFile(null); }}><X size={16} /></button>
             </div>
             <div className="modal-body">
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
@@ -233,9 +319,53 @@ export default function EmployeesPage() {
                     onChange={(e) => setForm({ ...form, break_duration_minutes: +e.target.value })} />
                 </div>
               </div>
+              <div className="form-group" style={{ marginTop: 14 }}>
+                {webcamActive ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12, background: 'var(--surface-2)', padding: 16, borderRadius: 'var(--radius-md)', border: '1px solid var(--border)' }}>
+                    <div style={{ width: '100%', maxWidth: 320, aspectRatio: '4/3', overflow: 'hidden', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)', background: '#000', transform: 'scaleX(-1)' }}>
+                      <video ref={videoRef} autoPlay playsInline muted style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    </div>
+                    <div style={{ display: 'flex', gap: 10 }}>
+                      <button className="btn btn-primary btn-sm" onClick={takeSnapshot}>Capture Snapshot</button>
+                      <button className="btn btn-secondary btn-sm" onClick={stopWebcam}>Cancel</button>
+                    </div>
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'var(--surface-2)', padding: 16, borderRadius: 'var(--radius-md)', border: '1px solid var(--border)' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                      <div style={{ width: 48, height: 48, borderRadius: '50%', overflow: 'hidden', border: '1px solid var(--border)', background: 'var(--surface-3)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-ghost)', flexShrink: 0 }}>
+                        {facePreview ? (
+                          <img src={facePreview} alt="Preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                        ) : (
+                          <Camera size={20} />
+                        )}
+                      </div>
+                      <div>
+                        <div style={{ fontWeight: 600, color: 'var(--text-primary)', marginBottom: 4 }}>Face ID Photo</div>
+                        <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{faceFile ? 'Snapshot ready' : 'Upload photo or capture face via webcam.'}</div>
+                      </div>
+                    </div>
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      <button className="btn btn-secondary btn-sm" onClick={() => fileInputRef.current?.click()}>
+                        Upload File
+                      </button>
+                      <button className="btn btn-primary btn-sm" onClick={startWebcam}>
+                        <Camera size={14} style={{ marginRight: 4 }} /> Use Webcam
+                      </button>
+                    </div>
+                    <input
+                      type="file"
+                      ref={fileInputRef}
+                      style={{ display: 'none' }}
+                      accept="image/*"
+                      onChange={handleFileChange}
+                    />
+                  </div>
+                )}
+              </div>
             </div>
             <div className="modal-footer">
-              <button className="btn btn-ghost" onClick={() => setShowModal(false)}>Cancel</button>
+              <button className="btn btn-ghost" onClick={() => { setShowModal(false); setFaceFile(null); setFacePreview(null); stopWebcam(); }}>Cancel</button>
               <button id="submit-employee-btn" className="btn btn-primary" onClick={handleAdd}>
                 <Plus size={14} /> Add Employee
               </button>

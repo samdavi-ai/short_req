@@ -1,5 +1,8 @@
 """Cameras API — Full CRUD + bulk position update for Layout Editor."""
 
+import os
+import sys
+import subprocess
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from typing import List, Optional
@@ -56,6 +59,24 @@ def create_camera(camera_in: CameraCreate, db: Session = Depends(get_db)):
     db.add(db_camera)
     db.commit()
     db.refresh(db_camera)
+    
+    # Spawn live processing pipeline for this camera
+    try:
+        processing_script = os.path.join(
+            os.path.dirname(os.path.abspath(__file__)), 
+            "..", "..", "..", "..", "processing", "run_camera.py"
+        )
+        if os.path.exists(processing_script):
+            subprocess.Popen(
+                [sys.executable, processing_script, "--camera_id", str(db_camera.id), "--rtsp_url", db_camera.rtsp_url],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                start_new_session=True # Run in background detached
+            )
+    except Exception as e:
+        # We log the error but don't fail the camera creation
+        print(f"Failed to start processing pipeline for camera {db_camera.id}: {e}")
+        
     return db_camera
 
 

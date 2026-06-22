@@ -18,9 +18,16 @@ from pipeline.camera_pipeline import CameraPipeline
 logger = logging.getLogger(__name__)
 
 
+def run_pipeline(camera_id, rtsp_url):
+    """Target function for CameraPipeline subprocess."""
+    pipeline = CameraPipeline(camera_id, rtsp_url)
+    pipeline.run()
+
+
 class PipelineManager:
     HEALTH_CHECK_INTERVAL = 10   # seconds between health checks
     MAX_RESTARTS = 5             # max restarts per camera before giving up
+    BACKEND_URL = os.environ.get("BACKEND_URL", "http://backend:8000")
 
     def __init__(self):
         # camera_id → {"process": Process, "camera": dict, "restart_count": int}
@@ -41,6 +48,8 @@ class PipelineManager:
 
     def setup_test_cameras(self):
         data_dir = "/app/data"  # inside docker
+        if not os.path.exists(data_dir):
+            data_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
         tests_dir = os.path.join(data_dir, "tests")
 
         video_files = [
@@ -109,8 +118,7 @@ class PipelineManager:
         """Spawn a single camera pipeline as a subprocess."""
         cam_id = camera["id"]
         rtsp_url = camera["rtsp_url"]
-        pipeline = CameraPipeline(cam_id, rtsp_url)
-        p = Process(target=pipeline.run, name=f"CameraPipeline-{cam_id}", daemon=True)
+        p = Process(target=run_pipeline, args=(cam_id, rtsp_url), name=f"CameraPipeline-{cam_id}", daemon=True)
         p.start()
         logger.info("Started pipeline for camera %d (%s) [PID: %d]",
                      cam_id, camera.get("name", "?"), p.pid)
@@ -158,14 +166,54 @@ class PipelineManager:
         logger.info("All %d pipelines launched. Starting health monitor...",
                      len(self.pipelines))
 
-        # Health monitoring loop with auto-restart
+        # Health monitoring loop with auto-restart + dynamic discovery
         try:
             while True:
                 time.sleep(self.HEALTH_CHECK_INTERVAL)
                 self._health_check()
+                self._discover_new_cameras()
         except KeyboardInterrupt:
             logger.info("Shutting down all pipelines...")
             self._shutdown_all()
+
+    def _discover_new_cameras(self):
+        """
+        Poll the backend API for newly registered ACTIVE cameras and
+        spawn a pipeline for any camera not yet being managed.
+        Called on every health-check cycle so that cameras registered
+        via the API are picked up within HEALTH_CHECK_INTERVAL seconds.
+        """
+        try:
+            resp = requests.get(
+                f"{self.BACKEND_URL}/cameras/",
+                timeout=5,
+            )
+            if resp.status_code != 200:
+                return
+            cameras = resp.json()
+        except Exception as e:
+            logger.warning("[Discovery] Could not reach backend: %s", e)
+            return
+
+        for cam in cameras:
+            cam_id = cam.get("id")
+            if cam_id is None:
+                continue
+            if cam.get("status") != "ACTIVE":
+                continue
+            if cam_id in self.pipelines:
+                continue  # already running
+
+            logger.info(
+                "[Discovery] New camera detected: %d (%s) → spawning pipeline",
+                cam_id, cam.get("name", "?"),
+            )
+            p = self._start_pipeline(cam)
+            self.pipelines[cam_id] = {
+                "process": p,
+                "camera": cam,
+                "restart_count": 0,
+            }
 
     def _health_check(self):
         """Check all pipeline processes and restart any that have died."""

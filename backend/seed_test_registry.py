@@ -3,6 +3,7 @@ import sys
 import json
 import numpy as np
 import cv2
+import sqlite3
 
 # Add project root, backend, and processing dirs to path
 base_dir = os.path.dirname(os.path.abspath(__file__))
@@ -10,12 +11,14 @@ project_dir = os.path.dirname(base_dir)
 sys.path.insert(0, os.path.join(project_dir, "backend"))
 sys.path.insert(0, os.path.join(project_dir, "processing"))
 
-from app.core.database import SessionLocal, Base, engine
-from app.models.models import Visitor, Employee, VisitorStatus
+from app.core.database import SessionLocal
+from app.models.models import Visitor, Employee
+from workers.person_detector import PersonDetector
 from workers.face_detector import FaceDetector
 from workers.face_embedder import FaceEmbedder
+from utils.database_logger import DB_PATH, enroll_identity
 
-def extract_first_face(video_path, detector, embedder):
+def extract_first_face(video_path, target_frame, person_detector, face_detector, face_embedder):
     if not os.path.exists(video_path):
         print(f"Warning: Test video not found at {video_path}")
         return None, None
@@ -26,49 +29,73 @@ def extract_first_face(video_path, detector, embedder):
         return None, None
         
     frame_idx = 0
-    max_frames = 1200 # scan up to 1200 frames (~40 seconds of video)
-    while frame_idx < max_frames:
+    while cap.isOpened():
         ret, frame = cap.read()
         if not ret:
             break
             
         frame_idx += 1
-        # Check every 4th frame for speed
-        if frame_idx % 4 != 0:
+        if frame_idx < target_frame:
             continue
+        if frame_idx > target_frame:
+            break
             
-        # Detect face
-        face_bbox = detector.detect_faces(frame)
-        if face_bbox is not None:
-            fx1, fy1, fx2, fy2 = face_bbox
+        # Detect person crops first, matching the camera pipeline
+        tracked_objects = person_detector.detect_and_track(frame)
+        best_area = -1
+        best_emb = None
+        best_crop = None
+        
+        for obj in tracked_objects:
+            x1, y1, x2, y2 = obj["bbox"]
             h, w = frame.shape[:2]
-            fx1, fy1 = max(0, fx1), max(0, fy1)
-            fx2, fy2 = min(w, fx2), min(h, fy2)
-            face_crop = frame[fy1:fy2, fx1:fx2]
-            
-            if face_crop.size > 0:
-                print(f"Successfully extracted face from {os.path.basename(video_path)} at frame {frame_idx} ✓")
-                embedding = embedder.extract_embedding(face_crop)
-                cap.release()
-                return embedding, face_crop
+            x1, y1 = max(0, int(x1)), max(0, int(y1))
+            x2, y2 = min(w, int(x2)), min(h, int(y2))
+            person_crop = frame[y1:y2, x1:x2]
+            if person_crop.size == 0:
+                continue
+
+            # Detect face inside person crop
+            face_bbox = face_detector.detect_faces(person_crop)
+            if face_bbox is not None:
+                fx1, fy1, fx2, fy2 = face_bbox
+                ch, cw = person_crop.shape[:2]
+                fx1, fy1 = max(0, fx1), max(0, fy1)
+                fx2, fy2 = min(cw, fx2), min(ch, fy2)
+                face_crop = person_crop[fy1:fy2, fx1:fx2]
+                
+                if face_crop.size > 0:
+                    emb = face_embedder.extract_embedding(face_crop)
+                    area = (x2 - x1) * (y2 - y1)
+                    if area > best_area:
+                        best_area = area
+                        best_emb = emb
+                        best_crop = face_crop
+                        
+        cap.release()
+        if best_emb is not None:
+            print(f"Successfully extracted face from {os.path.basename(video_path)} at frame {frame_idx} ✓")
+            return best_emb, best_crop
+        break
                 
     cap.release()
-    print(f"No face detected in {os.path.basename(video_path)}.")
+    print(f"No face detected in {os.path.basename(video_path)} at frame {target_frame}.")
     return None, None
 
 def seed_registry():
     print("Initializing Face AI Workers...")
+    person_detector = PersonDetector()
     detector = FaceDetector()
     embedder = FaceEmbedder()
     
     db = SessionLocal()
     
-    # Define test people to enroll
-    # (video_filename, fullname, is_employee, status/code)
+    # Define real people to enroll
+    # (video_filename, target_frame, fullname, code)
     test_enrollments = [
-        ("SS1.mp4", "Vikram Singh", False, VisitorStatus.WHITELISTED),
-        ("SS2.mp4", "Officer Raj Kumar", True, "EMP-99201"),
-        ("SS3.mp4", "Alice Cooper", False, VisitorStatus.WATCHLIST)
+        ("SS2.mp4", 90, "john", "EMP-004"),
+        ("SS3.mp4", 555, "ponniyah", "EMP-005"),
+        ("MS2.mp4", 675, "dinesh", "EMP-006")
     ]
     
     tests_dir = os.path.join(project_dir, "tests")
@@ -79,11 +106,23 @@ def seed_registry():
     os.makedirs(os.path.join(assets_dir, "employees"), exist_ok=True)
     
     try:
-        for filename, name, is_employee, identifier in test_enrollments:
+        # Clear existing visitors and employees to clean up fake data
+        print("Clearing existing visitors and employees from backend DB...")
+        db.query(Visitor).delete()
+        db.query(Employee).delete()
+        db.commit()
+        
+        # Clear database.db enrolled_identities
+        print("Clearing database.db enrolled_identities table...")
+        with sqlite3.connect(DB_PATH) as conn:
+            conn.execute("DELETE FROM enrolled_identities")
+            conn.commit()
+
+        for filename, frame, name, identifier in test_enrollments:
             video_path = os.path.join(tests_dir, filename)
-            print(f"\nProcessing {name} from {filename}...")
+            print(f"\nProcessing {name} from {filename} frame {frame}...")
             
-            embedding, face_crop = extract_first_face(video_path, detector, embedder)
+            embedding, face_crop = extract_first_face(video_path, frame, person_detector, detector, embedder)
             
             # If face extraction failed, fall back to a random stable unit vector
             if embedding is None:
@@ -94,61 +133,33 @@ def seed_registry():
                 face_crop = np.zeros((112, 112, 3), dtype=np.uint8)
                 cv2.putText(face_crop, "Fallback", (10, 60), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
 
-            # Check if already enrolled to avoid duplicates
-            if is_employee:
-                existing = db.query(Employee).filter(Employee.fullname == name).first()
-                if existing:
-                    print(f"Employee {name} is already registered. Updating embedding.")
-                    existing.face_embedding_id = json.dumps(embedding)
-                    existing.employee_code = identifier
-                    db.commit()
-                    continue
-                
-                # Save face crop image
-                photo_name = f"employee_seeded_{identifier}.jpg"
-                photo_path = os.path.join(assets_dir, "employees", photo_name)
-                cv2.imwrite(photo_path, face_crop)
-                
-                emp = Employee(
-                    fullname=name,
-                    employee_code=identifier,
-                    department="Security Operations",
-                    shift="MORNING",
-                    photo_path=f"/assets/employees/{photo_name}",
-                    face_embedding_id=json.dumps(embedding),
-                    is_active=True
-                )
-                db.add(emp)
-                print(f"Registered Employee: {name} ({identifier})")
-            else:
-                existing = db.query(Visitor).filter(Visitor.fullname == name).first()
-                if existing:
-                    print(f"Visitor {name} is already registered. Updating embedding and status.")
-                    existing.face_embedding_id = json.dumps(embedding)
-                    existing.status = identifier
-                    db.commit()
-                    continue
-                
-                # Save face crop image
-                photo_name = f"visitor_seeded_{name.replace(' ', '_').lower()}.jpg"
-                photo_path = os.path.join(assets_dir, "visitors", photo_name)
-                cv2.imwrite(photo_path, face_crop)
-                
-                visitor = Visitor(
-                    fullname=name,
-                    passport_number=f"P{np.random.randint(100000, 999999)}",
-                    nationality="Indian" if "Singh" in name else "British",
-                    phone_number="+91 9876543210",
-                    status=identifier,
-                    photo_path=f"/assets/visitors/{photo_name}",
-                    face_embedding_id=json.dumps(embedding),
-                    purpose="Surveillance Pipeline Testing",
-                    approved_by="System Admin",
-                    requires_escort=(identifier == VisitorStatus.WATCHLIST)
-                )
-                db.add(visitor)
-                print(f"Registered Visitor: {name} (Status: {identifier.value})")
-                
+            # Save face crop image
+            photo_name = f"employee_seeded_{identifier}.jpg"
+            photo_path = os.path.join(assets_dir, "employees", photo_name)
+            cv2.imwrite(photo_path, face_crop)
+            
+            emp = Employee(
+                fullname=name,
+                employee_code=identifier,
+                department="Security Operations",
+                shift="MORNING",
+                photo_path=f"/assets/employees/{photo_name}",
+                face_embedding_id=json.dumps(embedding.tolist() if isinstance(embedding, np.ndarray) else embedding),
+                is_active=True
+            )
+            db.add(emp)
+            print(f"Registered Employee: {name} ({identifier})")
+            
+            # Enroll in database.db enrolled_identities
+            enroll_identity(
+                name=name,
+                face_vector=embedding.tolist() if isinstance(embedding, np.ndarray) else embedding,
+                body_vector=None,
+                photo_path=f"assets/employees/{photo_name}",
+                person_type="EMPLOYEE"
+            )
+            print(f"Enrolled {name} in database.db")
+            
             db.commit()
             
         print("\nDatabase seeding completed successfully ✓")

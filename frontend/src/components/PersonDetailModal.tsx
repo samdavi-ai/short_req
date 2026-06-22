@@ -10,9 +10,11 @@ import React, { useEffect, useState } from 'react';
 import {
   X, Camera, ShieldCheck, ShieldAlert, User, Activity,
   MapPin, Clock, Users, Eye, TrendingUp, AlertTriangle,
-  Hash, Globe, Building2, Briefcase, Key, FileText
+  Hash, Globe, Building2, Briefcase, Key, FileText, Trash2
 } from 'lucide-react';
 import { resolveAssetUrl } from '../config/runtime';
+import { useStore } from '../stores/appStore';
+import { api } from '../hooks/api';
 
 /* ─────────────────────────────────────────────────── */
 /* Types                                               */
@@ -276,6 +278,10 @@ export function PersonDetailModal({ person, onClose }: Props) {
   const statusColor = getStatusColor(person);
   const statusLabel = getStatusLabel(person);
 
+  const { token, addToast, setEmployees, setVisitors } = useStore();
+  const [showConfirm, setShowConfirm] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+
   // Close on Escape
   useEffect(() => {
     const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
@@ -293,6 +299,28 @@ export function PersonDetailModal({ person, onClose }: Props) {
   const speed = person.speed || '24 Px/S';
   const pose = person.pose || 'Standing / Walking';
   const activity = person.activity || 'Walking';
+
+  const handleDelete = async () => {
+    if (!token) return;
+    setIsDeleting(true);
+    try {
+      if (person.type === 'employee') {
+        await api.deleteEmployee(token, person.id);
+        const updated = await api.getEmployees(token);
+        setEmployees(updated);
+        addToast(`Employee "${person.fullname}" deleted successfully`, 'success');
+      } else {
+        await api.deleteVisitor(token, person.id);
+        const updated = await api.getVisitors(token);
+        setVisitors(updated);
+        addToast(`Visitor "${person.fullname}" deleted successfully`, 'success');
+      }
+      onClose();
+    } catch (err: any) {
+      addToast(`Failed to delete record: ${err.message}`, 'error');
+      setIsDeleting(false);
+    }
+  };
 
   return (
     <div
@@ -344,19 +372,92 @@ export function PersonDetailModal({ person, onClose }: Props) {
               ID: {person.type === 'employee' ? person.employee_code : `VIS-${String(person.id).padStart(4, '0')}`}
             </span>
           </div>
-          <button
-            onClick={onClose}
-            aria-label="Close"
-            style={{
-              background: 'transparent', border: 'none', cursor: 'pointer',
-              color: 'var(--text-ghost)', display: 'flex', alignItems: 'center', padding: 4,
-              transition: 'color var(--t-fast)',
-            }}
-            onMouseEnter={e => e.currentTarget.style.color = 'var(--red)'}
-            onMouseLeave={e => e.currentTarget.style.color = 'var(--text-ghost)'}
-          >
-            <X size={16} />
-          </button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            {showConfirm ? (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <span style={{ fontSize: 9, fontFamily: 'var(--font-mono)', color: 'var(--text-ghost)', textTransform: 'uppercase' }}>Confirm delete?</span>
+                <button
+                  onClick={handleDelete}
+                  disabled={isDeleting}
+                  style={{
+                    background: 'var(--red)',
+                    border: 'none',
+                    borderRadius: '4px',
+                    color: '#fff',
+                    padding: '3px 8px',
+                    fontFamily: 'var(--font-mono)',
+                    fontSize: 9,
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                  }}
+                >
+                  {isDeleting ? 'Deleting...' : 'Yes, Delete'}
+                </button>
+                <button
+                  onClick={() => setShowConfirm(false)}
+                  disabled={isDeleting}
+                  style={{
+                    background: 'rgba(255,255,255,0.06)',
+                    border: '1px solid var(--border)',
+                    borderRadius: '4px',
+                    color: 'var(--text-primary)',
+                    padding: '2px 8px',
+                    fontFamily: 'var(--font-mono)',
+                    fontSize: 9,
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                  }}
+                >
+                  Cancel
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={() => setShowConfirm(true)}
+                style={{
+                  background: 'transparent',
+                  border: '1px solid rgba(239, 68, 68, 0.4)',
+                  borderRadius: '4px',
+                  color: '#ef4444',
+                  padding: '3px 8px',
+                  fontFamily: 'var(--font-mono)',
+                  fontSize: 9,
+                  fontWeight: 700,
+                  letterSpacing: '0.08em',
+                  textTransform: 'uppercase',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 4,
+                  cursor: 'pointer',
+                  transition: 'all 0.2s',
+                }}
+                onMouseEnter={e => {
+                  e.currentTarget.style.background = 'rgba(239, 68, 68, 0.1)';
+                  e.currentTarget.style.border = '1px solid var(--red)';
+                }}
+                onMouseLeave={e => {
+                  e.currentTarget.style.background = 'transparent';
+                  e.currentTarget.style.border = '1px solid rgba(239, 68, 68, 0.4)';
+                }}
+              >
+                <Trash2 size={10} />
+                Delete
+              </button>
+            )}
+            <button
+              onClick={onClose}
+              aria-label="Close"
+              style={{
+                background: 'transparent', border: 'none', cursor: 'pointer',
+                color: 'var(--text-ghost)', display: 'flex', alignItems: 'center', padding: 4,
+                transition: 'color var(--t-fast)',
+              }}
+              onMouseEnter={e => e.currentTarget.style.color = 'var(--red)'}
+              onMouseLeave={e => e.currentTarget.style.color = 'var(--text-ghost)'}
+            >
+              <X size={16} />
+            </button>
+          </div>
         </div>
 
         {/* Body */}

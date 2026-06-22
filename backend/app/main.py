@@ -14,6 +14,7 @@ from prometheus_client import make_asgi_app, Counter, Histogram
 import os
 
 from app.api.routes import cameras, tracks, zones, visitors, employees, alerts, layouts, analytics, enrollment, sites, buildings, simulation
+from app.api.routes import video_upload, video_annotate
 from app.api.routes.auth import router as auth_router
 from app.api.websocket import ws_router, redis_subscriber
 from app.core.config import settings
@@ -128,11 +129,20 @@ app.mount("/metrics", prometheus_app)
 os.makedirs(settings.ASSETS_DIR, exist_ok=True)
 app.mount("/assets", StaticFiles(directory=settings.ASSETS_DIR), name="assets")
 
+# Serve uploaded test videos so the browser <video> element can play them
+_uploads_dir = os.path.join(settings.ASSETS_DIR, "uploads")
+os.makedirs(_uploads_dir, exist_ok=True)
+app.mount("/uploads", StaticFiles(directory=_uploads_dir), name="uploads")
+
 # ─── API Routes ───────────────────────────────────────────────────────────────
 
 API_PREFIX = ""  # Routes are at root for now; add /api/v1 prefix later if needed
 
-app.include_router(auth_router,      prefix="/auth",      tags=["Auth"])
+from app.api.routes import auth, cameras, alerts, zones, visitors, employees, audit, sites, buildings, tracks
+
+# Include routers
+app.include_router(auth.router,      prefix="/auth",      tags=["Auth"])
+app.include_router(audit.router,     prefix="/audit",     tags=["Audit"])
 app.include_router(sites.router,     prefix="/sites",     tags=["Sites"])
 app.include_router(buildings.router, prefix="/buildings", tags=["Buildings"])
 app.include_router(cameras.router,   prefix="/cameras",   tags=["Cameras"])
@@ -142,10 +152,12 @@ app.include_router(visitors.router,  prefix="/visitors",  tags=["Visitors"])
 app.include_router(employees.router, prefix="/employees", tags=["Employees"])
 app.include_router(alerts.router,    prefix="/alerts",    tags=["Alerts"])
 app.include_router(layouts.router,   prefix="/layouts",   tags=["Layouts"])
-app.include_router(simulation.router, prefix="/simulation", tags=["Simulation"])
-app.include_router(analytics.router,    prefix="/analytics",    tags=["Analytics"])
-app.include_router(enrollment.router,   prefix="/enrollment",   tags=["Enrollment"])
-app.include_router(ws_router,                                   tags=["WebSockets"])
+app.include_router(simulation.router,      prefix="/simulation",     tags=["Simulation"])
+app.include_router(analytics.router,       prefix="/analytics",      tags=["Analytics"])
+app.include_router(enrollment.router,      prefix="/enrollment",      tags=["Enrollment"])
+app.include_router(video_upload.router,    prefix="/upload-video",    tags=["VideoTest"])
+app.include_router(video_annotate.router,  prefix="/annotate-video",  tags=["VideoTest"])
+app.include_router(ws_router,                                         tags=["WebSockets"])
 
 
 # ─── Health Check ─────────────────────────────────────────────────────────────

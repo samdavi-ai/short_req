@@ -73,11 +73,11 @@ if __name__ == "__main__":
     
     # Default video mapping (Ground Floor Cameras matching test files)
     video_map = [
-        (1, os.path.join(tests_dir, "SS1.mp4")),   # Vikram Singh (Whitelisted)
-        (2, os.path.join(tests_dir, "SS2.mp4")),   # Officer Raj Kumar (Employee)
-        (3, os.path.join(tests_dir, "SS3.mp4")),   # Alice Cooper (Watchlist Alert!)
+        (1, os.path.join(tests_dir, "SS1.mp4")),   # Test video
+        (2, os.path.join(tests_dir, "SS2.mp4")),   # john (Employee)
+        (3, os.path.join(tests_dir, "SS3.mp4")),   # ponniyah (Employee)
         (4, os.path.join(tests_dir, "MS1.mp4")),   # Multi-subject test video
-        (5, os.path.join(tests_dir, "MS2.mp4")),   # Multi-subject test video
+        (5, os.path.join(tests_dir, "MS2.mp4")),   # dinesh (Employee)
         (6, os.path.join(tests_dir, "MS3.mp4")),   # Multi-subject test video
     ]
     

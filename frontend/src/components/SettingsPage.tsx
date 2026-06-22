@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { Shield, Bell, Database, Save, RefreshCw } from 'lucide-react';
+import { Shield, Bell, Database, Save, RefreshCw, X } from 'lucide-react';
 import { useStore } from '../stores/appStore';
+import { api } from '../hooks/api';
 
 export default function SettingsPage() {
   const { addToast, user } = useStore();
@@ -17,6 +18,11 @@ export default function SettingsPage() {
     enableBreakCompliance: true,
     theme: 'dark',
   });
+
+  const [passwordModalOpen, setPasswordModalOpen] = useState(false);
+  const [passwordData, setPasswordData] = useState({ current_password: '', new_password: '', confirm_password: '' });
+  const [passwordError, setPasswordError] = useState('');
+  const { token } = useStore();
 
   const handleSave = () => {
     setSaved(true);
@@ -77,6 +83,15 @@ export default function SettingsPage() {
               <label className="form-label">Role</label>
               <input className="form-input" defaultValue={user?.role || 'admin'} readOnly style={{ opacity: 0.7 }} />
             </div>
+          </div>
+          <div style={{ marginTop: 16 }}>
+            <button 
+              className="btn btn-secondary" 
+              onClick={() => setPasswordModalOpen(true)}
+              style={{ padding: '8px 16px' }}
+            >
+              Change Password
+            </button>
           </div>
         </Section>
 
@@ -161,6 +176,74 @@ export default function SettingsPage() {
           </button>
         </div>
       </div>
+
+      {/* Change Password Modal */}
+      {passwordModalOpen && (
+        <div className="modal-overlay" onClick={() => setPasswordModalOpen(false)}>
+          <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: 400 }}>
+            <div className="modal-header">
+              <h2 className="modal-title">Change Password</h2>
+              <button className="icon-btn" onClick={() => setPasswordModalOpen(false)}><X size={18} /></button>
+            </div>
+            <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+              {passwordError && <div style={{ color: 'var(--red)', fontSize: 13, background: 'var(--red-transparent)', padding: 8, borderRadius: 4 }}>{passwordError}</div>}
+              
+              <div className="form-group">
+                <label className="form-label">Current Password</label>
+                <input 
+                  type="password" 
+                  className="form-input" 
+                  value={passwordData.current_password} 
+                  onChange={e => setPasswordData({...passwordData, current_password: e.target.value})} 
+                />
+              </div>
+              <div className="form-group">
+                <label className="form-label">New Password</label>
+                <input 
+                  type="password" 
+                  className="form-input" 
+                  value={passwordData.new_password} 
+                  onChange={e => setPasswordData({...passwordData, new_password: e.target.value})} 
+                />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Confirm New Password</label>
+                <input 
+                  type="password" 
+                  className="form-input" 
+                  value={passwordData.confirm_password} 
+                  onChange={e => setPasswordData({...passwordData, confirm_password: e.target.value})} 
+                />
+              </div>
+            </div>
+            <div className="modal-footer" style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 20 }}>
+              <button className="btn btn-secondary" onClick={() => setPasswordModalOpen(false)}>Cancel</button>
+              <button className="btn btn-primary" onClick={async () => {
+                if (passwordData.new_password !== passwordData.confirm_password) {
+                  setPasswordError("New passwords don't match.");
+                  return;
+                }
+                if (!passwordData.new_password || !passwordData.current_password) {
+                  setPasswordError("Please fill all fields.");
+                  return;
+                }
+                try {
+                  await api.changePassword(token as string, {
+                    current_password: passwordData.current_password,
+                    new_password: passwordData.new_password
+                  });
+                  addToast('Password changed successfully', 'success');
+                  setPasswordModalOpen(false);
+                  setPasswordData({ current_password: '', new_password: '', confirm_password: '' });
+                  setPasswordError('');
+                } catch (e: any) {
+                  setPasswordError(e.message || "Failed to change password.");
+                }
+              }}>Change Password</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

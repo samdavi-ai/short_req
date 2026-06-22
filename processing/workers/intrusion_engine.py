@@ -4,7 +4,6 @@ import logging
 from sqlalchemy.orm import Session
 from app.core.database import SessionLocal
 from app.models.models import Zone, Alert, ZoneType, AlertType, AlertSeverity
-from app.api.routes.auth import get_db
 
 logger = logging.getLogger(__name__)
 

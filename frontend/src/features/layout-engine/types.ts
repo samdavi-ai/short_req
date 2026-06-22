@@ -23,7 +23,7 @@ export interface CamOnCanvas {
   angle: number;
   fov: number;
   name: string;
-  status: 'ACTIVE' | 'OFFLINE' | 'MAINTENANCE';
+  status: 'ACTIVE' | 'OFFLINE' | 'MAINTENANCE' | 'PAUSED';
   rtsp_url?: string;
   location?: string;
   is_overhead?: boolean;

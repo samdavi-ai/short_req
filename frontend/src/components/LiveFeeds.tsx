@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { Camera, Grid, WifiOff } from 'lucide-react';
 import { useStore, Camera as CameraType } from '../stores/appStore';
-import PersonJourney from './PersonJourney';
+import { resolveAssetUrl } from '../config/runtime';
+import PersonCard from './PersonCard';
 
 // ─── CameraFeedCard ────────────────────────────────────────────────────────────
 
@@ -30,6 +31,15 @@ function CameraFeedCard({ cam, selected, onClick, onSelectTrack }: {
 
   // Resolve video source — must match run_all_videos.py exactly so detections align
   const videoSrc = React.useMemo(() => {
+    // If it is a local webcam index (digit), return null so it falls back to browser webcam capture
+    if (cam.rtsp_url === '0' || cam.rtsp_url === '1' || (cam.rtsp_url && /^\d+$/.test(cam.rtsp_url))) {
+      return null;
+    }
+    if (cam.rtsp_url && cam.rtsp_url.includes('uploads/')) {
+      const parts = cam.rtsp_url.split('/');
+      const filename = parts[parts.length - 1];
+      return resolveAssetUrl(`/uploads/${filename}`) || null;
+    }
     if (cam.rtsp_url && cam.rtsp_url.endsWith('.mp4')) {
       const parts = cam.rtsp_url.split('/');
       return `/videos/${parts[parts.length - 1]}`;
@@ -61,7 +71,7 @@ function CameraFeedCard({ cam, selected, onClick, onSelectTrack }: {
       setVideoSize(null);
     };
 
-    if (!selected || isOffline || isMaint) {
+    if (isOffline || isMaint) {
       stopStream();
       return;
     }
@@ -111,13 +121,11 @@ function CameraFeedCard({ cam, selected, onClick, onSelectTrack }: {
     const elemAspect = elemW  / elemH;
     let renderW: number, renderH: number, offX: number, offY: number;
     if (vidAspect > elemAspect) {
-      // wider video → letterbox (black bars top/bottom)
       renderW = elemW;
       renderH = elemW / vidAspect;
       offX    = 0;
       offY    = (elemH - renderH) / 2;
     } else {
-      // taller video → pillarbox (black bars left/right)
       renderH = elemH;
       renderW = elemH * vidAspect;
       offX    = (elemW - renderW) / 2;
@@ -132,72 +140,127 @@ function CameraFeedCard({ cam, selected, onClick, onSelectTrack }: {
 
     if (width < 4 || height < 4) return null;
 
-    const color =
-      track.identity_type === 'BLACKLISTED' || track.identity_type === 'WATCHLIST_MATCH'
-        ? '#ef4444'
-        : track.has_face
-        ? '#3b82f6'
-        : '#22c55e';
+    // Determine authorized vs unauthorized
+    const isAuthorized = track.identity_type === 'KNOWN_EMPLOYEE' || track.identity_type === 'KNOWN_VISITOR';
+    const isDangerous  = track.identity_type === 'BLACKLISTED' || track.identity_type === 'WATCHLIST_MATCH';
+    const color = isAuthorized ? '#22c55e' : isDangerous ? '#ef4444' : '#ef4444';
+    const glow  = isAuthorized ? 'rgba(34,197,94,0.4)' : 'rgba(239,68,68,0.4)';
 
-    const label = track.matched_name
-      ? `${track.matched_name} #${track.track_id}`
-      : `#${track.track_id}`;
+    const label = isAuthorized
+      ? (track.matched_name || `Person #${track.track_id}`)
+      : `UNKNOWN #${track.track_id}`;
+
+    const statusTag = isAuthorized ? 'AUTHORIZED' : isDangerous ? track.identity_type.replace('_', ' ') : 'UNAUTHORIZED';
+    const cornerSz  = Math.min(width, height) * 0.22;
+    const cornerThk = 2;
+
+    // Corner-bracket tick style (like the reference image)
+    const cornerStyle = (pos: 'tl' | 'tr' | 'bl' | 'br'): React.CSSProperties => ({
+      position: 'absolute',
+      width: cornerSz, height: cornerSz,
+      ...(pos === 'tl' ? { top: -1, left: -1, borderTop: `${cornerThk}px solid ${color}`, borderLeft: `${cornerThk}px solid ${color}` } : {}),
+      ...(pos === 'tr' ? { top: -1, right: -1, borderTop: `${cornerThk}px solid ${color}`, borderRight: `${cornerThk}px solid ${color}` } : {}),
+      ...(pos === 'bl' ? { bottom: -1, left: -1, borderBottom: `${cornerThk}px solid ${color}`, borderLeft: `${cornerThk}px solid ${color}` } : {}),
+      ...(pos === 'br' ? { bottom: -1, right: -1, borderBottom: `${cornerThk}px solid ${color}`, borderRight: `${cornerThk}px solid ${color}` } : {}),
+    });
 
     return (
       <div
         key={track.global_id}
         onClick={(e) => { e.stopPropagation(); onSelectTrack(track.global_id); }}
-        title={`Click to trace ${label} across all cameras`}
+        title={`Click to view ${label}`}
         style={{
           position: 'absolute',
-          left,
-          top,
-          width,
-          height,
-          border: `2px solid ${color}`,
-          borderRadius: 3,
-          boxShadow: `0 0 10px ${color}55`,
+          left, top, width, height,
+          border: `1px solid ${color}55`,
+          background: isAuthorized ? 'rgba(34,197,94,0.04)' : 'rgba(239,68,68,0.05)',
+          borderRadius: 2,
+          boxShadow: `0 0 14px ${glow}, inset 0 0 20px ${glow}22`,
           pointerEvents: 'auto',
           cursor: 'pointer',
           zIndex: 10,
+          transition: 'box-shadow 0.15s',
         }}
         onMouseEnter={(e) => {
-          e.currentTarget.style.background = `${color}18`;
-          e.currentTarget.style.borderWidth = '3px';
+          e.currentTarget.style.boxShadow = `0 0 22px ${glow}, inset 0 0 30px ${glow}33`;
         }}
         onMouseLeave={(e) => {
-          e.currentTarget.style.background = 'transparent';
-          e.currentTarget.style.borderWidth = '2px';
+          e.currentTarget.style.boxShadow = `0 0 14px ${glow}, inset 0 0 20px ${glow}22`;
         }}
       >
-        {/* Label chip above the box */}
-        <span style={{
+        {/* Corner brackets */}
+        <div style={cornerStyle('tl')} />
+        <div style={cornerStyle('tr')} />
+        <div style={cornerStyle('bl')} />
+        <div style={cornerStyle('br')} />
+
+        {/* Name label at top */}
+        <div style={{
           position: 'absolute',
-          top: -20,
+          top: -22,
           left: 0,
-          background: color,
-          color: '#fff',
-          fontSize: 10,
-          fontWeight: 700,
-          padding: '1px 5px',
-          borderRadius: 3,
-          whiteSpace: 'nowrap',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 4,
           pointerEvents: 'none',
         }}>
-          {label}
-        </span>
-        {/* Confidence dot */}
-        {track.has_face && (
           <span style={{
-            position: 'absolute',
-            bottom: 2,
-            right: 4,
-            fontSize: 8,
-            color,
-            fontWeight: 700,
+            background: color,
+            color: '#000',
+            fontSize: 9,
+            fontWeight: 800,
+            padding: '2px 6px',
+            borderRadius: 3,
+            whiteSpace: 'nowrap',
+            letterSpacing: '0.05em',
           }}>
-            FACE
+            {label}
           </span>
+        </div>
+
+        {/* Status tag bottom-left */}
+        <div style={{
+          position: 'absolute',
+          bottom: -20,
+          left: 0,
+          pointerEvents: 'none',
+        }}>
+          <span style={{
+            background: isAuthorized ? 'rgba(34,197,94,0.15)' : 'rgba(239,68,68,0.15)',
+            border: `1px solid ${color}55`,
+            color: color,
+            fontSize: 8,
+            fontWeight: 700,
+            padding: '1px 5px',
+            borderRadius: 3,
+            whiteSpace: 'nowrap',
+            letterSpacing: '0.08em',
+          }}>
+            {statusTag}
+          </span>
+        </div>
+
+        {/* FACE indicator top-right when face detected */}
+        {track.has_face && (
+          <div style={{
+            position: 'absolute',
+            top: -22,
+            right: 0,
+            pointerEvents: 'none',
+          }}>
+            <span style={{
+              background: 'rgba(56,189,248,0.2)',
+              border: '1px solid rgba(56,189,248,0.5)',
+              color: '#38bdf8',
+              fontSize: 8,
+              fontWeight: 700,
+              padding: '1px 5px',
+              borderRadius: 3,
+              letterSpacing: '0.06em',
+            }}>
+              FACE ✓
+            </span>
+          </div>
         )}
       </div>
     );
@@ -229,7 +292,7 @@ function CameraFeedCard({ cam, selected, onClick, onSelectTrack }: {
             <Camera size={28} color="var(--amber-bright)" />
             <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--amber-bright)' }}>MAINTENANCE</span>
           </>
-        ) : selected ? (
+        ) : (
           // ── Live video + real-time detection overlay ──────────────────────
           <div style={{ position: 'relative', width: '100%', height: '100%' }}>
             <video
@@ -260,14 +323,6 @@ function CameraFeedCard({ cam, selected, onClick, onSelectTrack }: {
               {activeTracks.map(renderOverlayBox)}
             </div>
           </div>
-        ) : (
-          // ── Idle thumbnail ────────────────────────────────────────────────
-          <>
-            <Camera size={20} color="rgba(255,255,255,0.15)" />
-            <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.25)' }}>
-              CLICK TO STREAM
-            </span>
-          </>
         )}
       </div>
 
@@ -405,7 +460,7 @@ export default function LiveFeeds() {
       </div>
 
       {selectedTrackId && (
-        <PersonJourney
+        <PersonCard
           globalId={selectedTrackId}
           onClose={() => setSelectedTrackId(null)}
         />

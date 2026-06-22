@@ -21,6 +21,8 @@ import CameraManager from './components/CameraManager';
 import SettingsPage from './components/SettingsPage';
 import PersonLookupPage from './components/PersonLookupPage';
 import TrackingMap from './components/TrackingMap';
+import VideoTestPage from './components/VideoTestPage';
+import ReportsPage from './components/ReportsPage';
 import { getApiBaseUrl } from './config/runtime';
 
 function renderPage(page: string): React.ReactElement {
@@ -36,9 +38,12 @@ function renderPage(page: string): React.ReactElement {
     case 'cameras':        return <CameraManager />;
     case 'settings':       return <SettingsPage />;
     case 'person-lookup':  return <PersonLookupPage />;
+    case 'video-test':     return <VideoTestPage />;
+    case 'reports':        return <ReportsPage />;
     default:               return <Dashboard />;
   }
 }
+
 
 export default function App() {
   const { token, currentPage } = useStore();

@@ -60,6 +60,34 @@ def get_track_journey(global_id: str, db: Session = Depends(get_db)):
     )
 
 
+@router.get("/person/{person_type}/{person_id}", response_model=List[TrackResponse])
+def get_person_tracks(
+    person_type: str,
+    person_id: int,
+    db: Session = Depends(get_db),
+):
+    """Get all track segments (active or inactive) for a specific employee or visitor."""
+    if person_type == "employee":
+        return (
+            db.query(ActiveTrack)
+            .filter(ActiveTrack.matched_employee_id == person_id)
+            .order_by(ActiveTrack.last_seen.desc())
+            .all()
+        )
+    elif person_type == "visitor":
+        return (
+            db.query(ActiveTrack)
+            .filter(ActiveTrack.matched_visitor_id == person_id)
+            .order_by(ActiveTrack.last_seen.desc())
+            .all()
+        )
+    else:
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid person type. Must be 'employee' or 'visitor'."
+        )
+
+
 @router.get("/{track_id}", response_model=TrackResponse)
 def get_track(track_id: str, db: Session = Depends(get_db)):
     """Get a single track by its local ID."""

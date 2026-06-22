@@ -6,6 +6,10 @@ import time
 from typing import List, Optional
 
 ROOT_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+# In Docker container, workspace is mounted to /app/data; ROOT_DIR resolves to '/' since 'processing' was copied to '/app'
+if os.path.exists("/app/data"):
+    ROOT_DIR = "/app/data"
+
 DB_PATH = os.path.join(ROOT_DIR, "database.db")
 STATIC_CROPPED_FACES_DIR = os.path.join(ROOT_DIR, "static", "cropped_faces")
 
@@ -23,9 +27,15 @@ def init_db():
                 face_vector BLOB,
                 body_vector BLOB,
                 photo_path TEXT,
+                person_type TEXT DEFAULT 'EMPLOYEE',
                 timestamp REAL
             )
         """)
+        # Add person_type column to existing DBs (migration)
+        try:
+            conn.execute("ALTER TABLE enrolled_identities ADD COLUMN person_type TEXT DEFAULT 'EMPLOYEE'")
+        except Exception:
+            pass  # Column already exists
         
         # 2. detections logged for every frame detection, including accuracy metrics
         conn.execute("""
@@ -41,6 +51,7 @@ def init_db():
                 gender INTEGER, -- 0: Female, 1: Male
                 age INTEGER, -- estimated age
                 match_similarity REAL, -- dot product/cosine similarity score
+                detection_conf REAL, -- YOLO detection confidence (0.0–1.0)
                 timestamp REAL
             )
         """)
@@ -76,17 +87,25 @@ def log_detection(
     pose: Optional[List[float]] = None,
     gender: Optional[int] = None,
     age: Optional[int] = None,
-    match_similarity: Optional[float] = None
+    match_similarity: Optional[float] = None,
+    detection_conf: Optional[float] = None,
 ):
     """Logs a single frame detection with bounding boxes and accuracy metrics."""
     with get_db_connection() as conn:
+        # Add detection_conf column if it does not exist yet (backward compat)
+        try:
+            conn.execute("ALTER TABLE detections ADD COLUMN detection_conf REAL")
+            conn.commit()
+        except Exception:
+            pass  # Column already exists
+
         conn.execute(
             """
             INSERT INTO detections (
                 camera_id, global_id, body_bbox, face_bbox,
                 face_landmarks_2d, face_landmarks_3d, pose,
-                gender, age, match_similarity, timestamp
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                gender, age, match_similarity, detection_conf, timestamp
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 camera_id,
@@ -99,6 +118,7 @@ def log_detection(
                 gender,
                 age,
                 match_similarity,
+                detection_conf,
                 time.time()
             )
         )
@@ -108,7 +128,8 @@ def enroll_identity(
     name: str,
     face_vector: Optional[List[float]],
     body_vector: Optional[List[float]],
-    photo_path: str
+    photo_path: str,
+    person_type: str = "EMPLOYEE",
 ):
     """Enrolls or replaces an identity, saving embeddings as BLOBs."""
     face_blob = serialize_vector(face_vector)
@@ -117,10 +138,10 @@ def enroll_identity(
     with get_db_connection() as conn:
         conn.execute(
             """
-            INSERT OR REPLACE INTO enrolled_identities (name, face_vector, body_vector, photo_path, timestamp)
-            VALUES (?, ?, ?, ?, ?)
+            INSERT OR REPLACE INTO enrolled_identities (name, face_vector, body_vector, photo_path, person_type, timestamp)
+            VALUES (?, ?, ?, ?, ?, ?)
             """,
-            (name, face_blob, body_blob, photo_path, time.time())
+            (name, face_blob, body_blob, photo_path, person_type, time.time())
         )
         conn.commit()
 
@@ -128,12 +149,16 @@ def load_enrolled_identities() -> List[dict]:
     """Loads all enrolled identities, deserializing binary BLOBs."""
     identities = []
     with get_db_connection() as conn:
-        rows = conn.execute("SELECT name, face_vector, body_vector, photo_path FROM enrolled_identities").fetchall()
+        rows = conn.execute(
+            "SELECT id, name, face_vector, body_vector, photo_path, person_type FROM enrolled_identities"
+        ).fetchall()
         for row in rows:
             identities.append({
+                "id": row["id"],
                 "name": row["name"],
                 "face_vector": deserialize_vector(row["face_vector"]),
                 "body_vector": deserialize_vector(row["body_vector"]),
-                "photo_path": row["photo_path"]
+                "photo_path": row["photo_path"],
+                "person_type": row["person_type"] or "EMPLOYEE",
             })
     return identities

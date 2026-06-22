@@ -75,17 +75,57 @@ def _get_shared_instances(redis_client):
 
 
 def _load_enrolled_faces():
-    """Load visitor/employee face embeddings from the database into the matcher."""
+    """
+    Load face embeddings from two sources into the WatchlistMatcher:
+      1. database.db → enrolled_identities (primary: john, ponniyah, dinesh etc.)
+         - person_type = 'EMPLOYEE' → treated as known employee (green badge)
+         - person_type = 'VISITOR'  → treated as known visitor
+      2. backend DB → visitors / employees tables (secondary, for UI-registered people)
+
+    Anyone NOT in either registry will be classified as UNKNOWN (potential intruder).
+    """
     global _shared_watchlist_matcher
+    import utils.database_logger as db_log
+
+    visitors = []
+    employees = []
+
+    # ── Source 1: database.db enrolled_identities (real binary face vectors) ──
+    try:
+        enrolled = db_log.load_enrolled_identities()
+        for person in enrolled:
+            face_vec = person.get("face_vector")
+            if not face_vec:
+                continue
+            ptype = (person.get("person_type") or "EMPLOYEE").upper()
+            if ptype == "VISITOR":
+                visitors.append({
+                    "id": person["id"],
+                    "fullname": person["name"],
+                    "status": "WHITELISTED",
+                    "face_vector": face_vec,
+                })
+            else:
+                # EMPLOYEE or any other type → treated as whitelisted employee
+                employees.append({
+                    "id": person["id"],
+                    "fullname": person["name"],
+                    "employee_code": f"EMP-{person['id']:03d}",
+                    "face_vector": face_vec,
+                })
+        logger.info(
+            "_load_enrolled_faces: loaded %d employees + %d visitors from database.db",
+            len(employees), len(visitors)
+        )
+    except Exception as e:
+        logger.error("Failed to load from database.db enrolled_identities: %s", e)
+
+    # ── Source 2: backend DB visitors / employees (JSON-encoded embeddings) ──
     db = SessionLocal()
     try:
         from app.models.models import Visitor, Employee
 
-        # Load visitors with face embeddings
-        visitors = []
         for v in db.query(Visitor).filter(Visitor.face_embedding_id.isnot(None)).all():
-            # face_vector is stored as JSON in the face_embedding_id field
-            # In the future this would be a separate table or Milvus collection
             vec = _parse_stored_vector(v.face_embedding_id)
             if vec is not None:
                 visitors.append({
@@ -95,8 +135,6 @@ def _load_enrolled_faces():
                     "face_vector": vec,
                 })
 
-        # Load employees with face embeddings
-        employees = []
         for e in db.query(Employee).filter(Employee.face_embedding_id.isnot(None)).all():
             vec = _parse_stored_vector(e.face_embedding_id)
             if vec is not None:
@@ -107,12 +145,16 @@ def _load_enrolled_faces():
                     "face_vector": vec,
                 })
 
-        _shared_watchlist_matcher.load_registry(visitors, employees)
-
     except Exception as e:
-        logger.error("Failed to load enrolled faces from DB: %s", e)
+        logger.error("Failed to load enrolled faces from backend DB: %s", e)
     finally:
         db.close()
+
+    _shared_watchlist_matcher.load_registry(visitors, employees)
+    logger.info(
+        "_load_enrolled_faces complete: %d employees, %d visitors in registry.",
+        len(employees), len(visitors)
+    )
 
 
 def _parse_stored_vector(embedding_id_or_json):
@@ -230,7 +272,7 @@ class CameraPipeline:
         logger.info("Starting inference pipeline on '%s' (ID: %d, Floor: %d)...",
                      self.camera_name, self.camera_id, self.floor)
 
-        input_source = 0 if self.rtsp_url.isdigit() or self.rtsp_url == "0" else self.rtsp_url
+        input_source = int(self.rtsp_url) if self.rtsp_url.isdigit() else self.rtsp_url
         cap = cv2.VideoCapture(input_source)
 
         if not cap.isOpened():
@@ -296,6 +338,9 @@ class CameraPipeline:
 
         # ── 2. Local state management ─────────────────────────────────────
         tracks = self.tracker.update(tracked_objects)
+
+        # Build a quick lookup: track_id -> detection confidence
+        conf_by_track_id = {t["track_id"]: t.get("conf", 0.0) for t in tracked_objects}
 
         for track_id, bbox in tracks:
             x1, y1, x2, y2 = bbox
@@ -443,6 +488,9 @@ class CameraPipeline:
                 "matched_via": identity["matched_via"],
                 "entry_exit": entry_exit_direction,
                 "timestamp": time.time(),
+                # ── Accuracy metrics from detection_and_recognition logic ──
+                "detection_conf": round(float(conf_by_track_id.get(track_id, 0.0)), 4),
+                "face_similarity": round(float(identity["similarity"]), 4) if identity.get("similarity") is not None else None,
             }
             self.redis_client.publish("ws_events", json.dumps(payload))
 

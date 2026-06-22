@@ -333,32 +333,94 @@ export default function VisitorsPage() {
 
               <div className="form-group">
                 <label className="form-label">Nationality</label>
-                <input className="form-input" placeholder="Country of origin" value={form.nationality}
-                  onChange={(e) => setForm({ ...form, nationality: e.target.value })} />
+                <select 
+                  className="form-select" 
+                  value={form.nationality}
+                  onChange={(e) => setForm({ ...form, nationality: e.target.value })}
+                >
+                  <option value="">Select Nationality</option>
+                  <option value="Indian">Indian</option>
+                  <option value="American">American</option>
+                  <option value="British">British</option>
+                  <option value="Singaporean">Singaporean</option>
+                  <option value="Australian">Australian</option>
+                  <option value="German">German</option>
+                  <option value="French">French</option>
+                  <option value="Japanese">Japanese</option>
+                  <option value="Canadian">Canadian</option>
+                  <option value="Other">Other</option>
+                </select>
               </div>
 
               <div className="form-group">
                 <label className="form-label">Target Location</label>
-                <input className="form-input" placeholder="e.g. Boardroom, Terminal 1" value={form.location}
-                  onChange={(e) => setForm({ ...form, location: e.target.value })} />
+                <select 
+                  className="form-select" 
+                  value={form.location}
+                  onChange={(e) => setForm({ ...form, location: e.target.value })}
+                >
+                  <option value="">Select Location</option>
+                  <option value="Reception Hall">Reception Hall</option>
+                  <option value="BIAL Canteen">BIAL Canteen</option>
+                  <option value="Control Office">Control Office</option>
+                  <option value="Server Room">Server Room</option>
+                  <option value="Boardroom">Boardroom</option>
+                  <option value="Terminal 1">Terminal 1</option>
+                  <option value="Terminal 2">Terminal 2</option>
+                  <option value="Training Area">Training Area</option>
+                  <option value="VHF Maintenance Room">VHF Maintenance Room</option>
+                  <option value="Other">Other</option>
+                </select>
               </div>
 
               <div className="form-group">
                 <label className="form-label">Department</label>
-                <input className="form-input" placeholder="e.g. Security, Operations" value={form.department}
-                  onChange={(e) => setForm({ ...form, department: e.target.value })} />
+                <select 
+                  className="form-select" 
+                  value={form.department}
+                  onChange={(e) => setForm({ ...form, department: e.target.value })}
+                >
+                  <option value="">Select Department</option>
+                  <option value="Security Operations">Security Operations</option>
+                  <option value="IT & Infrastructure">IT & Infrastructure</option>
+                  <option value="Administration">Administration</option>
+                  <option value="HR">HR</option>
+                  <option value="Finance">Finance</option>
+                  <option value="Maintenance">Maintenance</option>
+                  <option value="Vendor Management">Vendor Management</option>
+                </select>
               </div>
 
               <div className="form-group">
                 <label className="form-label">Role / Designation</label>
-                <input className="form-input" placeholder="e.g. Contractor, Inspector" value={form.role}
-                  onChange={(e) => setForm({ ...form, role: e.target.value })} />
+                <select 
+                  className="form-select" 
+                  value={form.role}
+                  onChange={(e) => setForm({ ...form, role: e.target.value })}
+                >
+                  <option value="">Select Role</option>
+                  <option value="Visitor">Visitor</option>
+                  <option value="Contractor">Contractor</option>
+                  <option value="Inspector">Inspector</option>
+                  <option value="Vendor">Vendor</option>
+                  <option value="Auditor">Auditor</option>
+                  <option value="VIP Guest">VIP Guest</option>
+                </select>
               </div>
 
               <div className="form-group">
                 <label className="form-label">Approver ID</label>
-                <input className="form-input" placeholder="e.g. EMP12345" value={form.approver_id}
-                  onChange={(e) => setForm({ ...form, approver_id: e.target.value })} />
+                <select 
+                  className="form-select" 
+                  value={form.approver_id}
+                  onChange={(e) => setForm({ ...form, approver_id: e.target.value })}
+                >
+                  <option value="">Select Approver</option>
+                  <option value="EMP-001">EMP-001 (Admin)</option>
+                  <option value="EMP-004">EMP-004 (John)</option>
+                  <option value="EMP-005">EMP-005 (Ponniyah)</option>
+                  <option value="EMP-006">EMP-006 (Dinesh)</option>
+                </select>
               </div>
 
               <div className="form-group">

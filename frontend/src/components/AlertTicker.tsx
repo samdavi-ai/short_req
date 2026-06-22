@@ -33,7 +33,10 @@ export default function AlertTicker() {
 
       {/* Scrolling track */}
       <div className="alert-ticker-track" aria-hidden="true">
-        <div className="alert-ticker-content">
+        <div
+          className="alert-ticker-content"
+          style={{ animationDuration: `${Math.max(80, Math.round(tickerText.length / 10))}s` }}
+        >
           {tickerText}
         </div>
       </div>

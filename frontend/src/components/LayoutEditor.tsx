@@ -412,11 +412,11 @@ export default function LayoutEditor() {
   const campusDragOffset = useRef({ x: 0, y: 0 });
 
   // Site/Building/Floor management
-  const isDemo = false;
-  const currentSites = storeSites;
-  const currentSiteId = activeSiteId;
-  const currentBuildings = storeBuildings;
-  const currentBuildingId = activeBuildingId;
+  const isDemo = !token || token === 'demo-token';
+  const currentSites = isDemo ? DEMO_SITES : storeSites;
+  const currentSiteId = isDemo ? -1 : activeSiteId;
+  const currentBuildings = isDemo ? DEMO_BUILDINGS : storeBuildings;
+  const currentBuildingId = isDemo ? (activeBuildingId ?? -1) : activeBuildingId;
   const activeBuilding = currentBuildings.find(b => b.id === currentBuildingId);
   const activeFloors = activeBuilding?.floors ?? [];
   const activeFloorLabel = activeFloors.find(f => f.level === activeFloor)?.label ?? `Floor ${activeFloor}`;
@@ -431,22 +431,24 @@ export default function LayoutEditor() {
 
   // Load sites on mount
   useEffect(() => {
-    api.getSites(token || '').then(setSites).catch(() => {});
-  }, [token, setSites]);
+    if (!isDemo && token) {
+      api.getSites(token).then(setSites).catch(() => {});
+    }
+  }, [isDemo, token, setSites]);
 
   // Load buildings when site changes
   useEffect(() => {
-    if (currentSiteId) {
-      api.getBuildings(token || '', currentSiteId).then(setBuildings).catch(() => {});
+    if (!isDemo && token && currentSiteId) {
+      api.getBuildings(token, currentSiteId).then(setBuildings).catch(() => {});
     }
-  }, [token, currentSiteId, setBuildings]);
+  }, [isDemo, token, currentSiteId, setBuildings]);
 
   // Auto-select first site/building
   useEffect(() => {
-    if (currentSites.length > 0 && !activeSiteId) {
+    if (!isDemo && currentSites.length > 0 && !activeSiteId) {
       setActiveSite(currentSites[0].id);
     }
-  }, [currentSites, activeSiteId, setActiveSite]);
+  }, [isDemo, currentSites, activeSiteId, setActiveSite]);
 
   useEffect(() => {
     if (currentBuildings.length > 0 && !currentBuildingId) {
@@ -669,7 +671,7 @@ export default function LayoutEditor() {
       }
     }
     const camCovers = (cam: CamOnCanvas, px: number, py: number) => {
-      if (cam.status === 'OFFLINE' || cam.status === 'PAUSED') return false;
+      if (cam.status === 'OFFLINE') return false;
       const dx = px - cam.x;
       const dy = py - cam.y;
       const distSq = dx * dx + dy * dy;
@@ -688,7 +690,7 @@ export default function LayoutEditor() {
 
     for (let i = 0; i < adjusted.length; i++) {
       const cam = adjusted[i];
-      if (cam.status === 'OFFLINE' || cam.status === 'PAUSED') continue;
+      if (cam.status === 'OFFLINE') continue;
       const containing = zones.find((z) => isPointInPolygonShared({ x: cam.x, y: cam.y }, z.points));
       let target = { x: (bounds.left + bounds.right) / 2, y: (bounds.top + bounds.bottom) / 2 };
       if (containing) {
@@ -930,35 +932,53 @@ export default function LayoutEditor() {
       setArchElements(GF_ARCH_ACCURATE.map((el) => ({ ...el })));
     }
 
-    const floorCams = cameras
-      .filter(c => c.floor === activeFloor && ((c as any).building_id ?? null) === (currentBuildingId ?? null))
-      .map(c => ({
-      id: c.id,
-      x: c.x_coord,
-      y: c.y_coord,
-      angle: c.angle,
-      fov: c.fov || 90,
-      name: c.name,
-      status: c.status,
-      rtsp_url: c.rtsp_url,
-      location: c.location,
-      is_overhead: c.is_overhead,
-    }));
-    setPlacedCams(floorCams);
+    if (token && token !== 'demo-token') {
+      const floorCams = cameras
+        .filter(c => c.floor === activeFloor && ((c as any).building_id ?? null) === (currentBuildingId ?? null))
+        .map(c => ({
+        id: c.id,
+        x: c.x_coord,
+        y: c.y_coord,
+        angle: c.angle,
+        fov: c.fov || 90,
+        name: c.name,
+        status: c.status,
+        rtsp_url: c.rtsp_url,
+        location: c.location,
+        is_overhead: c.is_overhead,
+      }));
+      setPlacedCams(floorCams);
 
-    const floorZones = zones
-      .filter(z => z.floor === activeFloor && (z.building_id ?? null) === (currentBuildingId ?? null))
-      .map(z => ({
-      id: z.id,
-      name: z.name,
-      points: z.coordinates,
-      type: z.zone_type,
-      color: z.color || ZONE_COLORS[z.zone_type] || '#6366f1',
-      dwell_alert_seconds: z.dwell_alert_seconds,
-      is_active: z.is_active,
-    }));
-    setDrawnZones(floorZones);
-    setIsDirty(false);
+      const floorZones = zones
+        .filter(z => z.floor === activeFloor && (z.building_id ?? null) === (currentBuildingId ?? null))
+        .map(z => ({
+        id: z.id,
+        name: z.name,
+        points: z.coordinates,
+        type: z.zone_type,
+        color: z.color || ZONE_COLORS[z.zone_type] || '#6366f1',
+        dwell_alert_seconds: z.dwell_alert_seconds,
+        is_active: z.is_active,
+      }));
+      setDrawnZones(floorZones);
+      setIsDirty(false);
+    } else {
+      // Demo mode — seed accurate room zones and default CCTV cameras.
+      if (activeFloor === 0) {
+        setPlacedCams(GF_CAMERAS_DEFAULT.map(c => ({ ...c })));
+        setDrawnZones(GF_ZONES_ACCURATE.map(z => ({ ...z })));
+      } else if (activeFloor === 1) {
+        setPlacedCams(AA_CAMERAS_DEFAULT.map(c => ({ ...c })));
+        setDrawnZones(AA_ZONES_ACCURATE.map(z => ({ ...z })));
+      } else if (activeFloor === 2) {
+        setPlacedCams(FF_CAMERAS_DEFAULT.map(c => ({ ...c })));
+        setDrawnZones(FF_ZONES_ACCURATE.map(z => ({ ...z })));
+      } else {
+        setPlacedCams(GF_CAMERAS_DEFAULT.map(c => ({ ...c })));
+        setDrawnZones(GF_ZONES_ACCURATE.map(z => ({ ...z })));
+      }
+      setIsDirty(false);
+    }
     clearSelections();
   }, [activeFloor, token, cameras, zones, clearSelections, currentBuildingId]);
 
@@ -1425,7 +1445,7 @@ export default function LayoutEditor() {
           
           ctx.beginPath();
           ctx.arc(cx - camZ, cy - camZ, 4, 0, Math.PI * 2);
-          ctx.fillStyle = cam.status === 'ACTIVE' ? '#10b981' : cam.status === 'PAUSED' ? '#6b7280' : '#ef4444';
+          ctx.fillStyle = cam.status === 'ACTIVE' ? '#10b981' : '#ef4444';
           ctx.fill();
           ctx.shadowColor = ctx.fillStyle;
           ctx.shadowBlur = 12;
@@ -1592,7 +1612,7 @@ export default function LayoutEditor() {
 
       // Draw semi-transparent green cones for each active camera's FOV
       placedCams.forEach((cam) => {
-        if (cam.status === 'OFFLINE' || cam.status === 'PAUSED') return;
+        if (cam.status === 'OFFLINE') return;
         const fovRad = (cam.fov * Math.PI) / 180;
         ctx.save();
         ctx.translate(cam.x, cam.y);
@@ -1774,8 +1794,7 @@ export default function LayoutEditor() {
     if (showCamerasLayer) placedCams.forEach((cam) => {
       const isSelected = selectedCam === cam.id;
       const isOffline = cam.status === 'OFFLINE';
-      const isPaused = cam.status === 'PAUSED';
-      const color = isOffline ? '#dc2626' : isPaused ? '#6b7280' : '#0ea5e9';
+      const color = isOffline ? '#dc2626' : '#0ea5e9';
 
       // FoV cone
       const fovRad = (cam.fov * Math.PI) / 180;
@@ -2703,7 +2722,11 @@ export default function LayoutEditor() {
   // Transactional database saving pipeline
   const saveLayout = async (silentParam?: any) => {
     const silent = silentParam === true;
-    const activeToken = token || '';
+    if (!token || token === 'demo-token') {
+      if (!silent) addToast('Demo Mode: Layout changes saved locally!', 'success');
+      setIsDirty(false);
+      return;
+    }
 
     try {
       setIsSaving(true);
@@ -2715,14 +2738,14 @@ export default function LayoutEditor() {
 
       const camsToDelete = storeFloorCams.filter(c => !placedIds.has(c.id));
       for (const cam of camsToDelete) {
-        await api.deleteCamera(activeToken, cam.id);
+        await api.deleteCamera(token, cam.id);
       }
 
       const camsToAdd = placedCams.filter(c => c.id > 100000000000);
       for (const cam of camsToAdd) {
         const uniqueSuffix = `${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
         try {
-          await api.createCamera(activeToken, {
+          await api.createCamera(token, {
             name: cam.name,
             rtsp_url: cam.rtsp_url && !cam.rtsp_url.includes('stream_') 
               ? cam.rtsp_url 
@@ -2739,7 +2762,7 @@ export default function LayoutEditor() {
           });
         } catch (err: any) {
           if (err.message?.includes('409') || err.message?.includes('already exists')) {
-            await api.createCamera(activeToken, {
+            await api.createCamera(token, {
               name: cam.name,
               rtsp_url: `rtsp://127.0.0.1:8554/cam_${Date.now()}_${Math.random().toString(36).slice(2)}`,
               location: cam.location || `Floor ${activeFloor} Area`,
@@ -2760,7 +2783,7 @@ export default function LayoutEditor() {
 
       const camsToUpdate = placedCams.filter(c => c.id <= 100000000000);
       for (const cam of camsToUpdate) {
-        await api.updateCamera(activeToken, cam.id, {
+        await api.updateCamera(token, cam.id, {
           name: cam.name,
           rtsp_url: cam.rtsp_url,
           location: cam.location,
@@ -2781,7 +2804,7 @@ export default function LayoutEditor() {
 
       const zonesToDelete = storeFloorZones.filter(z => !drawnIds.has(z.id));
       for (const zone of zonesToDelete) {
-        await api.deleteZone(activeToken, zone.id);
+        await api.deleteZone(token, zone.id);
       }
 
       const zonesToAdd = drawnZones.filter(z => z.id > 100000000000);
@@ -2790,7 +2813,7 @@ export default function LayoutEditor() {
           addToast(`Zone "${z.name}" needs at least 3 points — skipped`, 'info');
           continue;
         }
-        await api.createZone(activeToken, {
+        await api.createZone(token, {
           name: z.name,
           floor: activeFloor,
           building_id: currentBuildingId ?? undefined,
@@ -2804,7 +2827,7 @@ export default function LayoutEditor() {
 
       const zonesToUpdate = drawnZones.filter(z => z.id <= 100000000000);
       for (const z of zonesToUpdate) {
-        await api.updateZone(activeToken, z.id, {
+        await api.updateZone(token, z.id, {
           name: z.name,
           building_id: currentBuildingId ?? undefined,
           coordinates: z.points,
@@ -2816,8 +2839,8 @@ export default function LayoutEditor() {
       }
 
       // 3. Refresh Global Store data
-      const updatedCams = await api.getCameras(activeToken);
-      const updatedZones = await api.getZones(activeToken);
+      const updatedCams = await api.getCameras(token);
+      const updatedZones = await api.getZones(token);
       setCameras(updatedCams);
       setZones(updatedZones);
 

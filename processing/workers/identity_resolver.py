@@ -98,6 +98,7 @@ class IdentityResolver:
             result["identity_type"] = existing_identity["identity_type"]
             result["matched_person_id"] = existing_identity["matched_person_id"]
             result["matched_name"] = existing_identity["matched_name"]
+            result["person_type"] = existing_identity.get("person_type")
             self._identity_cache[global_id] = result
             return result
 
@@ -130,6 +131,7 @@ class IdentityResolver:
                 identity_type=result["identity_type"],
                 person_id=face_match["person_id"],
                 person_name=face_match["fullname"],
+                person_type=person_type,
             )
 
             # Trigger alert for watchlist/blacklisted persons

@@ -1514,7 +1514,7 @@ h1, h2, h3, h4, h5, h6,
   display: flex;
   align-items: center;
   gap: 0;
-  animation: ticker-scroll 40s linear infinite;
+  animation: ticker-scroll 80s linear infinite;
   white-space: nowrap;
   font-family: var(--font-mono);
   font-size: 11px;
@@ -2221,5 +2221,92 @@ div[style*="var(--surface-2)"] {
 }
 .card:hover {
   background: rgba(18, 25, 48, 0.55);
+}
+
+/* ─── Camera Grid Layout ──────────────────────────────────── */
+.camera-grid {
+  display: grid;
+  gap: 12px;
+  padding: 12px;
+  width: 100%;
+}
+.camera-grid.cols-1 { grid-template-columns: 1fr; }
+.camera-grid.cols-2 { grid-template-columns: repeat(2, 1fr); }
+.camera-grid.cols-3 { grid-template-columns: repeat(3, 1fr); }
+.camera-grid.cols-4 { grid-template-columns: repeat(4, 1fr); }
+
+.camera-feed {
+  position: relative;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  aspect-ratio: 16 / 9;
+  transition: all var(--t-fast);
+}
+
+.camera-feed.selected {
+  border-color: var(--orange);
+  box-shadow: var(--orange-glow);
+  z-index: 10;
+}
+
+.camera-feed.offline {
+  opacity: 0.6;
+}
+
+.camera-feed-placeholder {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.camera-feed-overlay {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  padding: 8px 12px;
+  background: linear-gradient(to top, rgba(0,0,0,0.9) 0%, transparent 100%);
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  pointer-events: none;
+}
+
+.camera-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: #fff;
+  text-shadow: 0 1px 4px rgba(0,0,0,0.8);
+}
+
+.camera-status-indicator {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  color: rgba(255,255,255,0.9);
+}
+
+.camera-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+}
+.camera-dot.online {
+  background: var(--green);
+  box-shadow: 0 0 6px var(--green);
+}
+.camera-dot.offline {
+  background: var(--red);
+  box-shadow: 0 0 6px var(--red);
 }
 

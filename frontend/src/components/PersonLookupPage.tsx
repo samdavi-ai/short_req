@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { useStore, Employee, Visitor } from '../stores/appStore';
 import { resolveAssetUrl } from '../config/runtime';
+import { api } from '../hooks/api';
 
 /* ─── Types ─────────────────────────────────────────────── */
 type PersonType = 'employee' | 'visitor';
@@ -112,13 +113,10 @@ function MovChip({ label, value, color }: { label: string; value: string; color?
 }
 
 /* ── Live Camera Image Panel ── */
-function LiveImagePanel({ record, authorized, borderColor }: {
-  record: PersonRecord; authorized: boolean; borderColor: string;
+function LiveImagePanel({ record, authorized, borderColor, cameraLabel, isCurrentlyActive }: {
+  record: PersonRecord; authorized: boolean; borderColor: string; cameraLabel: string; isCurrentlyActive: boolean;
 }) {
   const photoSrc = getPhotoSrc(record.data);
-  const camLabel = record.type === 'employee'
-    ? 'CAM_02'
-    : 'CAM_03';
 
   return (
     <div style={{ width: 180, flexShrink: 0 }}>
@@ -144,15 +142,17 @@ function LiveImagePanel({ record, authorized, borderColor }: {
           );
         })}
 
-        {/* LIVE badge */}
+        {/* LIVE / OFFLINE badge */}
         <div style={{
           position: 'absolute', top: 8, left: 8, zIndex: 3,
-          background: 'var(--red)', color: '#fff', fontFamily: 'var(--font-mono)',
+          background: isCurrentlyActive ? 'var(--red)' : '#4b5563', color: '#fff', fontFamily: 'var(--font-mono)',
           fontSize: 8, fontWeight: 700, padding: '2px 5px', letterSpacing: '0.12em',
           display: 'flex', alignItems: 'center', gap: 4,
         }}>
-          <span style={{ width: 4, height: 4, borderRadius: '50%', background: '#fff', flexShrink: 0, animation: 'pulse-dot 1.2s ease-in-out infinite' }} />
-          LIVE
+          {isCurrentlyActive && (
+            <span style={{ width: 4, height: 4, borderRadius: '50%', background: '#fff', flexShrink: 0, animation: 'pulse-dot 1.2s ease-in-out infinite' }} />
+          )}
+          {isCurrentlyActive ? 'LIVE' : 'OFFLINE'}
         </div>
 
         {photoSrc ? (
@@ -176,7 +176,7 @@ function LiveImagePanel({ record, authorized, borderColor }: {
         }}>
           <Camera size={8} color="var(--text-ghost)" />
           <span style={{ fontSize: 8, fontFamily: 'var(--font-mono)', color: 'var(--text-ghost)', letterSpacing: '0.06em' }}>
-            {camLabel}
+            {cameraLabel}
           </span>
         </div>
       </div>
@@ -184,8 +184,8 @@ function LiveImagePanel({ record, authorized, borderColor }: {
       {/* Annotation labels below image */}
       <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 4 }}>
         {[
-          { label: 'Live Status', value: 'LIVE', valueColor: 'var(--red)' },
-          { label: 'Camera', value: camLabel, valueColor: 'var(--text-secondary)' },
+          { label: 'Live Status', value: isCurrentlyActive ? 'LIVE' : 'OFFLINE', valueColor: isCurrentlyActive ? 'var(--red)' : 'var(--text-ghost)' },
+          { label: 'Camera', value: cameraLabel, valueColor: 'var(--text-secondary)' },
         ].map(({ label, value, valueColor }) => (
           <div key={label} style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
             <span style={{ width: 64, flexShrink: 0, fontSize: 8, fontFamily: 'var(--font-mono)', color: 'var(--text-ghost)', textTransform: 'uppercase', letterSpacing: '0.06em', lineHeight: 1.5 }}>
@@ -225,20 +225,84 @@ function InlineDetailView({ record }: { record: PersonRecord }) {
 
   const statusColor = authorized ? 'var(--green)' : vis?.status === 'PENDING' ? 'var(--amber)' : 'var(--red)';
 
-  // Mock tracking data — in production these come from the WebSocket/track API
-  const movement = {
-    direction: 'Moving Forward',
-    speed: '24 Px/S',
+  const { token, tracks, cameras } = useStore();
+  const [history, setHistory] = useState<any[]>([]);
+
+  // Fetch track history from backend DB when person selected changes
+  useEffect(() => {
+    if (token && token !== 'demo-token') {
+      api.getPersonTracks(token, record.type, record.data.id)
+        .then(setHistory)
+        .catch(() => setHistory([]));
+    } else {
+      setHistory([]);
+    }
+  }, [record, token]);
+
+  // Find active live track in the real-time store
+  const activeTrack = useMemo(() => {
+    return Object.values(tracks).find(
+      (t) => t.matched_person_id === record.data.id && t.person_type === record.type
+    );
+  }, [tracks, record]);
+
+  const isCurrentlyActive = !!activeTrack;
+
+  // Resolve camera details
+  const targetCameraId = activeTrack ? activeTrack.camera_id : (history.length > 0 ? history[0].camera_id : null);
+  const matchedCamera = cameras.find(c => c.id === targetCameraId);
+  const cameraLabel = matchedCamera ? matchedCamera.name : (targetCameraId ? `CAM_${String(targetCameraId).padStart(2, '0')}` : 'N/A');
+  const cameraLocation = matchedCamera ? matchedCamera.location : (targetCameraId ? `Zone ${targetCameraId}` : 'N/A');
+
+  // Resolve location label
+  const locationStr = isCurrentlyActive
+    ? `${cameraLocation} (Live)`
+    : (history.length > 0 ? `${cameraLocation} (Last Seen)` : 'Not in view');
+
+  // Parse movement status
+  const movement = isCurrentlyActive ? {
+    direction: activeTrack.entry_exit || 'Tracking',
+    speed: activeTrack.detection_conf ? `${Math.round(activeTrack.detection_conf * 100)}% Conf` : 'Active',
     pose: 'Standing / Walking',
-    activity: 'Walking',
+    activity: 'In View',
+  } : {
+    direction: 'Static',
+    speed: '0 Px/S',
+    pose: 'N/A',
+    activity: 'Offline',
   };
-  const presence = {
-    dwell: '2m 14s',
-    visits: '1',
-    frequency: 'New',
-    entry: '29 May 2026, 05:42 PM',
-    lastSeen: '29 May 2026, 05:44 PM',
-  };
+
+  // Calculate stats from track segments
+  const visitCount = history.length;
+  const frequency = visitCount > 5 ? 'Frequent' : visitCount > 1 ? 'Occasional' : visitCount === 1 ? 'New' : 'Never Seen';
+
+  const dwellTimeStr = useMemo(() => {
+    if (isCurrentlyActive) return 'In Progress';
+    if (history.length === 0) return '0s';
+    let totalSeconds = 0;
+    history.forEach(segment => {
+      const start = new Date(segment.first_seen).getTime();
+      const end = new Date(segment.last_seen).getTime();
+      totalSeconds += Math.max(0, Math.round((end - start) / 1000));
+    });
+    if (totalSeconds < 60) return `${totalSeconds}s`;
+    const mins = Math.floor(totalSeconds / 60);
+    const secs = totalSeconds % 60;
+    return `${mins}m ${secs}s`;
+  }, [history, isCurrentlyActive]);
+
+  const entryTimeStr = useMemo(() => {
+    if (history.length === 0) return 'Never';
+    const oldest = history[history.length - 1]; // sorted desc, so oldest is at the end
+    return new Date(oldest.first_seen).toLocaleString();
+  }, [history]);
+
+  const lastSeenStr = useMemo(() => {
+    if (isCurrentlyActive) return 'Just now (Live)';
+    if (history.length === 0) return 'Never';
+    const newest = history[0]; // sorted desc, so newest is at the index 0
+    return new Date(newest.last_seen).toLocaleString();
+  }, [history, isCurrentlyActive]);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
@@ -274,16 +338,22 @@ function InlineDetailView({ record }: { record: PersonRecord }) {
 
         {/* COL 1 — Live image + movement */}
         <div style={{ width: 220, flexShrink: 0, borderRight: '1px solid var(--border)', padding: 16, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 14 }}>
-          <LiveImagePanel record={record} authorized={authorized} borderColor={borderColor} />
+          <LiveImagePanel
+            record={record}
+            authorized={authorized}
+            borderColor={borderColor}
+            cameraLabel={cameraLabel}
+            isCurrentlyActive={isCurrentlyActive}
+          />
 
           {/* Movement Analysis */}
           <div>
             <SectionTitle icon={Activity} label="Movement Analysis" />
             <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 8 }}>
-              <MovChip label="Direction" value={movement.direction} color="var(--orange-bright)" />
-              <MovChip label="Speed" value={movement.speed} color="var(--teal)" />
+              <MovChip label="Direction" value={movement.direction} color={isCurrentlyActive ? 'var(--orange-bright)' : 'var(--text-ghost)'} />
+              <MovChip label="Speed" value={movement.speed} color={isCurrentlyActive ? 'var(--teal)' : 'var(--text-ghost)'} />
               <MovChip label="Pose" value={movement.pose} />
-              <MovChip label="Activity" value={movement.activity} color="var(--lime)" />
+              <MovChip label="Activity" value={movement.activity} color={isCurrentlyActive ? 'var(--lime)' : 'var(--text-ghost)'} />
             </div>
           </div>
 
@@ -318,23 +388,23 @@ function InlineDetailView({ record }: { record: PersonRecord }) {
                   <InfoRow label="Employee ID" value={emp.employee_code} />
                   <InfoRow label="Name" value={emp.fullname} />
                   <InfoRow label="Gender" value="—" />
-                  <InfoRow label="Camera ID" value="CAM_02" />
+                  <InfoRow label="Camera ID" value={cameraLabel} />
                   <InfoRow label="Nationality" value="—" />
                   <InfoRow label="Department" value={emp.department} />
                   <InfoRow label="Role" value="Staff" />
                   <InfoRow label="Access Level" value={emp.is_active ? 'Level 2' : 'Suspended'} valueColor={emp.is_active ? 'var(--teal)' : 'var(--red)'} />
-                  <InfoRow label="Location" value={(emp as any).current_location || 'Building A, Floor 3'} />
+                  <InfoRow label="Location" value={locationStr} />
                   <InfoRow label="Notes" value={`${emp.department} employee. Break interval every ${emp.break_interval_minutes} min.`} />
                 </>
               ) : (
                 <>
                   <InfoRow label="Employee ID" value="N/A" />
-                  <InfoRow label="Name" value={vis!.status === 'BLACKLISTED' || vis!.status === 'WATCHLIST' ? 'Unknown' : vis!.fullname} />
+                  <InfoRow label="Name" value={vis!.status === 'BLACKLISTED' || vis!.status === 'WATCHLIST' ? 'Unknown Person' : vis!.fullname} />
                   <InfoRow label="Gender" value="Unknown" />
                   <InfoRow label="Age Range" value="Approx. 30–40" />
-                  <InfoRow label="Nationality" value={(vis! as any).nationality || 'Unknown'} />
-                  <InfoRow label="Department" value={(vis! as any).department || 'Unknown'} />
-                  <InfoRow label="Role" value={(vis! as any).role || 'Unknown'} />
+                  <InfoRow label="Nationality" value={vis!.nationality || 'Unknown'} />
+                  <InfoRow label="Department" value={vis!.department || 'Unknown'} />
+                  <InfoRow label="Role" value={vis!.role || 'Visitor'} />
                   <InfoRow label="Access Level"
                     value={
                       vis!.status === 'WHITELISTED' ? 'Level 1 — Visitor'
@@ -343,7 +413,7 @@ function InlineDetailView({ record }: { record: PersonRecord }) {
                     }
                     valueColor={authorized ? 'var(--teal)' : 'var(--red)'}
                   />
-                  <InfoRow label="Location" value={(vis! as any).current_location || vis!.location || 'Building B, Floor 1'} />
+                  <InfoRow label="Location" value={locationStr} />
                   <InfoRow label="Notes"
                     value={
                       authorized
@@ -360,11 +430,11 @@ function InlineDetailView({ record }: { record: PersonRecord }) {
           <div>
             <SectionTitle icon={Clock} label="Presence & Frequency" />
             <div style={{ marginTop: 8 }}>
-              <InfoRow label="Dwell Time" value={presence.dwell} />
-              <InfoRow label="Visits" value={presence.visits} />
-              <InfoRow label="Frequency" value={presence.frequency} />
-              <InfoRow label="Entry Time" value={presence.entry} />
-              <InfoRow label="Last Seen" value={presence.lastSeen} />
+              <InfoRow label="Dwell Time" value={dwellTimeStr} />
+              <InfoRow label="Visits" value={String(visitCount)} />
+              <InfoRow label="Frequency" value={frequency} />
+              <InfoRow label="Entry Time" value={entryTimeStr} />
+              <InfoRow label="Last Seen" value={lastSeenStr} />
             </div>
           </div>
 
@@ -376,10 +446,10 @@ function InlineDetailView({ record }: { record: PersonRecord }) {
           {/* Movement stat tiles */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
             {[
-              { label: 'Direction', value: movement.direction, color: 'var(--orange-bright)' },
-              { label: 'Speed',     value: movement.speed,     color: 'var(--teal)' },
-              { label: 'Pose',      value: movement.pose,      color: 'var(--text-primary)' },
-              { label: 'Activity',  value: movement.activity,  color: 'var(--lime)' },
+              { label: 'Direction', value: movement.direction, color: isCurrentlyActive ? 'var(--orange-bright)' : 'var(--text-ghost)' },
+              { label: 'Speed',     value: movement.speed,     color: isCurrentlyActive ? 'var(--teal)' : 'var(--text-ghost)' },
+              { label: 'Pose',      value: movement.pose,      color: isCurrentlyActive ? 'var(--text-primary)' : 'var(--text-ghost)' },
+              { label: 'Activity',  value: movement.activity,  color: isCurrentlyActive ? 'var(--lime)' : 'var(--text-ghost)' },
             ].map(({ label, value, color }) => (
               <div key={label} style={{
                 background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border)', padding: '7px 10px',
@@ -429,11 +499,11 @@ function InlineDetailView({ record }: { record: PersonRecord }) {
             <SectionTitle icon={TrendingUp} label="Presence & Frequency" />
             <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginTop: 8 }}>
               {[
-                { label: 'Dwell Time', value: presence.dwell },
-                { label: 'Visits', value: presence.visits },
-                { label: 'Frequency', value: presence.frequency },
-                { label: 'Entry Time', value: presence.entry.split(',')[0] },
-                { label: 'Last Seen', value: presence.lastSeen.split(',')[0] },
+                { label: 'Dwell Time', value: dwellTimeStr },
+                { label: 'Visits', value: String(visitCount) },
+                { label: 'Frequency', value: frequency },
+                { label: 'Entry Time', value: entryTimeStr.split(',')[0] },
+                { label: 'Last Seen', value: lastSeenStr.split(',')[0] },
               ].map(({ label, value }) => (
                 <div key={label} style={{ display: 'flex', justifyContent: 'space-between', gap: 6 }}>
                   <span style={{ fontSize: 8, fontFamily: 'var(--font-mono)', color: 'var(--text-ghost)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>

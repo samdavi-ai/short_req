@@ -467,7 +467,17 @@ function CCTVFeedLocator({ cameraId, track }: CCTVFeedLocatorProps) {
     if (width < 4 || height < 4) return null;
 
     const isDangerous = track.identity_type === 'BLACKLISTED' || track.identity_type === 'WATCHLIST_MATCH';
-    const color = isDangerous ? '#ef4444' : '#00f0ff';
+    // detect.py palette: green for normal, red for dangerous
+    const bboxColor = isDangerous ? '#ef4444' : '#00ff41';
+    const TICK = 8;
+
+    // Short label like detect.py P-1, P-2 format
+    const shortLabel = track.matched_name
+      ? track.matched_name.split(' ')[0].slice(0, 8).toUpperCase()
+      : `P-${track.track_id}`;
+
+    const confPct = track.detection_conf !== null ? Math.round((track.detection_conf ?? 0) * 100) : null;
+    const simPct  = track.face_similarity  !== null ? Math.round((track.face_similarity ?? 0) * 100) : null;
 
     return (
       <div style={{
@@ -476,41 +486,89 @@ function CCTVFeedLocator({ cameraId, track }: CCTVFeedLocatorProps) {
         top,
         width,
         height,
-        border: `2px solid ${color}`,
-        borderRadius: 2,
-        boxShadow: `0 0 10px ${color}66`,
+        background: isDangerous ? 'rgba(239,68,68,0.08)' : 'rgba(0,255,65,0.06)',
+        border: `1px solid ${bboxColor}`,
+        boxShadow: `0 0 8px ${bboxColor}44`,
         pointerEvents: 'none',
         zIndex: 5,
       }}>
-        {/* Corners */}
-        {['top-left', 'top-right', 'bottom-left', 'bottom-right'].map(pos => {
-          const [v, h] = pos.split('-');
-          return (
-            <div key={pos} style={{
-              position: 'absolute', width: 6, height: 6,
-              [v]: -2, [h]: -2,
-              [`border${v.charAt(0).toUpperCase() + v.slice(1)}`]: `3px solid ${color}`,
-              [`border${h.charAt(0).toUpperCase() + h.slice(1)}`]: `3px solid ${color}`,
-            }} />
-          );
-        })}
 
-        {/* HUD box label */}
-        <span style={{
+        {/* Corner ticks — detect.py style */}
+        <div style={{ position:'absolute', top:-1, left:-1, width:TICK, height:1, background:bboxColor }} />
+        <div style={{ position:'absolute', top:-1, left:-1, width:1, height:TICK, background:bboxColor }} />
+        <div style={{ position:'absolute', top:-1, right:-1, width:TICK, height:1, background:bboxColor }} />
+        <div style={{ position:'absolute', top:-1, right:-1, width:1, height:TICK, background:bboxColor }} />
+        <div style={{ position:'absolute', bottom:-1, left:-1, width:TICK, height:1, background:bboxColor }} />
+        <div style={{ position:'absolute', bottom:-1, left:-1, width:1, height:TICK, background:bboxColor }} />
+        <div style={{ position:'absolute', bottom:-1, right:-1, width:TICK, height:1, background:bboxColor }} />
+        <div style={{ position:'absolute', bottom:-1, right:-1, width:1, height:TICK, background:bboxColor }} />
+
+        {/* detect.py: filled label tag at BOTTOM-LEFT of bbox */}
+        <div style={{
           position: 'absolute',
-          top: -16,
+          bottom: -1,
           left: 0,
-          background: color,
-          color: '#000',
-          fontSize: 8,
-          fontWeight: 800,
-          padding: '1px 5px',
-          borderRadius: 1,
-          fontFamily: 'monospace',
-          whiteSpace: 'nowrap',
+          background: bboxColor,
+          padding: '1px 4px 1px 3px',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 3,
+          borderRadius: '0 2px 0 0',
         }}>
-          {track.matched_name ? `ID: ${track.matched_name.toUpperCase()}` : `TRACK: #${track.track_id}`}
-        </span>
+          <span style={{
+            fontFamily: 'monospace',
+            fontSize: 8,
+            fontWeight: 800,
+            color: isDangerous ? '#fff' : '#000',
+            letterSpacing: '0.04em',
+            whiteSpace: 'nowrap',
+          }}>
+            {shortLabel}
+          </span>
+          {confPct !== null && (
+            <span style={{
+              fontFamily: 'monospace',
+              fontSize: 7,
+              color: isDangerous ? 'rgba(255,255,255,0.8)' : 'rgba(0,0,0,0.65)',
+              fontWeight: 600,
+            }}>
+              {confPct}%
+            </span>
+          )}
+        </div>
+
+        {/* Face similarity badge — top-right, only when face was matched */}
+        {simPct !== null && (
+          <div style={{
+            position: 'absolute',
+            top: -1,
+            right: 0,
+            background: 'rgba(0,0,0,0.78)',
+            padding: '1px 4px',
+            borderRadius: '0 0 0 2px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 2,
+          }}>
+            <span style={{ fontSize: 7, color: '#a78bfa', fontFamily: 'monospace', fontWeight: 700 }}>FACE</span>
+            <span style={{ fontSize: 7, color: '#fff', fontFamily: 'monospace', fontWeight: 600 }}>{simPct}%</span>
+          </div>
+        )}
+
+        {/* Detection confidence bar — thin bar along the top edge */}
+        {confPct !== null && (
+          <div style={{
+            position: 'absolute', top: 0, left: 0, width: '100%', height: 2,
+            background: 'rgba(0,0,0,0.35)',
+          }}>
+            <div style={{
+              width: `${confPct}%`,
+              height: '100%',
+              background: confPct >= 70 ? '#00ff41' : confPct >= 50 ? '#f59e0b' : '#ef4444',
+              transition: 'width 0.3s ease',
+            }} />
+          </div>
+        )}
       </div>
     );
   };
@@ -1186,7 +1244,7 @@ export default function TrackingMap() {
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
             
-            {/* Target ID */}
+            {/* Target Status */}
             <div className="hud-metric-box">
               <span className="hud-metric-label">Target status</span>
               <span className="hud-metric-value" style={{ color: activeTrackData ? 'var(--green-bright)' : '#ef4444', fontSize: 11, display: 'flex', alignItems: 'center', gap: 4 }}>
@@ -1203,7 +1261,7 @@ export default function TrackingMap() {
               </span>
             </div>
 
-            {/* Target ID */}
+            {/* Global ID */}
             <div className="hud-metric-box">
               <span className="hud-metric-label">Global ID</span>
               <span className="hud-metric-value" style={{ fontFamily: 'var(--font-mono)', fontSize: 11 }}>
@@ -1211,33 +1269,88 @@ export default function TrackingMap() {
               </span>
             </div>
 
-            {/* Match Rate */}
+            {/* Detection Confidence — real value from detect.py logic */}
             <div className="hud-metric-box">
-              <span className="hud-metric-label">Gait confidence</span>
-              <span className="hud-metric-value" style={{ color: 'var(--cyan)', fontSize: 11 }}>
-                {activeTrackData ? (activeTrackData.identity_type === 'UNKNOWN' ? 'ANALYZING...' : '94.2%') : '—'}
-              </span>
+              <span className="hud-metric-label">Detection Conf.</span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <span className="hud-metric-value" style={{
+                  fontSize: 13,
+                  color: activeTrackData?.detection_conf != null
+                    ? (activeTrackData.detection_conf >= 0.7 ? '#00ff41' : activeTrackData.detection_conf >= 0.5 ? '#f59e0b' : '#ef4444')
+                    : 'var(--text-ghost)'
+                }}>
+                  {activeTrackData?.detection_conf != null ? `${Math.round(activeTrackData.detection_conf * 100)}%` : '—'}
+                </span>
+              </div>
+              {/* Confidence bar */}
+              {activeTrackData?.detection_conf != null && (
+                <div style={{ marginTop: 3, height: 3, background: 'rgba(255,255,255,0.08)', borderRadius: 2 }}>
+                  <div style={{
+                    width: `${Math.round(activeTrackData.detection_conf * 100)}%`,
+                    height: '100%',
+                    borderRadius: 2,
+                    background: activeTrackData.detection_conf >= 0.7 ? '#00ff41' : activeTrackData.detection_conf >= 0.5 ? '#f59e0b' : '#ef4444',
+                    transition: 'width 0.4s ease',
+                  }} />
+                </div>
+              )}
             </div>
 
-            {/* Height */}
+            {/* Face Similarity — real value from ArcFace matching */}
             <div className="hud-metric-box">
-              <span className="hud-metric-label">Est. Height</span>
-              <span className="hud-metric-value" style={{ fontSize: 11 }}>
-                {activeTrackData ? '1.78 m' : '—'}
-              </span>
+              <span className="hud-metric-label">Face Similarity</span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <span className="hud-metric-value" style={{
+                  fontSize: 13,
+                  color: activeTrackData?.face_similarity != null
+                    ? (activeTrackData.face_similarity >= 0.75 ? '#a78bfa' : activeTrackData.face_similarity >= 0.5 ? '#60a5fa' : 'var(--text-ghost)')
+                    : 'var(--text-ghost)'
+                }}>
+                  {activeTrackData?.face_similarity != null ? `${Math.round(activeTrackData.face_similarity * 100)}%` : activeTrackData ? 'NO FACE' : '—'}
+                </span>
+              </div>
+              {activeTrackData?.face_similarity != null && (
+                <div style={{ marginTop: 3, height: 3, background: 'rgba(255,255,255,0.08)', borderRadius: 2 }}>
+                  <div style={{
+                    width: `${Math.round(activeTrackData.face_similarity * 100)}%`,
+                    height: '100%',
+                    borderRadius: 2,
+                    background: '#a78bfa',
+                    transition: 'width 0.4s ease',
+                  }} />
+                </div>
+              )}
             </div>
 
-            {/* Speed */}
+            {/* ReID Signals — matched_via from detection_and_recognition logic */}
             <div className="hud-metric-box">
-              <span className="hud-metric-label">Walking Speed</span>
-              <span className="hud-metric-value" style={{ fontSize: 11, display: 'flex', alignItems: 'center', gap: 4 }}>
-                <Activity size={10} color="var(--text-muted)" />
-                {activeTrackData ? '1.4 m/s' : '—'}
-              </span>
+              <span className="hud-metric-label">ReID Signals</span>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3, marginTop: 2 }}>
+                {activeTrackData ? (
+                  activeTrackData.matched_via.split('+').filter(Boolean).map((sig: string) => (
+                    <span key={sig} style={{
+                      fontSize: 8,
+                      fontFamily: 'monospace',
+                      fontWeight: 700,
+                      background: sig === 'face' ? 'rgba(167,139,250,0.2)' : sig === 'body' ? 'rgba(0,240,255,0.15)' : 'rgba(34,197,94,0.15)',
+                      color: sig === 'face' ? '#a78bfa' : sig === 'body' ? '#00f0ff' : '#22c55e',
+                      border: `1px solid ${sig === 'face' ? '#a78bfa44' : sig === 'body' ? '#00f0ff44' : '#22c55e44'}`,
+                      padding: '1px 5px',
+                      borderRadius: 3,
+                      textTransform: 'uppercase',
+                    }}>
+                      {sig}
+                    </span>
+                  ))
+                ) : (
+                  <span style={{ fontSize: 10, color: 'var(--text-ghost)' }}>—</span>
+                )}
+              </div>
             </div>
 
           </div>
         </div>
+
 
         {/* Timeline Log */}
         <div style={{ display: 'flex', flexDirection: 'column', flexGrow: 1, minHeight: 0, gap: 10 }}>

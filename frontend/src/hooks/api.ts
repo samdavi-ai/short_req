@@ -35,6 +35,23 @@ export const api = {
     return res.json();
   },
 
+  changePassword: async (token: string, data: Record<string, string>) => {
+    const res = await fetch(`${BASE}/auth/change-password`, {
+      method: 'POST',
+      headers: authHeaders(token),
+      body: JSON.stringify(data),
+    });
+    await checkOk(res);
+    return res.json();
+  },
+
+  // Audit
+  getAuditLogs: async (token: string, limit: number = 50, offset: number = 0) => {
+    const res = await fetch(`${BASE}/audit/logs?limit=${limit}&offset=${offset}`, { headers: authHeaders(token) });
+    await checkOk(res);
+    return res.json();
+  },
+
   // Analytics
   getStats: async (token: string) => {
     const res = await fetch(`${BASE}/analytics/stats`, { headers: authHeaders(token) });
@@ -171,6 +188,14 @@ export const api = {
     }).then((r) => checkOk(r)).then((r) => r.json());
   },
 
+  deleteVisitor: async (token: string, id: number) => {
+    const res = await fetch(`${BASE}/visitors/${id}`, {
+      method: 'DELETE',
+      headers: authHeaders(token),
+    });
+    if (!res.ok && res.status !== 404) await checkOk(res);
+  },
+
   // Employees
   getEmployees: async (token: string) => {
     const res = await fetch(`${BASE}/employees/`, { headers: authHeaders(token) });
@@ -186,6 +211,24 @@ export const api = {
     });
     await checkOk(res);
     return res.json();
+  },
+
+  enrollEmployeeFace: (token: string, id: number, file: File) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    return fetch(`${BASE}/enrollment/face/employee/${id}`, {
+      method: 'POST',
+      headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+      body: formData,
+    }).then((r) => checkOk(r)).then((r) => r.json());
+  },
+
+  deleteEmployee: async (token: string, id: number) => {
+    const res = await fetch(`${BASE}/employees/${id}`, {
+      method: 'DELETE',
+      headers: authHeaders(token),
+    });
+    if (!res.ok && res.status !== 404) await checkOk(res);
   },
 
   getBreakCompliance: async (token: string) => {
@@ -239,6 +282,12 @@ export const api = {
   // Tracks
   getActiveTracks: async (token: string) => {
     const res = await fetch(`${BASE}/tracks/active`, { headers: authHeaders(token) });
+    await checkOk(res);
+    return res.json();
+  },
+
+  getPersonTracks: async (token: string, type: 'employee' | 'visitor', id: number) => {
+    const res = await fetch(`${BASE}/tracks/person/${type}/${id}`, { headers: authHeaders(token) });
     await checkOk(res);
     return res.json();
   },

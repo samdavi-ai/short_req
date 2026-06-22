@@ -36,7 +36,7 @@ class Settings(BaseSettings):
     # --- JWT Auth ---
     SECRET_KEY: str = _DEFAULT_SECRET
     ALGORITHM: str = "HS256"
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 1440  # 24 hours
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 480  # 8 hours
 
     ALLOWED_ORIGINS: list[str] = [
         "http://localhost:5173",

@@ -310,7 +310,7 @@ class VisitorBase(BaseModel):
     purpose: Optional[str] = None
     notes: Optional[str] = None
     status: VisitorStatus = VisitorStatus.WHITELISTED
-    requires_escort: bool = False
+    requires_escort: Optional[bool] = False
     location: Optional[str] = None
     entry_time: Optional[datetime] = None
     exit_time: Optional[datetime] = None

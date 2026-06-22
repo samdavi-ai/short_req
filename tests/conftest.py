@@ -24,7 +24,7 @@ from sqlalchemy.pool import StaticPool
 
 # Import Base and get_db AFTER env var is set
 from app.core.database import Base, get_db
-from app.api.routes import cameras, tracks, zones, visitors, employees, alerts, layouts, analytics
+from app.api.routes import cameras, tracks, zones, visitors, employees, alerts, layouts, analytics, audit
 from app.api.routes.auth import router as auth_router
 from app.api.websocket import ws_router
 
@@ -61,6 +61,7 @@ test_app.include_router(employees.router,  prefix="/employees",  tags=["Employee
 test_app.include_router(alerts.router,     prefix="/alerts",     tags=["Alerts"])
 test_app.include_router(layouts.router,    prefix="/layouts",    tags=["Layouts"])
 test_app.include_router(analytics.router,  prefix="/analytics",  tags=["Analytics"])
+test_app.include_router(audit.router,      prefix="/audit",      tags=["Audit"])
 test_app.include_router(ws_router,                               tags=["WebSockets"])
 
 # Override DB dependency for every route

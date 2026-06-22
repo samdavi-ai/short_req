@@ -14,7 +14,17 @@ RUN apt-get update && apt-get install -y \
 WORKDIR /app
 
 COPY processing/requirements.txt .
-RUN pip3 install --no-cache-dir -r requirements.txt
+RUN pip3 install --no-cache-dir --extra-index-url https://download.pytorch.org/whl/cpu -r requirements.txt
+RUN pip3 install --no-cache-dir insightface --no-deps
+
+# Copy local pre-downloaded models to bypass slow downloads during build
+COPY processing/models /root/.insightface/models
+COPY processing/checkpoints /root/.cache/torch/hub/checkpoints
+
+# Initialize FaceAnalysis, ResNet50, and MobileNetV3 to pre-warm the model caching
+RUN python3 -c "from insightface.app import FaceAnalysis; FaceAnalysis(name='buffalo_l')" \
+    && python3 -c "from torchvision.models import resnet50, ResNet50_Weights; resnet50(weights=ResNet50_Weights.IMAGENET1K_V1)" \
+    && python3 -c "from torchvision.models import mobilenet_v3_small, MobileNet_V3_Small_Weights; mobilenet_v3_small(weights=MobileNet_V3_Small_Weights.IMAGENET1K_V1)"
 
 COPY processing/ .
 COPY backend/app ./app

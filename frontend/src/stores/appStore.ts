@@ -130,6 +130,9 @@ export interface LiveTrack {
   matched_via: string;
   entry_exit: 'IN' | 'OUT' | null;
   timestamp: number;
+  // Accuracy metrics from detection_and_recognition logic
+  detection_conf: number | null;    // YOLO detection confidence 0.0–1.0
+  face_similarity: number | null;   // ArcFace cosine similarity 0.0–1.0
 }
 
 export interface AnalyticsStats {
@@ -198,14 +201,12 @@ interface AppStore {
 
 export const useStore = create<AppStore>((set) => ({
   user: null,
-  token: localStorage.getItem('token'),
+  token: null,
   setAuth: (user, token) => {
-    localStorage.setItem('token', token);
     set({ user, token });
   },
   logout: () => {
     useStore.getState().closeWebSocket();
-    localStorage.removeItem('token');
     set({ user: null, token: null, currentPage: 'login' });
   },
 
@@ -292,6 +293,9 @@ export const useStore = create<AppStore>((set) => ({
             matched_via: payload.matched_via || 'unknown',
             entry_exit: payload.entry_exit || null,
             timestamp: payload.timestamp,
+            // Accuracy metrics
+            detection_conf: payload.detection_conf ?? null,
+            face_similarity: payload.face_similarity ?? null,
           };
           set((state) => ({
             tracks: {

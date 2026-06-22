@@ -20,6 +20,7 @@
 9. [Privacy & Compliance](#privacy--compliance)
 10. [Accuracy Targets](#accuracy-targets)
 11. [Development Phases](#development-phases)
+12. [Implemented Changes & Production Fixes](#implemented-changes--production-fixes)
 
 ---
 
@@ -268,8 +269,8 @@ STEP 1: SELECT                    STEP 2: DRAG                     STEP 3: CONFI
 ZONE DRAWING MODE
 ┌──────────────────────────────────────────────────────────────┐
 │                                                              │
-│  Toolbar:  [🟩 Entry Zone] [🟥 Restricted] [🟦 Work Area]   │
-│            [🟧 Dwell Zone] [🟪 Break Area] [🟨 Public]      │
+│  Toolbar:  [🟩 Entry Zone] [🟥 Restricted] [🟦 Work Area]     │
+│            [🟧 Dwell Zone] [🟪 Break Area] [🟨 Public]        │
 │                                                              │
 │  ┌────────────────────────────────────────────────────────┐  │
 │  │                                                        │  │
@@ -286,7 +287,7 @@ ZONE DRAWING MODE
 │  │                                                        │  │
 │  └────────────────────────────────────────────────────────┘  │
 │                                                              │
-│  After finishing:                                             │
+│  After finishing:                                            │
 │  → Name the zone (auto-suggested based on nearby cameras)    │
 │  → Set zone type (dropdown with color-coded icons)           │
 │  → Set dwell threshold (simple slider: "Alert after __ min") │
@@ -321,8 +322,8 @@ ZONE DRAWING MODE
 │        │              FLOOR PLAN CANVAS                         │  PANEL    │
 │┌──────┐│     (Zoomable, Pannable, Interactive)                  │           │
 ││Roof  ││                                                        │ ┌───────┐ │
-│├──────┤│    📷──╱╲     📷──╱╲                                   │ │ Name  │ │
-││Fl. 3 ││       ╱  ╲       ╱  ╲     📹──╱╲                      │ │[     ]│ │
+│├──────┤│     📷──╱╲     📷──╱╲                                   │ │ Name  │ │
+││Fl. 3 ││       ╱  ╲       ╱  ╲     📹──╱╲                        │ │[     ]│ │
 │├──────┤│      ╱____╲     ╱____╲       ╱  ╲                     │ │       │ │
 ││Fl. 2 ││                              ╱____╲                    │ │ Type  │ │
 │├──────┤│  ┌─────────────────────┐                               │ │[Dome▼]│ │
@@ -576,7 +577,7 @@ When the system is live, the layout editor doubles as a **live monitoring map:**
 **Face Capture Strategy:**
 ```
   ┌─────────────────────────────────────────────────────────┐
-  │  OVERHEAD CAMERAS (majority)     FACE-CAPTURE CAMERAS  │
+  │  OVERHEAD CAMERAS (majority)     FACE-CAPTURE CAMERAS   │
   │  ┌───────────────────────┐       ┌───────────────────┐  │
   │  │ Track person with     │       │ Capture face at   │  │
   │  │ body + head-top ReID  │──────►│ strategic points  │  │
@@ -744,11 +745,11 @@ Before running expensive embedding comparisons, filter candidates using fast sof
                          ▼
 ┌─────────────────────────────────────────────────────────────────┐
 │                    DATA LAYER                                   │
-│  ┌──────────────┐ ┌──────────────┐ ┌─────────────────────────┐ │
-│  │ PostgreSQL   │ │ Milvus /     │ │ Redis                   │ │
-│  │ (Relational) │ │ FAISS        │ │ (Cache / Pub-Sub)       │ │
-│  │ Tracks, logs │ │ (Vectors)    │ │ Real-time state         │ │
-│  │ visitors,    │ │ Face & body  │ │ Occupancy counters      │ │
+│  ┌──────────────┐ ┌──────────────┐ ┌─────────────────────────┐  │
+│  │ PostgreSQL   │ │ Milvus /     │ │ Redis                   │  │
+│  │ (Relational) │ │ FAISS        │ │ (Cache / Pub-Sub)       │  │ 
+│  │ Tracks, logs │ │ (Vectors)    │ │ Real-time state         │  │
+│  │ visitors,    │ │ Face & body  │ │ Occupancy counters      │  │
 │  │ employees    │ │ embeddings   │ │ Active tracks           │ │
 │  └──────────────┘ └──────────────┘ └─────────────────────────┘ │
 │  ┌──────────────┐ ┌──────────────────────────────────────────┐ │
@@ -759,7 +760,6 @@ Before running expensive embedding comparisons, filter candidates using fast sof
 │  └──────────────┘ └──────────────────────────────────────────┘ │
 └─────────────────────────────────────────────────────────────────┘
 ```
-
 ---
 
 ## Technology Stack
@@ -1529,9 +1529,82 @@ make health                # check all services
 
 ---
 
-> **Document Version:** 3.0  
-> **Last Updated:** June 2026  
+## Implemented Changes & Production Fixes
+
+A set of 8 critical production readiness and real-time operations fixes have been implemented in the camera processing and tracking codebase to meet the accuracy and performance goals defined in this document.
+
+### 📋 Overview of Implemented Fixes
+
+| ID | Component | Severity | Description | Files Modified |
+|:---|:---|:---|:---|:---|
+| **1** | **GlobalTracker** | 🔴 Critical | Added camera-type-aware fusion weights & spatio-temporal constraint scoring | [global_tracker.py](file:///Users/samdavi/projects/short_req/processing/workers/global_tracker.py) |
+| **2** | **Face Cache Safety** | 🔴 Critical | Moved face tracking cache to instance-level attributes to prevent multi-camera race conditions | [face_detector.py](file:///Users/samdavi/projects/short_req/processing/workers/face_detector.py), [face_embedder.py](file:///Users/samdavi/projects/short_req/processing/workers/face_embedder.py), [camera_pipeline.py](file:///Users/samdavi/projects/short_req/processing/pipeline/camera_pipeline.py) |
+| **3** | **Overhead Detection** | 🟠 Major | Integrated camera profile loading (`is_overhead` flag) to drive automatic weight selection | [camera_pipeline.py](file:///Users/samdavi/projects/short_req/processing/pipeline/camera_pipeline.py) |
+| **4** | **Entry/Exit Counter** | 🟠 Major | Implemented directional cooldowns for bidirectional counting and zone occupancy tracking | [entry_exit_counter.py](file:///Users/samdavi/projects/short_req/processing/workers/entry_exit_counter.py) |
+| **5** | **Break DB Persistence** | 🟠 Major | Added database persistence for relaxation lounge monitoring breaks to prevent data loss on restart | [break_monitor.py](file:///Users/samdavi/projects/short_req/processing/workers/break_monitor.py) |
+| **6** | **Pipeline Resilience** | 🟡 Minor | Implemented process health checks, automated self-healing restarts, and camera offline alerts | [pipeline_manager.py](file:///Users/samdavi/projects/short_req/processing/pipeline/pipeline_manager.py) |
+| **7** | **Dwell Time Heatmap** | 🟡 Minor | Added high-frequency real-time dwell time updates to Redis for the dashboard heatmap | [intrusion_engine.py](file:///Users/samdavi/projects/short_req/processing/workers/intrusion_engine.py) |
+| **8** | **Code Hygiene** | 🟡 Minor | Cleansed the project directory of unused/duplicated code files and temporary directories | *Workspace-wide clean up* |
+
+---
+
+### 🔍 Detailed Fix Breakdown
+
+#### 1. GlobalTracker Multi-Modal Fusion & Spatio-Temporal Constraints
+* **Issue:** The fusion tracker previously used fixed weights (Face = 50%, Body = 35%, Head = 15%) across all cameras. Since 80% of airport cameras are ceiling-mounted (overhead-first design), they cannot capture faces, leading to degradation of tracking accuracy.
+* **Resolution:** Replaced fixed weights with three dynamic, camera-specific profiles loaded automatically depending on the camera's mounting type:
+  * **Overhead Profile:** Body = 50%, Head = 30%, Face = 0%, Spatial = 20%.
+  * **Face-Capture Profile:** Face = 60%, Body = 15%, Head = 10%, Spatial = 15%.
+  * **Mixed Profile:** Body = 30%, Head = 20%, Face = 30%, Spatial = 20%.
+* **Spatio-Temporal Plausibility:** Integrated physical constraints for track association (handoffs) between camera zones:
+  * Same camera, short occlusion (<5s) → score = 1.0 (highly plausible)
+  * Same floor, adjacent zone transit (15s–60s) → score = 0.8
+  * Elevator/escalator multi-floor transit (60s–90s) → score = 0.6
+  * Physically impossible transitions (different floors in <15s) → score = 0.0 (strictly suppressed)
+
+#### 2. Thread-Safe Multi-Camera Face Cache
+* **Issue:** `FaceDetector` utilized module-level global variables (`_last_faces`, `_last_person_crop_id`) to share detection data with `FaceEmbedder`. Under multi-camera parallel frame ingestion, this caused race conditions where one camera's embeddings were associated with another camera's crops.
+* **Resolution:**
+  * Moved cache storage (`_last_faces` and `_last_crop_id`) to instance-level fields of `FaceDetector`.
+  * Refactored `FaceEmbedder`'s constructor to accept a specific `FaceDetector` instance, accessing its local instance-level cache.
+  * Ensures complete data isolation for parallel execution context across all running pipelines.
+
+#### 3. Live Integration of Camera Mounting Configurations
+* **Issue:** The database contained an `is_overhead` attribute for each camera, but this flag was never loaded or propagated to the ingestion pipeline.
+* **Resolution:** Updated `CameraPipeline._load_camera_config` to query and cache the camera's `is_overhead` configuration from the PostgreSQL database, passing it down during frame matching to initialize the correct `GlobalTracker` weight profile.
+
+#### 4. Bidirectional Counting and Cooldown Controls
+* **Issue:** Tracks crossing the line were saved to a permanent `crossed_tracks` set, making it impossible to register an individual who enters a zone and then subsequently exits it.
+* **Resolution:** Replaced the static set with a directional cooldown mechanism using Redis-backed temporal tracking:
+  * Recrossing in the same direction is throttled for 3 seconds to prevent count jitter (double counts).
+  * Recrossing in the opposite direction is allowed immediately.
+  * Added `get_zone_occupancy()` to calculate net real-time occupancy.
+
+#### 5. Database Auditing for Employee Break Compliance
+* **Issue:** Break start and end times were stored only in transient memory. A restart of the processing daemon completely wiped active breaks and history.
+* **Resolution:** Integrated the PostgreSQL ORM with `BreakMonitor`. Once an employee enters and subsequently leaves a relaxation lounge zone, the system commits an `EmployeeBreak` record storing:
+  * `employee_id`
+  * `start_time` & `end_time`
+  * `duration_seconds`
+  * `compliant` (Boolean flag reflecting whether the break duration was within bounds)
+
+#### 6. Pipeline Self-Healing and Offline Alerts
+* **Issue:** Camera ingestion processes crashed silently on frame loss or RTSP disconnect, requiring manual process restart.
+* **Resolution:** Enhanced `PipelineManager` with a 10-second watchdog loop using `Process.is_alive()`.
+  * Crashed ingestion streams are automatically restarted (up to 5 retry attempts).
+  * Automatically publishes a JSON payload to the Redis `CAMERA_OFFLINE` channel to notify security operators on the frontend dashboard.
+
+#### 7. High-Frequency Heatmap Data Stream
+* **Issue:** The security dashboard heatmap was only updated when alerts were generated, lacking visual density.
+* **Resolution:** Added real-time tracker publishing inside `IntrusionEngine`. The engine now broadcasts a `DWELL_UPDATE` Redis payload every 10 seconds for all active individuals within dwell zones, allowing the UI to render real-time color-coded heatmaps.
+
+#### 8. Project Files Clean Up & Maintenance
+* **Action:** Removed redundant files, dead code, experimental scripts, and duplicate dependencies from the codebase. Ensured that only deployment-ready modules are retained under `processing/` and `backend/`.
+
+---
+
+> **Document Version:** 3.1  
+do> **Last Updated:** June 2026  
 > **Status:** Draft — Pending Review  
 > **Deployment Model:** Local Docker Compose (NVIDIA Container Toolkit for GPU)
-
 

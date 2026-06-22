@@ -354,7 +354,7 @@ class GlobalTracker:
 
     # ── Identity annotation ───────────────────────────────────────────────
 
-    def set_identity(self, global_id, identity_type, person_id=None, person_name=None):
+    def set_identity(self, global_id, identity_type, person_id=None, person_name=None, person_type=None):
         """
         Called by IdentityResolver when a track matches a registered person.
         """
@@ -363,6 +363,7 @@ class GlobalTracker:
             entry["identity_type"] = identity_type
             entry["matched_person_id"] = person_id
             entry["matched_name"] = person_name
+            entry["person_type"] = person_type
 
     def get_identity(self, global_id):
         """Return cached identity info for a global_id."""
@@ -371,6 +372,7 @@ class GlobalTracker:
             "identity_type": entry.get("identity_type", "UNKNOWN"),
             "matched_person_id": entry.get("matched_person_id"),
             "matched_name": entry.get("matched_name"),
+            "person_type": entry.get("person_type"),
             "matched_via": entry.get("matched_via", "unknown"),
         }
 

@@ -332,3 +332,18 @@ class Alert(Base):
     acknowledged_at = Column(DateTime(timezone=True))
 
     camera = relationship("Camera", back_populates="alerts")
+
+
+# ─── Audit Logs ───────────────────────────────────────────────────────────────
+
+class AuditLog(Base):
+    __tablename__ = "audit_logs"
+
+    id            = Column(Integer, primary_key=True)
+    user_id       = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    action        = Column(String(100), nullable=False) # e.g., "LOGIN", "CHANGE_PASSWORD", "CREATE_EMPLOYEE"
+    resource_type = Column(String(100)) # e.g., "User", "Employee"
+    resource_id   = Column(String(100))
+    details       = Column(JSON) # Store IP address, before/after states
+    timestamp     = Column(DateTime(timezone=True), server_default=func.now(), index=True)
+
