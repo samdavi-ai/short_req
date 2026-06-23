@@ -35,9 +35,12 @@ class WatchlistMatcher:
     REFRESH_INTERVAL = 60             # seconds between DB re-syncs
 
     def __init__(self):
+        import os
         self._registry: List[PersonRecord] = []
         self._last_refresh = 0.0
-        logger.info("WatchlistMatcher initialized (in-memory cosine index).")
+        # Load from environment variable or default to 0.65
+        self.FACE_MATCH_THRESHOLD = float(os.getenv("FACE_MATCH_THRESHOLD", "0.65"))
+        logger.info(f"WatchlistMatcher initialized (in-memory cosine index). FACE_MATCH_THRESHOLD: {self.FACE_MATCH_THRESHOLD}")
 
     # ── Registry management ───────────────────────────────────────────────
 

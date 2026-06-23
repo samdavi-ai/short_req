@@ -13,18 +13,19 @@ from ultralytics import YOLO
 
 class PersonDetector:
     # Production-grade thresholds
-    CONF_THRESHOLD = 0.38   # minimum detection confidence (restored to capture moving targets)
     IOU_THRESHOLD  = 0.50   # NMS IoU for deduplication
     MIN_BOX_AREA   = 800    # reject tiny false-positive boxes (px²) (lowered to catch smaller targets)
 
     def __init__(self, model_path: str = 'yolov8s.pt', use_gpu: bool = False):
+        import os
         self.model_path = model_path
         self.use_gpu = use_gpu
         self.device = 0 if use_gpu else 'cpu'
+        self.CONF_THRESHOLD = float(os.getenv("DETECTION_THRESHOLD", "0.45"))
         
         # Load YOLOv8 model
         self.model = YOLO(model_path)
-        print(f"Initializing Ultralytics YOLOv8 human detector/tracker ✓ (Device: {self.device})")
+        print(f"Initializing Ultralytics YOLOv8 human detector/tracker ✓ (Device: {self.device}, Conf: {self.CONF_THRESHOLD})")
         
     def detect_and_track(self, frame: np.ndarray):
         """

@@ -189,13 +189,15 @@ class CameraPipeline:
         redis_url = os.getenv("REDIS_URL", "redis://localhost:6379/0")
         self.redis_client = redis.from_url(redis_url, decode_responses=True)
 
+        use_gpu = os.getenv("USE_GPU", "true").lower() == "true"
+
         # ── Per-camera workers ────────────────────────────────────────────
-        self.detector = PersonDetector()
+        self.detector = PersonDetector(use_gpu=use_gpu)
         self.tracker = SingleCameraTracker()
         self.face_detector = FaceDetector()
-        self.face_embedder = FaceEmbedder(face_detector=self.face_detector)
-        self.body_reid = BodyReIDEmbedder()
-        self.head_embedder = HeadTopEmbedder()
+        self.face_embedder = FaceEmbedder(use_gpu=use_gpu, face_detector=self.face_detector)
+        self.body_reid = BodyReIDEmbedder(use_gpu=use_gpu)
+        self.head_embedder = HeadTopEmbedder(use_gpu=use_gpu)
         self.intrusion_engine = IntrusionEngine(self.redis_client)
         self.entry_exit_counter = EntryExitCounter()
 

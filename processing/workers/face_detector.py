@@ -66,6 +66,8 @@ class FaceDetector:
             else:
                 app = get_shared_face_analysis()
                 faces = app.get(person_crop)
+                # Filter faces by a minimum detection confidence threshold to reject false positives (noise)
+                faces = [f for f in faces if getattr(f, 'det_score', 0.0) >= 0.6]
                 self._last_crop_id = crop_id
                 self._last_faces = faces
 

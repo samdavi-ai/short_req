@@ -6,13 +6,13 @@
  *
  * Integrated into sidebar as "Person Lookup" tab.
  */
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef, useReducer } from 'react';
 import {
   Search, User, UserCheck, Users, ShieldCheck, ShieldAlert,
   Camera, Activity, Clock, TrendingUp, MapPin, X, Fingerprint,
   ChevronRight, AlertTriangle,
 } from 'lucide-react';
-import { useStore, Employee, Visitor } from '../stores/appStore';
+import { useStore, Employee, Visitor, Camera as CameraType } from '../stores/appStore';
 import { resolveAssetUrl } from '../config/runtime';
 import { api } from '../hooks/api';
 
@@ -113,10 +113,247 @@ function MovChip({ label, value, color }: { label: string; value: string; color?
 }
 
 /* ── Live Camera Image Panel ── */
-function LiveImagePanel({ record, authorized, borderColor, cameraLabel, isCurrentlyActive }: {
-  record: PersonRecord; authorized: boolean; borderColor: string; cameraLabel: string; isCurrentlyActive: boolean;
+function LiveImagePanel({
+  record,
+  authorized,
+  borderColor,
+  cameraLabel,
+  isCurrentlyActive,
+  activeTrack,
+  matchedCamera,
+}: {
+  record: PersonRecord;
+  authorized: boolean;
+  borderColor: string;
+  cameraLabel: string;
+  isCurrentlyActive: boolean;
+  activeTrack?: any;
+  matchedCamera?: CameraType;
 }) {
   const photoSrc = getPhotoSrc(record.data);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+  const [videoSize, setVideoSize] = useState<{ w: number; h: number } | null>(null);
+
+  // Force re-render every 150ms so bounding boxes track in real time
+  const [, forceRender] = useReducer((n) => n + 1, 0);
+  useEffect(() => {
+    const id = setInterval(forceRender, 150);
+    return () => clearInterval(id);
+  }, []);
+
+  const videoSrc = useMemo(() => {
+    if (!matchedCamera) return null;
+    if (matchedCamera.rtsp_url === '0' || matchedCamera.rtsp_url === '1' || (matchedCamera.rtsp_url && /^\d+$/.test(matchedCamera.rtsp_url))) {
+      return null;
+    }
+    if (matchedCamera.rtsp_url && matchedCamera.rtsp_url.includes('uploads/')) {
+      const parts = matchedCamera.rtsp_url.split('/');
+      const filename = parts[parts.length - 1];
+      return resolveAssetUrl(`/uploads/${filename}`) || null;
+    }
+    if (matchedCamera.rtsp_url && matchedCamera.rtsp_url.endsWith('.mp4')) {
+      const parts = matchedCamera.rtsp_url.split('/');
+      return `/videos/${parts[parts.length - 1]}`;
+    }
+    const mapping: Record<number, string> = {
+      1:  '/videos/SS1.mp4',
+      2:  '/videos/SS2.mp4',
+      3:  '/videos/SS3.mp4',
+      4:  '/videos/test_video.mp4',
+      13: '/videos/MS1.mp4',
+      14: '/videos/MS2.mp4',
+      15: '/videos/MS3.mp4',
+    };
+    return mapping[matchedCamera.id] || null;
+  }, [matchedCamera]);
+
+  useEffect(() => {
+    const stopStream = () => {
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach((t) => t.stop());
+        streamRef.current = null;
+      }
+      if (videoRef.current) {
+        videoRef.current.srcObject = null;
+        videoRef.current.src = '';
+      }
+      setVideoSize(null);
+    };
+
+    if (!isCurrentlyActive || !matchedCamera) {
+      stopStream();
+      return;
+    }
+
+    const isOffline = matchedCamera.status === 'OFFLINE';
+    const isMaint = matchedCamera.status === 'MAINTENANCE';
+
+    if (isOffline || isMaint) {
+      stopStream();
+      return;
+    }
+
+    if (videoSrc) {
+      stopStream();
+      if (videoRef.current) {
+        videoRef.current.src = videoSrc;
+        videoRef.current.loop = true;
+        videoRef.current.play().catch((err) => console.error('Video play error:', err));
+      }
+      return;
+    }
+
+    // Fallback: webcam
+    navigator.mediaDevices
+      .getUserMedia({ video: { width: 640, height: 360 } })
+      .then((s) => {
+        stopStream();
+        streamRef.current = s;
+        if (videoRef.current) videoRef.current.srcObject = s;
+      })
+      .catch((err) => console.error('Webcam access error:', err));
+
+    return stopStream;
+  }, [isCurrentlyActive, matchedCamera, videoSrc]);
+
+  const renderOverlayBox = (track: any) => {
+    if (!videoSize || !videoRef.current) return null;
+    const vid    = videoRef.current;
+    const frameW = videoSize.w;
+    const frameH = videoSize.h;
+    const elemW  = vid.clientWidth  || 1;
+    const elemH  = vid.clientHeight || 1;
+    if (!frameW || !frameH) return null;
+
+    const vidAspect  = frameW / frameH;
+    const elemAspect = elemW  / elemH;
+    let renderW: number, renderH: number, offX: number, offY: number;
+    if (vidAspect > elemAspect) {
+      renderW = elemW;
+      renderH = elemW / vidAspect;
+      offX    = 0;
+      offY    = (elemH - renderH) / 2;
+    } else {
+      renderH = elemH;
+      renderW = elemH * vidAspect;
+      offX    = (elemW - renderW) / 2;
+      offY    = 0;
+    }
+
+    const [x1, y1, x2, y2] = track.bbox;
+    const left   = offX + (x1 / frameW) * renderW;
+    const top    = offY + (y1 / frameH) * renderH;
+    const width  = ((x2 - x1) / frameW) * renderW;
+    const height = ((y2 - y1) / frameH) * renderH;
+
+    if (width < 4 || height < 4) return null;
+
+    const isAuthorized = track.identity_type === 'KNOWN_EMPLOYEE' || track.identity_type === 'KNOWN_VISITOR';
+    const isDangerous  = track.identity_type === 'BLACKLISTED' || track.identity_type === 'WATCHLIST_MATCH';
+    const color = isAuthorized ? '#22c55e' : isDangerous ? '#ef4444' : '#ef4444';
+    const glow  = isAuthorized ? 'rgba(34,197,94,0.4)' : 'rgba(239,68,68,0.4)';
+
+    const label = isAuthorized
+      ? (track.matched_name || `Person #${track.track_id}`)
+      : `UNKNOWN #${track.track_id}`;
+
+    const statusTag = isAuthorized ? 'AUTHORIZED' : isDangerous ? track.identity_type.replace('_', ' ') : 'UNAUTHORIZED';
+    const cornerSz  = Math.min(width, height) * 0.22;
+    const cornerThk = 2;
+
+    const cornerStyle = (pos: 'tl' | 'tr' | 'bl' | 'br'): React.CSSProperties => ({
+      position: 'absolute',
+      width: cornerSz, height: cornerSz,
+      ...(pos === 'tl' ? { top: -1, left: -1, borderTop: `${cornerThk}px solid ${color}`, borderLeft: `${cornerThk}px solid ${color}` } : {}),
+      ...(pos === 'tr' ? { top: -1, right: -1, borderTop: `${cornerThk}px solid ${color}`, borderRight: `${cornerThk}px solid ${color}` } : {}),
+      ...(pos === 'bl' ? { bottom: -1, left: -1, borderBottom: `${cornerThk}px solid ${color}`, borderLeft: `${cornerThk}px solid ${color}` } : {}),
+      ...(pos === 'br' ? { bottom: -1, right: -1, borderBottom: `${cornerThk}px solid ${color}`, borderRight: `${cornerThk}px solid ${color}` } : {}),
+    });
+
+    return (
+      <div
+        style={{
+          position: 'absolute',
+          left, top, width, height,
+          border: `1px solid ${color}55`,
+          background: isAuthorized ? 'rgba(34,197,94,0.04)' : 'rgba(239,68,68,0.05)',
+          borderRadius: 2,
+          boxShadow: `0 0 14px ${glow}, inset 0 0 20px ${glow}22`,
+          pointerEvents: 'none',
+          zIndex: 10,
+        }}
+      >
+        <div style={cornerStyle('tl')} />
+        <div style={cornerStyle('tr')} />
+        <div style={cornerStyle('bl')} />
+        <div style={cornerStyle('br')} />
+
+        <div style={{
+          position: 'absolute',
+          top: -22,
+          left: 0,
+          display: 'flex',
+          alignItems: 'center',
+          gap: 4,
+        }}>
+          <span style={{
+            background: color,
+            color: '#000',
+            fontSize: 9,
+            fontWeight: 800,
+            padding: '2px 6px',
+            borderRadius: 3,
+            whiteSpace: 'nowrap',
+            letterSpacing: '0.05em',
+          }}>
+            {label}
+          </span>
+        </div>
+
+        <div style={{
+          position: 'absolute',
+          bottom: -20,
+          left: 0,
+        }}>
+          <span style={{
+            background: isAuthorized ? 'rgba(34,197,94,0.15)' : 'rgba(239,68,68,0.15)',
+            border: `1px solid ${color}55`,
+            color: color,
+            fontSize: 8,
+            fontWeight: 700,
+            padding: '1px 5px',
+            borderRadius: 3,
+            whiteSpace: 'nowrap',
+            letterSpacing: '0.08em',
+          }}>
+            {statusTag}
+          </span>
+        </div>
+
+        {track.has_face && (
+          <div style={{
+            position: 'absolute',
+            top: -22,
+            right: 0,
+          }}>
+            <span style={{
+              background: 'rgba(56,189,248,0.2)',
+              border: '1px solid rgba(56,189,248,0.5)',
+              color: '#38bdf8',
+              fontSize: 8,
+              fontWeight: 700,
+              padding: '1px 5px',
+              borderRadius: 3,
+              letterSpacing: '0.06em',
+            }}>
+              FACE ✓
+            </span>
+          </div>
+        )}
+      </div>
+    );
+  };
 
   return (
     <div style={{ width: 180, flexShrink: 0 }}>
@@ -155,7 +392,36 @@ function LiveImagePanel({ record, authorized, borderColor, cameraLabel, isCurren
           {isCurrentlyActive ? 'LIVE' : 'OFFLINE'}
         </div>
 
-        {photoSrc ? (
+        {isCurrentlyActive ? (
+          <div style={{ position: 'relative', width: '100%', height: '100%' }}>
+            <video
+              ref={videoRef}
+              autoPlay
+              playsInline
+              muted
+              style={{
+                width: '100%',
+                height: '100%',
+                objectFit: 'contain',
+                background: '#000',
+                display: 'block',
+              }}
+              onLoadedMetadata={(e) => {
+                const v = e.currentTarget;
+                setVideoSize({ w: v.videoWidth, h: v.videoHeight });
+              }}
+            />
+            <div
+              style={{
+                position: 'absolute',
+                inset: 0,
+                pointerEvents: 'none',
+              }}
+            >
+              {activeTrack && renderOverlayBox(activeTrack)}
+            </div>
+          </div>
+        ) : photoSrc ? (
           <img src={photoSrc} alt={record.data.fullname}
             style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
         ) : (
@@ -344,6 +610,8 @@ function InlineDetailView({ record }: { record: PersonRecord }) {
             borderColor={borderColor}
             cameraLabel={cameraLabel}
             isCurrentlyActive={isCurrentlyActive}
+            activeTrack={activeTrack}
+            matchedCamera={matchedCamera}
           />
 
           {/* Movement Analysis */}
