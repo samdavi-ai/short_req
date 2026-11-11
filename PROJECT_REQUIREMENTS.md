@@ -191,9 +191,9 @@ The system must operate with **high accuracy** in challenging conditions:
 │  │  │ Floor 1 │  ← Ground floor / arrivals             │       │
 │  │  │ 📷 ×31  │                                        │       │
 │  │  ├─────────┤                                        │       │
-│  │  │ Basement│  ← Parking / baggage handling          │       │
-│  │  │ 📷 ×8   │                                        │       │
-│  │  └─────────┘                                        │       │
+│  │  │ Basement│  ← Parking / baggage handling           │       │
+│  │  │ 📷 ×8   │                                         │       │
+│  │  └─────────┘                                         │       │
 │  └──────────────────────────────────────────────────────┘       │
 │                                                                 │
 │  Features:                                                      │
@@ -227,11 +227,11 @@ STEP 1: SELECT                    STEP 2: DRAG                     STEP 3: CONFI
 │ (left sidebar)   │         │                       │         │ (right panel)        │
 │                  │         │                       │         │                      │
 │ ┌──────────────┐ │         │    ┌───┐              │         │ Name: [Gate A3 Cam ] │
-│ │ 📷           │ │  DRAG   │    │📷 │  ← dropped   │         │                      │
+│ │ 📷           │ │  DRAG   │    │📷 │  ← dropped    │         │                      │
 │ │ Dome Camera  │ │ ──────► │    └───┘    here      │  CLICK  │ Type: [Dome     ▼]   │
 │ │              │ │         │         ╱  ╲          │ ──────► │                      │
 │ └──────────────┘ │         │        ╱ FoV ╲        │         │ Stream: [rtsp://... ] │
-│ ┌──────────────┐ │         │       ╱______╲       │         │                      │
+│ ┌──────────────┐ │         │       ╱______╲        │         │                      │
 │ │ 📹           │ │         │                       │         │ Height: [4.5m   ▼]   │
 │ │ PTZ Camera   │ │         │                       │         │                      │
 │ └──────────────┘ │         │                       │         │ FoV: [━━━●━━ 120°]   │
@@ -324,11 +324,11 @@ ZONE DRAWING MODE
 ││Roof  ││                                                        │ ┌───────┐ │
 │├──────┤│     📷──╱╲     📷──╱╲                                   │ │ Name  │ │
 ││Fl. 3 ││       ╱  ╲       ╱  ╲     📹──╱╲                        │ │[     ]│ │
-│├──────┤│      ╱____╲     ╱____╲       ╱  ╲                     │ │       │ │
+│├──────┤│      ╱____╲     ╱____╲        ╱  ╲                     │ │       │ │
 ││Fl. 2 ││                              ╱____╲                    │ │ Type  │ │
 │├──────┤│  ┌─────────────────────┐                               │ │[Dome▼]│ │
-││Fl. 1 ││  │ 🟧 Gate A3 Zone    │        📷──╱╲                  │ │       │ │
-││ ●    ││  │ Dwell: 15 min      │           ╱  ╲                │ │ URL   │ │
+││Fl. 1 ││  │ 🟧 Gate A3 Zone    │         📷──╱╲                  │ │       │ │
+││ ●    ││  │ Dwell: 15 min      │            ╱  ╲                │ │ URL   │ │
 │├──────┤│  └─────────────────────┘          ╱____╲               │ │[rtsp:]│ │
 ││Base  ││                                                        │ │       │ │
 │└──────┘│  🟥 Restricted  ┌──────────────────┐                   │ │ FoV   │ │
@@ -464,7 +464,7 @@ When the system is live, the layout editor doubles as a **live monitoring map:**
        │                  │          └───────┬────────┘
        ▼                  ▼                  ▼
 ┌──────────────┐   ┌──────────────┐  ┌────────────────┐
-│ Head-Top     │   │ ReID Embedding│  │ Face Embedding │
+│ Head-Top     │   │ ReID Embedding│  │ Face Embedding│
 │ Embedding    │   │ (TransReID / │  │ (ArcFace /     │
 │ 256-d vector │   │  CLIP-ReID)  │  │  AdaFace)      │
 │              │   │  2048-d vec  │  │  512-d vector  │
@@ -1607,4 +1607,6 @@ A set of 8 critical production readiness and real-time operations fixes have bee
 do> **Last Updated:** June 2026  
 > **Status:** Draft — Pending Review  
 > **Deployment Model:** Local Docker Compose (NVIDIA Container Toolkit for GPU)
+
+
 

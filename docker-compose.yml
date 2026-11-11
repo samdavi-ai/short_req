@@ -28,7 +28,8 @@ services:
       - REDIS_URL=redis://redis:6379/0
       - DATABASE_URL=postgresql://user:password@db:5432/airport_db
       # Enable GPU if available
-      - USE_CUDA=true
+      - USE_CUDA=false
+      - USE_GPU=false
     volumes:
       - ./:/app/data
     depends_on:

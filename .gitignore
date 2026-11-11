@@ -61,6 +61,9 @@ processing/models/*.pth
 assets/crops/
 assets/alerts/
 assets/visitors/
+assets/uploads/
+static/
+*.zip
 # Keep layouts directory structure but not uploaded images
 assets/layouts/*.png
 assets/layouts/*.jpg
@@ -113,9 +116,11 @@ dump.rdb
 # ─── Project Management / Office Files ──────────────────────────────
 *.xlsx
 *.xls
+*.numbers
 Project_*.csv
 Project_*.xlsx
 
 # ─── Temporary / Root Level Prototypes ──────────────────────────────
 Alpha2GroundFloor.tsx
 cc.txt
+detection_and_recognition/

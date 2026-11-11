@@ -1,0 +1,101 @@
+{
+  "script": [
+    {
+      "slide": 1,
+      "title": "Topic Title and Graphical Abstract",
+      "seconds": 35,
+      "text": "Good morning. My topic is robust multi-condition human recognition using deep learning for real-time visual systems, my approved CA1 thrust. I apply it to a concrete case: OpenVisionGuard, my existing surveillance pipeline, as the perception foundation for GRaCEmo ViRa, an autonomous robot under development. This graphical abstract summarises the idea. Solid boxes are existing, audited components: input, detection, tracking and a baseline re-identification stage. The teal box is my proposed research, robust feature learning. The amber box, robot integration, is future work."
+    },
+    {
+      "slide": 2,
+      "title": "Introduction and Research Problem",
+      "seconds": 55,
+      "text": "Robots that work among people must know who is who, and keep knowing it as people move, turn, and leave and re-enter view. That is person re-identification, and it is distinct from tracking, which only links detections within one continuous view. Appearance, however, changes with lighting, partial occlusion, pose and camera viewpoint, and a wrong identity leads to irrelevant or unsafe robot behaviour. My foundation is OpenVisionGuard, a working multi-camera pipeline. My audit found that its body re-identification uses an ImageNet ResNet-50 plus a colour histogram, with no metric learning and no public benchmark evaluation. The research problem is therefore: how can a person-recognition pipeline preserve identity under illumination, occlusion, pose and viewpoint change, while remaining fast enough for real-time robotic use?"
+    },
+    {
+      "slide": 3,
+      "title": "Existing System and Proposed Architecture",
+      "seconds": 65,
+      "text": "This slide separates what exists from what is proposed. On the left is OpenVisionGuard, as verified in my code audit. Video is decoded with OpenCV, YOLOv8s detects people, ByteTrack links them within a camera, and features are extracted: ArcFace face embeddings, a ResNet-50 plus HSV body vector of 2144 dimensions, and an overhead head-top embedder whose projection layer is untrained. A global tracker fuses these across cameras using cosine similarity and transit-time gating. The body and head-top stages are heuristic, so they are shown as partial. In the middle is my proposed contribution: replace the body re-identification stage with a learned encoder, add metric learning and occlusion-aware part weighting, and evaluate on public benchmarks. On the right is GRaCEmo ViRa: RGB-D camera, LiDAR, Jetson Orin Nano and ROS 2 Jazzy. These are design selections; integration is future work."
+    },
+    {
+      "slide": 4,
+      "title": "Research Gap and Proposed Methodology",
+      "seconds": 65,
+      "text": "The audit exposed four gaps. First, body features come from classification pre-training, not re-identification losses. Second, a colour histogram carries half of the body signature and is fragile under lighting and white-balance change. Third, three fixed stripes cannot cope with occlusion by luggage or counters. Fourth, accuracy figures in the project documents are design targets; nothing has been measured. My methodology answers these in eight steps. I prepare public datasets, apply preprocessing including photometric and occlusion augmentation, and first benchmark the existing baseline. Detection and tracking are held fixed, YOLOv8s and ByteTrack, and are only measured. The research contribution is in the re-identification stage: OSNet-AIN with triplet and supervised contrastive losses and visibility-weighted parts. Finally, I compare baseline and proposed models condition by condition, including runtime."
+    },
+    {
+      "slide": 5,
+      "title": "System Use-Case Diagram and Research Workflow",
+      "seconds": 75,
+      "text": "Two diagrams here. On the left is the system use-case diagram. The camera or sensor supplies frames. The human is the observed subject who is detected and re-identified. Within the proposed perception system, re-identification includes embedding extraction, which includes detection and tracking. GRaCEmo ViRa is an actor that would consume person identity through a ROS 2 interface; that use case is dashed amber because it is future work. The researcher configures models and runs benchmark evaluation, shown in teal as proposed. On the right is the research workflow, eight stages from problem identification to analysis and conclusion. Filled markers are established by my audit: the problem and the research gap. The baseline exists but is not yet benchmarked. Literature review, dataset selection, the proposed improvement and the evaluation are the work ahead of me."
+    },
+    {
+      "slide": 6,
+      "title": "Proposed Evaluation Matrix and Expected Contributions",
+      "seconds": 75,
+      "text": "This is the proposed evaluation framework. I stress that no experimental results exist yet; the figures in earlier project documents are design targets, not measurements. The matrix has five dimensions. Detection: precision, recall and mAP. Tracking: IDF1 and HOTA, which measure association consistency inside one camera. Person re-identification: Rank-1, Rank-5, mAP and mINP on Market-1501, MSMT17 and Occluded-DukeMTMC. Robustness: the drop in Rank-1 and mAP per condition, which directly tests my thrust. Runtime: frames per second and latency, for real-time feasibility on edge hardware. Every metric will be reported for the baseline and for each proposed variant. On the right are the expected contributions: a first measured baseline, a more robust re-identification representation, and a condition-wise and runtime analysis that informs integration. These are hypotheses to be tested, not findings."
+    },
+    {
+      "slide": 7,
+      "title": "Conclusion and References",
+      "seconds": 50,
+      "text": "To conclude. The problem is keeping a person's identity under changing illumination, occlusion, pose and viewpoint, in real time. My method is to benchmark the existing baseline, then test learned, occlusion-aware representations against it. The expected contribution is a measured baseline and a more robust re-identification stage. OpenVisionGuard is the existing, audited foundation; GRaCEmo ViRa is the target application, and integration through ROS 2 is future work, alongside edge deployment on Jetson hardware. The references are listed on the slide. Thank you; I welcome your questions."
+    }
+  ],
+  "viva": [
+    {
+      "q": "What is the difference between tracking and re-identification in your system?",
+      "a": "Tracking (ByteTrack) links detections frame to frame within one camera using motion and box overlap; it assigns a local track ID. Re-identification matches appearance embeddings to decide whether two observations, possibly in different cameras or after a long gap, are the same person. In OpenVisionGuard the GlobalTracker does this across cameras with face, body and head-top embeddings plus transit-time gating. My research targets the re-identification representation; tracking is held fixed."
+    },
+    {
+      "q": "Your project documents mention more than 95% mAP and more than 85% Rank-1. What dataset were these measured on?",
+      "a": "None. My audit found these are design targets in the requirements document, not measurements. The repository contains API tests and smoke tests on dummy inputs only. Producing the first measured baseline on public benchmarks is the first stage of the research. The audit also found that some documented models (YOLOv8l ONNX, TransReID) are 0-byte placeholder files; the running system uses YOLOv8s and a ResNet-50 plus HSV proxy."
+    },
+    {
+      "q": "Why not simply fine-tune ResNet-50 with a triplet loss instead of moving to OSNet-AIN?",
+      "a": "That is a fair and necessary comparison. I will include a ResNet-50 with metric learning as an ablation so that gains from the loss are separated from gains from the architecture. OSNet-AIN is proposed because it is small (about 2.2M parameters), captures multi-scale features, and uses instance normalisation to reduce camera-style effects, which suits edge deployment and cross-domain use [4, 5]."
+    },
+    {
+      "q": "What is novel in this work? OSNet and SupCon already exist.",
+      "a": "I do not claim a new backbone or loss. The intended contribution is an empirical, condition-wise study of how a deployed heuristic baseline and learned alternatives behave under illumination, occlusion, pose and viewpoint change, under edge-runtime constraints, with an occlusion-aware part-weighting adaptation. The first measured baseline for this system is itself a contribution. Any stronger novelty claim depends on the experimental results."
+    },
+    {
+      "q": "Public Re-ID datasets lack illumination labels. How will you test illumination robustness?",
+      "a": "I will apply controlled photometric perturbations (brightness, contrast, colour shift, shadow) to query images and report the performance drop relative to unperturbed queries. I accept this is synthetic, so it will be complemented by cross-domain tests and, later, by recorded clips from real environments. Results will be described as robustness under simulated change, not as proof of real-world lighting robustness."
+    },
+    {
+      "q": "GRaCEmo ViRa is not finished. How is this research relevant to it now?",
+      "a": "The research is on the human-perception module, which can be developed and evaluated offline on public data and recorded video independently of the robot. ViRa is the target application: its hardware is a set of design selections (Jetson Orin Nano, OAK-D Pro, LiDAR, ROS 2 Jazzy) and its integration status has not been verified. Integration is proposed future work, and I make no claim that it is complete."
+    },
+    {
+      "q": "Re-ID benchmarks use fixed surveillance cameras. A robot is moving and close to people. Is there a domain gap?",
+      "a": "Yes. Motion blur, ego-motion, close range and partial body views differ from benchmark conditions. I will address this by evaluating cross-domain transfer (for example Market-1501 to DukeMTMC-reID), by including occluded and partial-body benchmarks, and by recording ViRa-like clips when the platform allows. I list this as a limitation rather than assuming benchmark results transfer."
+    },
+    {
+      "q": "How will you demonstrate real-time feasibility?",
+      "a": "By reporting FPS and per-frame latency for each pipeline variant on the available hardware. The existing system runs on CPU by default and its TensorRT scripts are placeholders, so any edge-acceleration result will be measured only when implemented. Jetson Orin Nano measurements depend on hardware availability; until then I will report CPU/GPU figures and state them as such."
+    },
+    {
+      "q": "Why does your evaluation include both Rank-1 and mAP, and why mINP?",
+      "a": "Rank-1 shows whether the correct identity is the top match; mAP reflects the full ranking across all true matches; mINP penalises the hardest-to-find match, which matters when a robot must not lose a person. Together they describe both typical and worst-case retrieval behaviour."
+    },
+    {
+      "q": "What are the ethical and privacy implications of person recognition?",
+      "a": "Face and body recognition are sensitive biometric processing. I will use only public, published research datasets for training and evaluation, avoid storing identities beyond experimental needs, and note that any deployment would need consent, purpose limitation and compliance with applicable law such as India's Digital Personal Data Protection Act, 2023. The research aims at robustness, not at expanding surveillance capability."
+    }
+  ],
+  "refs": [
+    "K. He, X. Zhang, S. Ren, J. Sun, \"Deep Residual Learning for Image Recognition,\" CVPR, 2016.",
+    "J. Deng, J. Guo, N. Xue, S. Zafeiriou, \"ArcFace: Additive Angular Margin Loss for Deep Face Recognition,\" CVPR, 2019.",
+    "Y. Zhang et al., \"ByteTrack: Multi-Object Tracking by Associating Every Detection Box,\" ECCV, 2022.",
+    "K. Zhou, Y. Yang, A. Cavallaro, T. Xiang, \"Omni-Scale Feature Learning for Person Re-Identification,\" ICCV, 2019.",
+    "K. Zhou, Y. Yang, A. Cavallaro, T. Xiang, \"Learning Generalisable Omni-Scale Representations for Person Re-Identification,\" IEEE TPAMI, 2022.",
+    "S. He et al., \"TransReID: Transformer-based Object Re-Identification,\" ICCV, 2021.",
+    "L. Zheng et al., \"Scalable Person Re-identification: A Benchmark,\" ICCV, 2015.",
+    "L. Wei, S. Zhang, W. Gao, Q. Tian, \"Person Transfer GAN to Bridge Domain Gap for Person Re-Identification,\" CVPR, 2018.",
+    "J. Miao et al., \"Pose-Guided Feature Alignment for Occluded Person Re-Identification,\" ICCV, 2019.",
+    "J. Luiten et al., \"HOTA: A Higher Order Metric for Evaluating Multi-Object Tracking,\" IJCV, 2021.",
+    "P. Khosla et al., \"Supervised Contrastive Learning,\" NeurIPS, 2020."
+  ]
+}

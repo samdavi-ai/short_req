@@ -257,3 +257,8 @@ When running the AI processing pipeline locally without physical cameras:
 ### 4. GPU vs. CPU execution
 * On Linux machines with an NVIDIA GPU, make sure to install the **NVIDIA Container Toolkit** so that the `video_processor` container can access CUDA resources.
 * On macOS, the models run on CPU execution mode (using standard CPU execution providers in ONNX Runtime). Ensure `USE_GPU=false` is set in the environment files.
+
+
+
+
+

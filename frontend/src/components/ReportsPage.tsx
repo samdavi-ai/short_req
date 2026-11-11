@@ -54,6 +54,16 @@ export default function ReportsPage() {
     window.open(url, '_blank');
   };
 
+  const downloadVisitorsCsv = () => {
+    const url = `${getApiBaseUrl()}/audit/export/visitors?month=${month}&token=${token}`;
+    window.open(url, '_blank');
+  };
+
+  const downloadEntryExitCsv = () => {
+    const url = `${getApiBaseUrl()}/audit/export/entry_exit?month=${month}&token=${token}`;
+    window.open(url, '_blank');
+  };
+
   return (
     <div className="page-content" style={{ padding: '24px 32px', display: 'flex', flexDirection: 'column', gap: 24, overflowY: 'auto' }}>
       
@@ -98,6 +108,20 @@ export default function ReportsPage() {
             style={{ height: 36, display: 'flex', alignItems: 'center', gap: 8, padding: '0 16px' }}
           >
             <FileSpreadsheet size={16} /> Export Employee Data
+          </button>
+          <button 
+            onClick={downloadVisitorsCsv}
+            className="btn btn-secondary"
+            style={{ height: 36, display: 'flex', alignItems: 'center', gap: 8, padding: '0 16px' }}
+          >
+            <FileSpreadsheet size={16} /> Export Visitor Data
+          </button>
+          <button 
+            onClick={downloadEntryExitCsv}
+            className="btn btn-secondary"
+            style={{ height: 36, display: 'flex', alignItems: 'center', gap: 8, padding: '0 16px' }}
+          >
+            <FileSpreadsheet size={16} /> Export Entry/Exit Logs
           </button>
         </div>
       </div>
